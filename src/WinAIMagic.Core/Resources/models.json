@@ -1,0 +1,294 @@
+{
+  "models": [
+    {
+      "id": "deepseek-v4.1-flash-compact",
+      "name": "DeepSeek-V4.1-Flash Compact",
+      "family": "deepseek",
+      "summary": "748B MoE · experts 1,6 bit, attention 8 bit · 115 GB in het geheugen",
+      "vision": "deepseek-v4.1",
+      "files": [
+        {
+          "local": "deepseek-v4.1-flash-compact-00001-of-00005.gguf",
+          "size": 47781530400,
+          "sha256": "a0cb7966afd68bc35c46f78018d1fa1d2e4bcbe3c3baf39f60cd1733ed9ad7e5",
+          "url": "https://huggingface.co/peasantsmith/DeepSeek-V4.1-Flash-1017-Maya-GGUF/resolve/main/Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00001-of-00005.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-compact-00002-of-00005.gguf",
+          "size": 47775748128,
+          "sha256": "ba5afb43adfc667436ebcfbd82d25411fa2843ee7e1d877290611cd60f93cca1",
+          "url": "https://huggingface.co/peasantsmith/DeepSeek-V4.1-Flash-1017-Maya-GGUF/resolve/main/Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00002-of-00005.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-compact-00003-of-00005.gguf",
+          "size": 19784230848,
+          "sha256": "1482443bb4957c8d2f005ded365445f98558ff05c50674f9ee9a96ddabc122a4",
+          "url": "https://huggingface.co/peasantsmith/DeepSeek-V4.1-Flash-1017-Maya-GGUF/resolve/main/Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00003-of-00005.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-compact-00004-of-00005.gguf",
+          "size": 80641295472,
+          "sha256": "0d93315942c523d82f6dbc0a6e0e1751548e309f3963f96b82f92e8f9bc52e36",
+          "url": "https://huggingface.co/peasantsmith/DeepSeek-V4.1-Flash-1017-Maya-GGUF/resolve/main/Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00004-of-00005.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-compact-00005-of-00005.gguf",
+          "size": 80643503412,
+          "sha256": "39bbc8cde8b17604fed9a7ba7fc6bc9c5e72e34733657943ac049b4b9ca2d340",
+          "url": "https://huggingface.co/peasantsmith/DeepSeek-V4.1-Flash-1017-Maya-GGUF/resolve/main/Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00005-of-00005.gguf"
+        }
+      ],
+      "mtp": "none",
+      "memory": 115335661568,
+      "dense": 9167341568,
+      "speedOn32GB": "~5"
+    },
+    {
+      "id": "deepseek-v4.1-flash-q4",
+      "name": "DeepSeek-V4.1-Flash Q4",
+      "family": "deepseek",
+      "summary": "748B MoE · 4 bit, vrijwel gelijk aan het origineel · groter dan 128 GB: de meest gebruikte experts staan op de GPU, de rest komt van de SSD (~6–8 tok/s)",
+      "vision": "deepseek-v4.1",
+      "files": [
+        {
+          "local": "deepseek-v4.1-flash-q4-00001-of-00009.gguf",
+          "size": 5780589,
+          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f",
+          "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/main/UD-Q4_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q4_K_XL-00001-of-00009.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-q4-00002-of-00009.gguf",
+          "size": 48129640000,
+          "sha256": "17df217d8fc26a39f21ea40805dc6ab788c7ce8623a59a95c431051df7eafc94",
+          "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/main/UD-Q4_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q4_K_XL-00002-of-00009.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-q4-00003-of-00009.gguf",
+          "size": 48129640000,
+          "sha256": "0c8065f620a049cb437024c54ff12c314c94603a1cc683f5191be4689d6d6d3b",
+          "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/main/UD-Q4_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q4_K_XL-00003-of-00009.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-q4-00004-of-00009.gguf",
+          "size": 48129640000,
+          "sha256": "3bd8b2ebf8f51d8708a73ae0895f8d4acc7e4c983ba4e89d038492b203cc89ac",
+          "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/main/UD-Q4_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q4_K_XL-00004-of-00009.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-q4-00005-of-00009.gguf",
+          "size": 48129640000,
+          "sha256": "929054a6bbf3701765779b58c37988b6c6284a3b8413901858b59c0e95f37cc3",
+          "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/main/UD-Q4_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q4_K_XL-00005-of-00009.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-q4-00006-of-00009.gguf",
+          "size": 48129640000,
+          "sha256": "49d3de04bd6a09de786c9ef7db900eae02ee9fd391573f91a923013d7d5b24d3",
+          "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/main/UD-Q4_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q4_K_XL-00006-of-00009.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-q4-00007-of-00009.gguf",
+          "size": 48129640000,
+          "sha256": "f18feae5878dd680f1ea87ecd1d84f4fb098480298b25a3162dcbdab8dc2ca5b",
+          "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/main/UD-Q4_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q4_K_XL-00007-of-00009.gguf"
+        },
+        {
+          "local": "deepseek-v4.1-flash-q4-00008-of-00009.gguf",
+          "size": 161284798692,
+          "sha256": "5c2a5a4aa87c72cecc0fc2a8898cb2b91ab9ae5a61a5c8befe21df1b3db26179",
+          "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/main/engram/DeepSeek-V4.1-Flash-1017-engram-Q6_K.gguf_file",
+          "stamp": [
+            8,
+            9
+          ]
+        },
+        {
+          "local": "deepseek-v4.1-flash-q4-00009-of-00009.gguf",
+          "size": 9165923392,
+          "sha256": "c21ad6105a780bc2f44eb7dd41f9b1a1efb4e8ec87618f60b733bc2652bd2ffe",
+          "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/main/UD-Q4_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q4_K_XL-00009-of-00009.gguf"
+        }
+      ],
+      "mtp": "none",
+      "memory": 297943697408,
+      "dense": 9165867008,
+      "speedOn32GB": "~1,5"
+    },
+    {
+      "id": "glm-5.3-flash-compact",
+      "name": "GLM-5.3-Flash Compact",
+      "family": "glm",
+      "summary": "321B MoE · experts 2–3 bit · 109 GB in het geheugen",
+      "vision": "glm-5.3",
+      "files": [
+        {
+          "local": "glm-5.3-flash-compact-00001-of-00004.gguf",
+          "size": 9429984,
+          "sha256": "2f32eba33ebc75a715e9c85a010faac4c67542e38e8970bd961d544bfe815f9e",
+          "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/UD-Q2_K_XL/GLM-5.3-Flash-UD-Q2_K_XL-00001-of-00004.gguf"
+        },
+        {
+          "local": "glm-5.3-flash-compact-00002-of-00004.gguf",
+          "size": 49294975936,
+          "sha256": "f4a9e1ab13d5d9620f5590c9a4aba4c169e6707a1554f3be3fe3112f80a66825",
+          "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/UD-Q2_K_XL/GLM-5.3-Flash-UD-Q2_K_XL-00002-of-00004.gguf"
+        },
+        {
+          "local": "glm-5.3-flash-compact-00003-of-00004.gguf",
+          "size": 49949266048,
+          "sha256": "330a8ad76c787b3ab6df062dd30abea7aafe6a0e3d5860e8720dfa4abb2434a5",
+          "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/UD-Q2_K_XL/GLM-5.3-Flash-UD-Q2_K_XL-00003-of-00004.gguf"
+        },
+        {
+          "local": "glm-5.3-flash-compact-00004-of-00004.gguf",
+          "size": 9466399584,
+          "sha256": "5c294f42edc5d69cf00a79ab444e61f0742e9933105fc5c85f97da54dab8946f",
+          "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/UD-Q2_K_XL/GLM-5.3-Flash-UD-Q2_K_XL-00004-of-00004.gguf"
+        }
+      ],
+      "mtp": "builtin",
+      "memory": 108710552704,
+      "dense": 7053206656,
+      "speedOn32GB": "~2,6"
+    },
+    {
+      "id": "glm-5.3-flash-q4",
+      "name": "GLM-5.3-Flash Q4",
+      "family": "glm",
+      "summary": "321B MoE · 4 bit · groter dan 128 GB: de meest gebruikte experts staan op de GPU, de rest komt van de SSD (~5–6 tok/s)",
+      "vision": "glm-5.3",
+      "files": [
+        {
+          "local": "glm-5.3-flash-q4-00001-of-00006.gguf",
+          "size": 9429984,
+          "sha256": "b59c030090f012b38213bc8c4f78ce10767f2693d730d0dbcd3dc16a5f69e2bc",
+          "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/UD-Q4_K_XL/GLM-5.3-Flash-UD-Q4_K_XL-00001-of-00006.gguf"
+        },
+        {
+          "local": "glm-5.3-flash-q4-00002-of-00006.gguf",
+          "size": 49198039200,
+          "sha256": "d3ecb6ff3957a99878f9a0352676a0913748a431a9a4a1b1ffa5ade9b8947a74",
+          "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/UD-Q4_K_XL/GLM-5.3-Flash-UD-Q4_K_XL-00002-of-00006.gguf"
+        },
+        {
+          "local": "glm-5.3-flash-q4-00003-of-00006.gguf",
+          "size": 49988626304,
+          "sha256": "328073c004e7c5395b208247feed26089db247b94dd8fa4ab0f2569d86c1d770",
+          "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/UD-Q4_K_XL/GLM-5.3-Flash-UD-Q4_K_XL-00003-of-00006.gguf"
+        },
+        {
+          "local": "glm-5.3-flash-q4-00004-of-00006.gguf",
+          "size": 48700701344,
+          "sha256": "6803ab7effa6da4a0b02c9c7865952fdd6c5b2e10e53903348da369e90bd13f9",
+          "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/UD-Q4_K_XL/GLM-5.3-Flash-UD-Q4_K_XL-00004-of-00006.gguf"
+        },
+        {
+          "local": "glm-5.3-flash-q4-00005-of-00006.gguf",
+          "size": 49026026752,
+          "sha256": "852f3df9dacde3d196796f9fe738468e80c8701555ff0a8c30bc010fb8974dd8",
+          "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/UD-Q4_K_XL/GLM-5.3-Flash-UD-Q4_K_XL-00005-of-00006.gguf"
+        },
+        {
+          "local": "glm-5.3-flash-q4-00006-of-00006.gguf",
+          "size": 2784497888,
+          "sha256": "c6ba510fafc1e12cc0addbc361a329c0c592ab96980098e7e25e107d8faa983e",
+          "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/UD-Q4_K_XL/GLM-5.3-Flash-UD-Q4_K_XL-00006-of-00006.gguf"
+        }
+      ],
+      "mtp": "builtin",
+      "memory": 199697802368,
+      "dense": 9840534656,
+      "speedOn32GB": "~0,1"
+    },
+    {
+      "id": "qwen3.8-flash-next-q4",
+      "name": "Qwen3.8-Flash-Next Q4",
+      "family": "qwen",
+      "summary": "180B MoE · 6B actief · 4 bit · 83 GB in het geheugen · MTP voor sneller schrijven",
+      "vision": "qwen3.8",
+      "draft": {
+        "local": "qwen3.8-flash-next-mtp.gguf",
+        "size": 4137429120,
+        "sha256": "58a47d6a216307e9b97172d5bfdc3436a8994b632f5e436b9bb6edf8951da8d1",
+        "url": "https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/main/mtp-Qwen3.8-Flash-Next-Q8_0.gguf"
+      },
+      "files": [
+        {
+          "local": "qwen3.8-flash-next-q4-00001-of-00004.gguf",
+          "size": 10946624,
+          "sha256": "4448186216b3af4cc558bbce2c3213f01608f8f8b2e5267a9767971dd3ec8082",
+          "url": "https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/main/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf"
+        },
+        {
+          "local": "qwen3.8-flash-next-q4-00002-of-00004.gguf",
+          "size": 49859583136,
+          "sha256": "3f342f1c1580473f1ee94ddd5b28206e8c07a70fa1a366f59d1d6c922919a6c9",
+          "url": "https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/main/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00002-of-00004.gguf"
+        },
+        {
+          "local": "qwen3.8-flash-next-q4-00003-of-00004.gguf",
+          "size": 49376141504,
+          "sha256": "56758f40269cad5cd9b0d3d6fbae0f40f6d5be6de49e4ab392dbe83157d9cbd3",
+          "url": "https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/main/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00003-of-00004.gguf"
+        },
+        {
+          "local": "qwen3.8-flash-next-q4-00004-of-00004.gguf",
+          "size": 12087983520,
+          "sha256": "753bda48b98ba4f1636134a90a967de1b2d3908a236c026e464777342e53510a",
+          "url": "https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/main/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00004-of-00004.gguf"
+        }
+      ],
+      "mtp": "file",
+      "memory": 82523491840,
+      "dense": 5505584640,
+      "speedOn32GB": "2–6"
+    },
+    {
+      "id": "qwen3.6-35b-a3b-q4",
+      "name": "Qwen3.6-35B-A3B Q4",
+      "family": "qwen",
+      "summary": "35B MoE · 3B actief · 4 bit · 22 GB in het geheugen · snel, ook op een Mac met 32 GB",
+      "vision": "qwen3.6",
+      "files": [
+        {
+          "local": "qwen3.6-35b-a3b-q4.gguf",
+          "size": 22360456160,
+          "sha256": "707a55a8a4397ecde44de0c499d3e68c1ad1d240d1da65826b4949d1043f4450",
+          "url": "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
+        }
+      ],
+      "memory": 22349466112,
+      "dense": 2678180352
+    }
+  ],
+  "vision": [
+    {
+      "id": "deepseek-v4.1",
+      "local": "deepseek-v4.1-vision.gguf",
+      "size": 971004064,
+      "sha256": "dad8ad13f1d9a25757e121592d7b4f8ca83620d1172048004998b7c0b964b18e",
+      "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/main/mmproj-F16.gguf"
+    },
+    {
+      "id": "glm-5.3",
+      "local": "glm-5.3-vision.gguf",
+      "size": 1128047296,
+      "sha256": "922b809664d6a89cc1e40bfeaa63618000edc6651baf4082ce0718a784adf947",
+      "url": "https://huggingface.co/unsloth/GLM-5.3-Flash-GGUF/resolve/main/mmproj-F16.gguf"
+    },
+    {
+      "id": "qwen3.8",
+      "local": "qwen3.8-vision.gguf",
+      "size": 904004000,
+      "sha256": "1f7b7f0b984cf065c604360c29c8098362ed61b290db0ff12c6f360bb1a8a980",
+      "url": "https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/main/mmproj-F16.gguf"
+    },
+    {
+      "id": "qwen3.6",
+      "local": "qwen3.6-vision.gguf",
+      "size": 899283680,
+      "sha256": "8971ee4f331ff0a4c609374f32984b3d4e6dc086c0aa35f1d637fad1829e887f",
+      "url": "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/mmproj-F16.gguf"
+    }
+  ]
+}
