@@ -1,0 +1,1 @@
+Vendored from project upstream at commit 3a47bbe (v1.1.51). Not tracked automatically; upstream fixes are taken deliberately.

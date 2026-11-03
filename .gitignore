@@ -1,0 +1,12 @@
+# build output and fetched sources
+build/
+engine/tiered/third_party/llama.cpp/
+engine/llama.cpp/
+*.gguf
+!engine/tiered/data/*.gguf
+models/
+bin/
+obj/
+*.user
+.vs/
+dist/

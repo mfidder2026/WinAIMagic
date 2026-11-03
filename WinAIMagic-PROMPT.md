@@ -47,7 +47,18 @@ letterlijk uit de code. Wat hier niet staat maar wel in de code of tests zit, ho
 
 **Referentie-pc van de opdrachtgever:** Windows 11, één videokaart met **16 GB VRAM**, **128 GB RAM**, NVMe.
 
-> Nog invullen door de opdrachtgever: GPU-type: `____` · CPU en geheugenkanalen: `____` · NVMe-type en vrije ruimte: `____`
+> Gemeten op 2026-11-03: GPU: NVIDIA GeForce RTX 5060 Ti 16 GB, driver 610.88, aangesloten op PCIe 3.0 x8 · CPU: Intel Core
+> i9-10900K, 128 GB DDR4-2400, 2 kanalen · Modelschijf: `C:` NVMe ADATA Legend 710, 400 GB beschikbaar voor modellen. `D:` wordt
+> niet gebruikt voor modellen.
+
+**Besluiten van de opdrachtgever (2026-11-03):**
+
+- **Eerst NVIDIA.** Fase 0 en de eerste versies bouwen en meten op NVIDIA. AMD blijft in het ontwerp (§3a), maar telt als experimenteel
+  zolang er geen meting op echte hardware is.
+- **Verspreiden, niet verkopen.** De installer gaat naar meerdere pc's en collega's. De ondertekening (§12) en de licenties (§13) worden hierop beoordeeld.
+- **Modellen op deze pc:** Qwen3.6 en één GLM-5.3 Flash. De overige modellen uit de catalogus worden hier niet gemeten, tenzij er
+  ruimte bijkomt. Ze tonen dan geen snelheid (§2.4) en zijn als "niet gemeten" gemarkeerd.
+- **De modellocatie is vrij te kiezen en te wijzigen** (§10).
 
 **WinAIMagic is merkonafhankelijk en haalt het beste uit NVIDIA én AMD.** Hetzelfde installatiepakket werkt op beide. De app
 herkent de kaart bij elke start en kiest zelf de snelste backend en instellingen. Zie §3a.
@@ -345,7 +356,7 @@ Dit zijn de Windows-valkuilen die de snelheid bepalen. Ze horen in het plan én 
 
 - **Wisselbestand:** VRAM en de gepinde laag tellen allebei mee voor commit. "Door systeem beheerd" kan op een 128 GB-pc op
   8 GB blijven staan, en dan pint de engine te weinig. Upstream mat op een RTX 5090: 2,4-4,1 → 8,4-11 tok/s. Eis: **minstens VRAM + 9 GB**,
-  dus 24 GB hier (de eis op een APU staat in §3a). De knop **Stel in** vraagt via UAC om toestemming en meldt dat een herstart nodig is.
+  dus 25 GB hier (de eis op een APU staat in §3a). De knop **Stel in** vraagt via UAC om toestemming en meldt dat een herstart nodig is.
 - **VRAM-reserve:** een volle kaart faalt op Windows niet, WDDM pagineert. De snelheid zakt dan naar enkele tokens per seconde.
   Vrije-VRAM-metingen kunnen ca. 1 GB te hoog zijn. Instelling **VRAM-reserve** (standaard uit het profiel, §3a), en waarschuw als de engine `LOW` logt.
 - **RAM:** de engine pint alles behalve ca. 6 GB en de start duurt enkele minuten. Toon dat vóór het starten, en
@@ -470,6 +481,8 @@ Bron: `AppState`, `Engine/*`, `Support/*`, `Views/*`.
 
 **Modellen.** Raster van 2 kolommen, kaart met voortgangsring, badges, Download/Pauzeer, Kies, planbalk, plandetails, engine-, API- en mapkaart. Kies werkt zodra de headers binnen zijn: schrijf downloads dus **sequentieel**, zonder vooraf te reserveren.
 
+**Modellocatie.** De gebruiker kiest de map (ook op een andere schijf) op de mapkaart en in de setup, en kan die altijd wijzigen, zoals `modelFolder` op de Mac. Toon per schijf de vrije ruimte en of het een NVMe is. Een trage schijf geeft een waarschuwing, geen blokkade. Anders dan op de Mac biedt de app bij een wijziging aan om bestaande modellen **mee te verplaatsen**: alleen als er genoeg ruimte is en de engine niet draait, hervatbaar, met controle op grootte vóór het verwijderen van het origineel. Downloads, packs, het expert-profiel en de engine-config volgen de gekozen map. Staat de map niet (meer) op de pc, bijvoorbeeld een losgekoppelde schijf, dan meldt de app dat en verwijdert hij niets. De installer en het verwijderen van de app laten modellen staan.
+
 **Downloads.** Eigen `HttpClient`-downloader in plaats van het shellscript, zelfde gedrag: per bestand parallel, 10 pogingen, hervatten met Range, exacte grootte, sha256, `stamp` patchen (hash vóór het stempelen), `.ok`-sentinel, 2 s status, EMA-snelheid. Sluit de gebruiker de app tijdens een download, dan hervat die bij de volgende start. Met de hand neergezette bestanden van de juiste grootte tellen mee, zodat modellen van een Mac niet opnieuw gedownload hoeven te worden. Daarna het pack bouwen. Op NTFS: paden boven 260 tekens, en kies bij een kleine `C:` actief een andere schijf.
 
 **Vergelijken.** Procedure, lange prompt (36 notities, tijdstempel) en bewaarde velden uit `BenchmarkRunner.swift`. Toevoegen: VRAM en RAM. Grafieken en tabel als op de Mac.
@@ -509,9 +522,9 @@ Deze gevallen zijn gevonden bij het lezen van de code. Herstel ze op Windows en 
 Werk in deze volgorde. **Elke fase eindigt met een demo-rapport met metingen.** Na fase 0 stop je tot de opdrachtgever akkoord geeft.
 
 **Fase 0: bewijs op de echte pc (go/no-go).** Nog geen UI.
-1. Bouw de fork en LlamaEngine op Windows voor CUDA én HIP (Vulkan voor LlamaEngine), met de thinking-patch. Het bouwen moet voor beide lukken, ook al zit er maar één merk in de pc.
-2. Stel het wisselbestand in, draai GLM Compact 24, DeepSeek Compact en MiniMax Compact vanaf een pack.
-3. Probeer de vier Mac-bestanden uit §5 (DeepSeek Q4, GLM Compact, GLM Q4, Qwen3.8), plus Qwen3.6 via LlamaEngine.
+1. Bouw de fork en LlamaEngine op Windows voor CUDA (Vulkan en CPU voor LlamaEngine), met de thinking-patch. De HIP-build volgt later (§3, besluiten).
+2. Stel het wisselbestand in, draai GLM Compact 24 vanaf een pack. Past er meer dan één GLM op de schijf, meet dan ook de andere.
+3. Draai Qwen3.6 via LlamaEngine. De overige modellen uit §5 volgen als er ruimte is.
 4. Meet per model: schrijven en prompt lezen (zelfde methode als `BenchmarkRunner`), laadtijd, VRAM, RAM, SSD, koud en warm, voor en na kalibratie, plus één lange agentsessie op 64K.
 5. Meet het tweede model naast het zware (§7).
 6. Lever: een eerste `gpu-profiles.json` voor de aanwezige kaart, `docs/RESEARCH.md` voor Windows, definitieve catalogusvolgorde, aanbeveling, lijst met wat niet werkt, EULA-conclusie, en een voorstel als iets uit deze opdracht niet haalbaar blijkt.
@@ -526,7 +539,7 @@ Werk in deze volgorde. **Elke fase eindigt met een demo-rapport met metingen.** 
 
 **Fase 5: rest.** Vergelijken, cluster, API-kaart.
 
-**Fase 6: uitlevering.** Inno Setup-installer plus zip, sha256, licentiebestanden, schone-pc-test in een Windows-VM met GPU-passthrough of op een tweede schijf. Eigen repo `WinAIMagic` (bestaat nog niet; maak hem alleen met toestemming). Workflow als bij MacAIMagic: elke versie naar `main`, `RELEASE/` met nieuwe zip en `.sha256`, GitHub Release met tag `vX.Y.Z` en een vaste naam `WinAIMagic-Windows-x64.zip`. Modellen nooit in de repo.
+**Fase 6: uitlevering.** Inno Setup-installer plus zip, sha256, licentiebestanden, schone-pc-test in een Windows-VM met GPU-passthrough of op een tweede schijf. Eigen repo [`mfidder2026/WinAIMagic`](https://github.com/mfidder2026/WinAIMagic). Workflow als bij MacAIMagic: elke versie naar `main`, `RELEASE/` met nieuwe zip en `.sha256`, GitHub Release met tag `vX.Y.Z` en een vaste naam `WinAIMagic-Windows-x64.zip`. Modellen nooit in de repo.
 
 **Ondertekenen:** de Apple-certificaten gelden hier niet. Zonder Authenticode-certificaat waarschuwt SmartScreen. Stel een keuze voor (Azure Trusted Signing of een OV-certificaat), met kosten. Dat is een besluit van de opdrachtgever. Sla nooit certificaten of sleutels op in de repo.
 
@@ -546,7 +559,8 @@ Werk in deze volgorde. **Elke fase eindigt met een demo-rapport met metingen.** 
 - [ ] De `.docx`-uitvoer uit `sjabloon.docx` geeft nul validatorproblemen en opent in Word zonder reparatiemelding.
 - [ ] Contracttests slagen op beide engines, inclusief thinking-budget per verzoek.
 - [ ] Hetzelfde pakket herkent NVIDIA en AMD en kiest zelf de backend. `FakeGpuBackend`-tests slagen voor elk profiel, en geen merkcode buiten de GPU-laag.
-- [ ] Op de referentie-pc: elk model uit de catalogus start. Echte metingen staan in de README en op de modelkaarten.
+- [ ] Op de referentie-pc: elk model dat op de schijf staat (minimaal Qwen3.6 en één GLM-5.3 Flash) start. Echte metingen staan in de README en op de modelkaarten; de rest is gemarkeerd als "niet gemeten".
+- [ ] De modelmap is te kiezen en te wijzigen, ook met modellen erin, zonder opnieuw te downloaden.
 - [ ] Een C64-test of vergelijkbare agenttaak uit `docs/RESEARCH.md` §6 loopt van begin tot eind in een werkmap.
 - [ ] Claude Code werkt via `ANTHROPIC_BASE_URL`.
 - [ ] Schone Windows 11: installeren, model downloaden en chatten zonder iets anders te installeren dan de GPU-driver.

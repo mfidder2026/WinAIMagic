@@ -1,0 +1,14 @@
+diff --git a/src/llama-mmap.cpp b/src/llama-mmap.cpp
+index ed055a7..fab0779 100644
+--- a/src/llama-mmap.cpp
++++ b/src/llama-mmap.cpp
+@@ -925,6 +925,9 @@ void llama_upload_chunk(const llama_tensor_upload & u) {
+     static const uintptr_t page_size = sysconf(_SC_PAGESIZE);
+     const uintptr_t first = (uintptr_t) u.src / page_size * page_size;
+     posix_madvise((void *) first, (uintptr_t) u.src + u.size - first, POSIX_MADV_WILLNEED);
++#elif defined(_WIN32) && _WIN32_WINNT >= 0x602
++    WIN32_MEMORY_RANGE_ENTRY range = { (PVOID) u.src, u.size };
++    PrefetchVirtualMemory(GetCurrentProcess(), 1, &range, 0);
+ #endif
+     if (u.dst) {
+         ggml_backend_tensor_set(u.dst, u.src, u.offset, u.size);
