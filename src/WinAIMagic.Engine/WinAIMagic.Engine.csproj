@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\WinAIMagic.Core\WinAIMagic.Core.csproj" />
+    <InternalsVisibleTo Include="WinAIMagic.Engine.Tests" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,52 @@
 {
   "models": [
     {
+      "id": "glm-5.3-flash-compact-24",
+      "name": "GLM-5.3-Flash Compact 24",
+      "family": "glm",
+      "summary": "321B MoE · experts 2–3 bit, attention 4 bit · 95 GB in het geheugen · laat op kaarten tot 24 GB meer VRAM over voor experts",
+      "vision": "glm-5.3",
+      "files": [
+        {
+          "local": "glm-5.3-flash-compact-24-00001-of-00003.gguf",
+          "size": 46886573024,
+          "sha256": [
+            "8ebd5c74bcf65ece2a8699b7b6fd2b8d177f350ed252cee252fdd99b86a0138c",
+            "3dc347757686c1435eae36c4872f5c151191cc5063bc188ce699b97700aae076"
+          ],
+          "url": "https://huggingface.co/peasantsmith/GLM-5.3-Flash-Maya-GGUF/resolve/a1c2a554ea72a7e8e66cc28b3eaf5036c9313860/Maya-S24/GLM-5.3-Flash-Maya-S24-IQ2_XXS_S-00001-of-00003.gguf"
+        },
+        {
+          "local": "glm-5.3-flash-compact-24-00002-of-00003.gguf",
+          "size": 46982144736,
+          "sha256": "4bd445da3a0128a9c5b32228c924e0a622aa4a132c7a8dc9a2c207a4beea8e34",
+          "url": "https://huggingface.co/peasantsmith/GLM-5.3-Flash-Maya-GGUF/resolve/a1c2a554ea72a7e8e66cc28b3eaf5036c9313860/Maya-S24/GLM-5.3-Flash-Maya-S24-IQ2_XXS_S-00002-of-00003.gguf"
+        },
+        {
+          "local": "glm-5.3-flash-compact-24-00003-of-00003.gguf",
+          "size": 832958464,
+          "sha256": "a6fd4e88007ac49b431c7d02be34e43ab7a09224d53a0c52782327613cb41917",
+          "url": "https://huggingface.co/peasantsmith/GLM-5.3-Flash-Maya-GGUF/resolve/a1c2a554ea72a7e8e66cc28b3eaf5036c9313860/Maya-S24/GLM-5.3-Flash-Maya-S24-IQ2_XXS_S-00003-of-00003.gguf"
+        }
+      ],
+      "mtp": "builtin",
+      "memory": 94692156544,
+      "dense": 6039250048,
+      "engine": "tiered",
+      "pack": {
+        "tool": "glm"
+      },
+      "tier": {
+        "exe": "wam-glm.exe",
+        "sampling": {
+          "temperature": 1.0,
+          "top_p": 0.95
+        },
+        "llama": true,
+        "recommendMaxVramGb": 24.5
+      }
+    },
+    {
       "id": "deepseek-v4.1-flash-compact",
       "name": "DeepSeek-V4.1-Flash Compact",
       "family": "deepseek",
@@ -41,13 +87,67 @@
       "mtp": "none",
       "memory": 115335661568,
       "dense": 9167341568,
-      "speedOn32GB": "~5"
+      "engine": "tiered",
+      "pack": {
+        "tool": "deepseek"
+      },
+      "tier": {
+        "exe": "wam-ds4.exe",
+        "sampling": {
+          "temperature": 1.0,
+          "top_p": 1.0
+        },
+        "llama": true
+      }
+    },
+    {
+      "id": "minimax-m3.1-flash-compact",
+      "name": "MiniMax-M3.1-Flash Compact",
+      "family": "minimax",
+      "summary": "experts 1,6 bit · 93 GB in het geheugen · eigen licentie",
+      "files": [
+        {
+          "local": "minimax-m3.1-flash-compact-00001-of-00002.gguf",
+          "size": 47846435136,
+          "sha256": "a7ce35ed3a9059ea4d53e817e55d5a9516e31c82fb01e291b56e34be56c33e3c",
+          "url": "https://huggingface.co/peasantsmith/MiniMax-M3.1-Flash-Maya-GGUF/resolve/9d256f59f1abe27216511c82e3a8bbe4bd0930d0/Maya-XS/MiniMax-M3.1-Flash-Maya-XS-IQ1_S-00001-of-00002.gguf"
+        },
+        {
+          "local": "minimax-m3.1-flash-compact-00002-of-00002.gguf",
+          "size": 45138103520,
+          "sha256": "62a7e1db00496c87a93fc75f12748251ebeb300fd90b0534a576dfa4c3daf213",
+          "url": "https://huggingface.co/peasantsmith/MiniMax-M3.1-Flash-Maya-GGUF/resolve/9d256f59f1abe27216511c82e3a8bbe4bd0930d0/Maya-XS/MiniMax-M3.1-Flash-Maya-XS-IQ1_S-00002-of-00002.gguf"
+        }
+      ],
+      "extras": [
+        {
+          "local": "minimax-m3.1-flash-compact-indexers.bin",
+          "size": 12538080,
+          "sha256": "b68c04c2970707a1cb4c43d32efb85bbb006df7688ef98417f027593610d3a18",
+          "url": "https://huggingface.co/peasantsmith/MiniMax-M3.1-Flash-Maya-GGUF/resolve/9d256f59f1abe27216511c82e3a8bbe4bd0930d0/Maya-XS/MiniMax-M3.1-Flash-Maya-XS-maya-indexers.bin"
+        }
+      ],
+      "mtp": "none",
+      "memory": 92984538656,
+      "engine": "tiered",
+      "pack": {
+        "tool": "minimax"
+      },
+      "tier": {
+        "exe": "wam-mm3.exe",
+        "sampling": {
+          "temperature": 1.0,
+          "top_p": 0.95
+        },
+        "llama": false
+      },
+      "license": "minimax-community"
     },
     {
       "id": "deepseek-v4.1-flash-q4",
       "name": "DeepSeek-V4.1-Flash Q4",
       "family": "deepseek",
-      "summary": "748B MoE · 4 bit, vrijwel gelijk aan het origineel · groter dan 128 GB: de meest gebruikte experts staan op de GPU, de rest komt van de SSD (~6–8 tok/s)",
+      "summary": "748B MoE · 4 bit, vrijwel gelijk aan het origineel · de meest gebruikte experts staan in VRAM en RAM, de rest komt van de SSD",
       "vision": "deepseek-v4.1",
       "files": [
         {
@@ -112,7 +212,18 @@
       "mtp": "none",
       "memory": 297943697408,
       "dense": 9165867008,
-      "speedOn32GB": "~1,5"
+      "engine": "tiered",
+      "pack": {
+        "tool": "deepseek"
+      },
+      "tier": {
+        "exe": "wam-ds4.exe",
+        "sampling": {
+          "temperature": 1.0,
+          "top_p": 1.0
+        },
+        "llama": true
+      }
     },
     {
       "id": "glm-5.3-flash-compact",
@@ -149,13 +260,24 @@
       "mtp": "builtin",
       "memory": 108710552704,
       "dense": 7053206656,
-      "speedOn32GB": "~2,6"
+      "engine": "tiered",
+      "pack": {
+        "tool": "glm"
+      },
+      "tier": {
+        "exe": "wam-glm.exe",
+        "sampling": {
+          "temperature": 1.0,
+          "top_p": 0.95
+        },
+        "llama": true
+      }
     },
     {
       "id": "glm-5.3-flash-q4",
       "name": "GLM-5.3-Flash Q4",
       "family": "glm",
-      "summary": "321B MoE · 4 bit · groter dan 128 GB: de meest gebruikte experts staan op de GPU, de rest komt van de SSD (~5–6 tok/s)",
+      "summary": "321B MoE · 4 bit · de meest gebruikte experts staan in VRAM en RAM, de rest komt van de SSD",
       "vision": "glm-5.3",
       "files": [
         {
@@ -198,7 +320,18 @@
       "mtp": "builtin",
       "memory": 199697802368,
       "dense": 9840534656,
-      "speedOn32GB": "~0,1"
+      "engine": "tiered",
+      "pack": {
+        "tool": "glm"
+      },
+      "tier": {
+        "exe": "wam-glm.exe",
+        "sampling": {
+          "temperature": 1.0,
+          "top_p": 0.95
+        },
+        "llama": true
+      }
     },
     {
       "id": "qwen3.8-flash-next-q4",
@@ -241,13 +374,14 @@
       "mtp": "file",
       "memory": 82523491840,
       "dense": 5505584640,
-      "speedOn32GB": "2–6"
+      "engine": "llama",
+      "license": "qwen-community"
     },
     {
       "id": "qwen3.6-35b-a3b-q4",
       "name": "Qwen3.6-35B-A3B Q4",
       "family": "qwen",
-      "summary": "35B MoE · 3B actief · 4 bit · 22 GB in het geheugen · snel, ook op een Mac met 32 GB",
+      "summary": "35B MoE · 3B actief · 4 bit · 22 GB in het geheugen",
       "vision": "qwen3.6",
       "files": [
         {
@@ -258,7 +392,9 @@
         }
       ],
       "memory": 22349466112,
-      "dense": 2678180352
+      "dense": 2678180352,
+      "engine": "llama",
+      "license": "qwen-community"
     }
   ],
   "vision": [

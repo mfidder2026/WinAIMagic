@@ -1,0 +1,105 @@
+{
+  "_": "Start values per card, key vendor/architecture/VRAM class, from general to specific; a more specific key overrides single fields. Upstream's numbers until measured on real hardware (WinAIMagic brief 3a).",
+  "profiles": {
+    "nvidia/*/*": {
+      "backend": "cuda",
+      "engineFolder": "cuda",
+      "tiered": true,
+      "experimental": false,
+      "measured": false,
+      "vramReserveMib": 700,
+      "vramReserveDisplayMib": 1500,
+      "ramMarginGib": 6,
+      "pageFileExtraGib": 9,
+      "prefill": "auto",
+      "maxGpus": 16,
+      "env": {
+        "CUDA_DEVICE_ORDER": "PCI_BUS_ID"
+      },
+      "telemetry": "pdh+nvml-child"
+    },
+    "nvidia/pascal/*": {
+      "experimental": true
+    },
+    "amd/*/*": {
+      "backend": "hip",
+      "engineFolder": "hip",
+      "tiered": false,
+      "experimental": true,
+      "measured": false,
+      "vramReserveMib": 3072,
+      "vramReserveDisplayMib": 3072,
+      "ramMarginGib": 16,
+      "pageFileExtraGib": 9,
+      "prefill": "auto",
+      "maxGpus": 2,
+      "env": {
+        "GPU_FLUSH_ON_EXECUTION": "1",
+        "STRATA_GLM_RESERVE_MB": "3072",
+        "STRATA_GLM_RAM_HEADROOM_GB": "16"
+      },
+      "telemetry": "pdh"
+    },
+    "amd/gfx1100/*": {
+      "tiered": true
+    },
+    "amd/gfx1201/*": {
+      "tiered": true
+    },
+    "amd/gfx1151/*": {
+      "tiered": true,
+      "unified": true,
+      "ramMarginGib": 8,
+      "env": {
+        "STRATA_GLM_PREFILL_SUB": "1024",
+        "STRATA_GLM_PREFILL_MB": "4096"
+      }
+    },
+    "amd/gfx1030/*": {
+      "tiered": true,
+      "experimental": true
+    },
+    "amd/*/24": {
+      "env": {
+        "STRATA_GLM_PREFILL_SUB": "1024",
+        "STRATA_GLM_PREFILL_MB": "4096"
+      }
+    },
+    "amd/*/32+": {
+      "env": {
+        "STRATA_GLM_PREFILL_SUB": "1024",
+        "STRATA_GLM_PREFILL_MB": "4096"
+      }
+    },
+    "vulkan/*/*": {
+      "backend": "vulkan",
+      "engineFolder": "vulkan",
+      "tiered": false,
+      "experimental": false,
+      "measured": false,
+      "vramReserveMib": 700,
+      "vramReserveDisplayMib": 1500,
+      "ramMarginGib": 6,
+      "pageFileExtraGib": 9,
+      "prefill": "auto",
+      "maxGpus": 1,
+      "env": {},
+      "telemetry": "pdh"
+    },
+    "cpu/*/*": {
+      "backend": "cpu",
+      "engineFolder": "cpu",
+      "tiered": false,
+      "experimental": false,
+      "measured": false,
+      "vramReserveMib": 0,
+      "vramReserveDisplayMib": 0,
+      "ramMarginGib": 6,
+      "pageFileExtraGib": 0,
+      "prefill": "auto",
+      "maxGpus": 0,
+      "env": {},
+      "telemetry": "none"
+    }
+  }
+}

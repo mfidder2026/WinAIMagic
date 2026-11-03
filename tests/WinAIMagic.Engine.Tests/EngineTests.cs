@@ -1,0 +1,558 @@
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json.Nodes;
+using WinAIMagic.Core.Support;
+using Xunit;
+
+namespace WinAIMagic.Engine.Tests;
+
+public class ChildProcessTests : EngineTest
+{
+    [Theory]
+    [InlineData("plain", "plain")]
+    [InlineData("with space", "\"with space\"")]
+    [InlineData("", "\"\"")]
+    [InlineData("C:\\dir with space\\", "\"C:\\dir with space\\\\\"")]
+    [InlineData("say \"hi\"", "\"say \\\"hi\\\"\"")]
+    [InlineData("a\\\"b", "\"a\\\\\\\"b\"")]
+    [InlineData("C:\\no\\space\\", "C:\\no\\space\\")]
+    public void ArgumentsAreQuotedAsWindowsReadsThem(string raw, string quoted) =>
+        Assert.Equal(quoted, ChildProcess.QuoteArgument(raw));
+
+    [Fact]
+    public void OutputAndExitCodeComeBack()
+    {
+        var r = ChildProcess.RunToEnd(FakeExe, new[] { "--exit", "7" }, TimeSpan.FromSeconds(20));
+        Assert.Equal(7, r!.Value.Status);
+        Assert.Contains("loading the model failed", r.Value.Output);
+    }
+
+    [Fact]
+    public void ATimeoutEndsTheProcess()
+    {
+        var sw = Stopwatch.StartNew();
+        Assert.Null(ChildProcess.RunToEnd(FakeExe, new[] { "--sleep" }, TimeSpan.FromSeconds(1)));
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(15));
+    }
+
+    [Fact]
+    public void AMissingExeThrowsAWin32Error() =>
+        Assert.Throws<System.ComponentModel.Win32Exception>(() => ChildProcess.RunToEnd(Path.Combine(Root, "nope.exe"), Array.Empty<string>(), TimeSpan.FromSeconds(5)));
+
+    private static bool Alive(int pid)
+    {
+        try { using var p = Process.GetProcessById(pid); return !p.HasExited; }
+        catch (ArgumentException) { return false; }
+    }
+
+    /// <summary>The job: whatever a child started ends with it, also when the app goes away without saying anything.</summary>
+    [Fact]
+    public void ClosingTheJobEndsTheWholeTree()
+    {
+        var output = new StringBuilder();
+        var c = ChildProcess.Start(new ChildStart(FakeExe, new[] { "--spawn-child" })
+        {
+            OnOutput = (b, n) => { lock (output) output.Append(Encoding.UTF8.GetString(b, 0, n)); },
+        });
+        int grandchild = 0;
+        Assert.True(WaitUntil(() =>
+        {
+            lock (output)
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(output.ToString(), @"child (\d+)");
+                if (m.Success) grandchild = int.Parse(m.Groups[1].Value);
+                return m.Success;
+            }
+        }));
+        Assert.True(Alive(c.Pid));
+        Assert.True(Alive(grandchild));
+        // the two, and their console hosts
+        Assert.True(c.ActiveProcesses >= 2);
+        int pid = c.Pid;
+        c.Dispose();
+        Assert.True(WaitUntil(() => !Alive(pid) && !Alive(grandchild)));
+    }
+
+    /// <summary>A break reaches only the child's own group, also from a process without a console, and the child can finish.</summary>
+    [Fact]
+    public void ABreakStopsTheChildAndNotUs()
+    {
+        var marker = Path.Combine(Root, "marker.txt");
+        var ready = new ManualResetEventSlim();
+        using var c = ChildProcess.Start(new ChildStart(FakeExe, new[] { "--marker", marker })
+        {
+            OnOutput = (_, _) => ready.Set(),
+        });
+        Assert.True(ready.Wait(TimeSpan.FromSeconds(20)));
+        Assert.True(c.RequestBreak());
+        Assert.True(c.Exited.Wait(TimeSpan.FromSeconds(10)), "the child did not end on the break");
+        Assert.Equal(0, c.Exited.Result);
+        Assert.StartsWith("break", File.ReadAllText(marker));
+    }
+
+    /// <summary>--parent-pipe: the end of the pipe says the program that started it ended.</summary>
+    [Fact]
+    public void ClosingStdinIsTheParentPipe()
+    {
+        var marker = Path.Combine(Root, "marker.txt");
+        var ready = new ManualResetEventSlim();
+        using var c = ChildProcess.Start(new ChildStart(FakeExe, new[] { "--parent-pipe", "--marker", marker })
+        {
+            StdinPipe = true,
+            OnOutput = (_, _) => ready.Set(),
+        });
+        Assert.True(ready.Wait(TimeSpan.FromSeconds(20)));
+        Assert.False(c.Exited.Wait(TimeSpan.FromSeconds(1)));
+        c.CloseStdin();
+        Assert.True(c.Exited.Wait(TimeSpan.FromSeconds(10)));
+        Assert.StartsWith("pipe", File.ReadAllText(marker));
+    }
+
+    [Fact]
+    public void TerminateEndsOnlyThatProcess()
+    {
+        var ready = new ManualResetEventSlim();
+        using var c = ChildProcess.Start(new ChildStart(FakeExe, new[] { "--ignore-break" }) { OnOutput = (_, _) => ready.Set() });
+        Assert.True(ready.Wait(TimeSpan.FromSeconds(20)));
+        c.Terminate();
+        Assert.True(c.Exited.Wait(TimeSpan.FromSeconds(5)));
+        Assert.Equal(15, c.Exited.Result);
+    }
+
+    [Fact]
+    public void TheEnvironmentReachesTheChildAndCanRemove()
+    {
+        var marker = Path.Combine(Root, "m.txt");
+        var ready = new ManualResetEventSlim();
+        using var c = ChildProcess.Start(new ChildStart(FakeExe, new[] { "--marker", marker, "--parent-pipe" })
+        {
+            StdinPipe = true,
+            Env = new Dictionary<string, string?> { ["LLAMA_API_KEY"] = "secret", ["NOT_THERE"] = null },
+            OnOutput = (_, _) => ready.Set(),
+        });
+        Assert.True(ready.Wait(TimeSpan.FromSeconds(20)));
+        c.CloseStdin();
+        Assert.True(c.Exited.Wait(TimeSpan.FromSeconds(10)));
+        Assert.Contains("key=secret", File.ReadAllText(marker));
+    }
+
+    [Fact]
+    public void SleepGuardCounts()
+    {
+        int before = SleepGuard.Holds;
+        var a = SleepGuard.Hold();
+        var b = SleepGuard.Hold();
+        Assert.Equal(before + 2, SleepGuard.Holds);
+        a.Dispose();
+        a.Dispose();
+        b.Dispose();
+        Assert.Equal(before, SleepGuard.Holds);
+    }
+}
+
+public class LogFilterTests
+{
+    [Theory]
+    [InlineData("[Maya] loading", "[engine] loading")]
+    [InlineData("MAYA_GLM_X and maya-glm.exe", "engine_GLM_X and engine-glm.exe")]
+    [InlineData("general.name = GLM-5.3-Flash-mAyA-S24", "general.name = GLM-5.3-Flash-engine-S24")]
+    [InlineData("nothing here", "nothing here")]
+    public void TheNameNeverLeaves(string raw, string clean) => Assert.Equal(clean, LogFilter.Clean(raw));
+}
+
+public class OrphanTests
+{
+    private const string Engine = @"C:\Program Files\WinAIMagic\engine", App = @"C:\Program Files\WinAIMagic";
+
+    [Fact]
+    public void OnlyEnginesUnderOurFolderWithoutOurAppAsParent()
+    {
+        var list = new[]
+        {
+            new EngineOrphans.Entry(1, 100, @"C:\Program Files\WinAIMagic\WinAIMagic.exe"),
+            new EngineOrphans.Entry(2, 1, @"C:\Program Files\WinAIMagic\engine\cuda\llama-server.exe"),      // our app is the parent: alive
+            new EngineOrphans.Entry(3, 999, @"C:\Program Files\WinAIMagic\engine\python\python.exe"),         // parent gone: orphan
+            new EngineOrphans.Entry(4, 3, @"C:\Program Files\WinAIMagic\engine\tiered\bin\wam-glm.exe"),      // under a python of ours: follows it
+            new EngineOrphans.Entry(5, 999, @"C:\other\llama-server.exe"),                                    // someone else's
+            new EngineOrphans.Entry(6, 7, @"C:\Program Files\WinAIMagic\engine\cuda\ggml-rpc-server.exe"),    // started by another program
+            new EngineOrphans.Entry(7, 1000, @"C:\Windows\explorer.exe"),
+        };
+        Assert.Equal(new[] { 3, 6 }, EngineOrphans.Pids(list, Engine, App));
+    }
+
+    [Fact]
+    public void ASimilarFolderNameIsNotOurs()
+    {
+        var list = new[] { new EngineOrphans.Entry(1, 9, @"C:\Program Files\WinAIMagic\engine2\llama-server.exe") };
+        Assert.Empty(EngineOrphans.Pids(list, Engine, App));
+    }
+
+    [Fact]
+    public void TheRealProcessListCanBeRead() => Assert.NotEmpty(EngineOrphans.Snapshot());
+}
+
+public class LlamaEngineTests : EngineTest
+{
+    private static readonly ModelInfo Qwen = ModelCatalog.Shared.Model("qwen3.6-35b-a3b-q4")!;
+    private static readonly FakeGpuBackend Card = FakeGpuBackend.Nvidia(16);
+    private static MemoryPlan Plan(int context = 65_536, ulong? cache = null) =>
+        MemoryPlanner.Plan(TestModels.Index("qwen35moe", 40, 2_678_180_352, 491_782_144), SystemInfo.Simulated(Card, 128, 10), context, false);
+    private static EngineStart Start(MemoryPlan? plan = null) => new(Qwen, new[] { @"C:\models\q.gguf" }, plan ?? Plan(), Card);
+
+    private LlamaEngine Fake(params string[] args)
+    {
+        int port = FreePort();
+        var engine = new LlamaEngine(port) { ExecutableOverride = FakeExe, HealthInterval = TimeSpan.FromMilliseconds(50) };
+        engine.ArgumentsOverride = args.Concat(new[] { "--port", port.ToString() }).ToList();
+        return engine;
+    }
+
+    [Fact]
+    public void ArgumentsAsOnTheMac()
+    {
+        var e = new LlamaEngine(port: 9000);
+        var args = e.Arguments(Start()).ToList();
+        string Value(string flag) => args[args.IndexOf(flag) + 1];
+        Assert.Equal(@"C:\models\q.gguf", Value("--model"));
+        Assert.Equal("127.0.0.1", Value("--host"));
+        Assert.Equal("9000", Value("--port"));
+        Assert.Equal("65536", Value("--ctx-size"));
+        Assert.Equal("999", Value("--n-gpu-layers"));
+        Assert.Equal("on", Value("--flash-attn"));
+        Assert.Equal("1024", Value("--ubatch-size"));
+        Assert.Equal("2048", Value("--batch-size"));
+        Assert.Equal("off", Value("--fit"));
+        Assert.Equal("1", Value("--parallel"));
+        Assert.Contains("--jinja", args);
+        Assert.Equal("deepseek", Value("--reasoning-format"));
+        Assert.Contains("--metrics", args);
+        Assert.Equal(Qwen.Id, Value("--alias"));
+        Assert.Contains("--n-cpu-moe", args);
+        Assert.DoesNotContain("--no-repack", args);
+    }
+
+    [Fact]
+    public void AModelLargerThanMemoryStreamsWithACache()
+    {
+        var model = ModelCatalog.Shared.Model("deepseek-v4.1-flash-q4")!;
+        var s = SystemInfo.Simulated(FakeGpuBackend.Nvidia(48), 128, 10);
+        var plan = MemoryPlanner.Plan(TestModels.IndexOf(model), s, 32_768, false);
+        var start = new EngineStart(model, new[] { "a" }, plan, FakeGpuBackend.Nvidia(48));
+        var e = new LlamaEngine(port: 9000);
+        var args = e.Arguments(start).ToList();
+        Assert.Contains("--no-repack", args);
+        Assert.Equal((plan.ExpertCache >> 20).ToString(), args[args.IndexOf("--moe-cache-mib") + 1]);
+        Assert.Equal("4096", args[args.IndexOf("--ubatch-size") + 1]);
+        var env = e.Environment(start);
+        Assert.Equal("0", env["LLAMA_MMAP_PREFETCH"]);
+        Assert.Equal("8", env["LLAMA_MOE_CACHE_MAX_BATCH"]);
+        Assert.Equal("9", env["GGML_OP_OFFLOAD_MIN_BATCH"]);
+        Assert.StartsWith(Paths.ModelDir(model.Id), env["LLAMA_MOE_CACHE_FILE"]);
+        Assert.Equal("PCI_BUS_ID", env["CUDA_DEVICE_ORDER"]);
+    }
+
+    [Fact]
+    public void TheClusterPutsHelpersFirst()
+    {
+        var idx = TestModels.Index("glm5-next", 46, 9_800_000_000, 4_416_000_000, firstExpertLayer: 3);
+        var plan = MemoryPlanner.Plan(idx, SystemInfo.Simulated(Card, 128, 10), 65_536, false, helpers: new ulong[] { 69_000_000_000 });
+        var args = new LlamaEngine(port: 9000).Arguments(new EngineStart(ModelCatalog.Shared.Model("glm-5.3-flash-q4")!, new[] { "a" }, plan, Card) { Rpc = "10.0.0.2:50052" }).ToList();
+        Assert.Equal("10.0.0.2:50052", args[args.IndexOf("--rpc") + 1]);
+        Assert.Equal(string.Join(",", plan.TensorSplit), args[args.IndexOf("--tensor-split") + 1]);
+        Assert.DoesNotContain("--n-cpu-moe", args);
+        if (plan.HostExpertLayers.Count > 0) Assert.Contains(args, a => a.StartsWith("blk\\.("));
+    }
+
+    [Fact]
+    public void MtpFollowsTheSettingAndTheCache()
+    {
+        var glm = ModelCatalog.Shared.Model("glm-5.3-flash-compact")!;
+        var plan = MemoryPlanner.Plan(TestModels.IndexOf(glm), SystemInfo.Simulated(FakeGpuBackend.Nvidia(16), 128, 10), 65_536, false);
+        var e = new LlamaEngine(port: 9000);
+        var withMtp = e.Arguments(new EngineStart(glm, new[] { "a" }, plan, Card));
+        Assert.Contains("draft-mtp", withMtp);
+        Settings.Shared.Mtp = false;
+        Assert.DoesNotContain("draft-mtp", e.Arguments(new EngineStart(glm, new[] { "a" }, plan, Card)));
+        Settings.Shared.Mtp = true;
+        var fileMtp = ModelCatalog.Shared.Model("qwen3.8-flash-next-q4")!;
+        var qplan = MemoryPlanner.Plan(TestModels.IndexOf(fileMtp), SystemInfo.Simulated(FakeGpuBackend.Nvidia(16), 128, 10), 65_536, false);
+        var args = e.Arguments(new EngineStart(fileMtp, new[] { "a" }, qplan, Card) { Draft = "draft.gguf" }).ToList();
+        Assert.Equal("draft.gguf", args[args.IndexOf("--model-draft") + 1]);
+    }
+
+    /// <summary>A key on the command line is visible to every program on the PC.</summary>
+    [Fact]
+    public void TheKeyGoesThroughTheEnvironment()
+    {
+        Settings.Shared.ApiKey = "secret-key";
+        var e = new LlamaEngine(port: 9000);
+        var args = e.Arguments(Start());
+        Assert.DoesNotContain("--api-key", args);
+        Assert.DoesNotContain(args, a => a.Contains("secret-key"));
+        Assert.Equal("secret-key", e.Environment(Start())["LLAMA_API_KEY"]);
+        Settings.Shared.ApiKey = "";
+        Assert.Null(e.Environment(Start())["LLAMA_API_KEY"]);
+    }
+
+    /// <summary>0.0.0.0 only with a key; the app's own client always talks to this PC.</summary>
+    [Fact]
+    public void ListeningOnAllAddressesNeedsAKey()
+    {
+        Settings.Shared.Host = "0.0.0.0";
+        var e = new LlamaEngine();
+        Assert.Equal("127.0.0.1", e.Host);
+        Settings.Shared.ApiKey = "k";
+        Assert.Equal("0.0.0.0", e.Host);
+        Assert.Equal(new Uri($"http://127.0.0.1:{Settings.Shared.Port}"), e.BaseUrl);
+        // a second engine stays on this PC, on its own port
+        var fast = new LlamaEngine(port: 8081);
+        Assert.Equal("127.0.0.1", fast.Host);
+        Assert.Equal(8081, fast.Port);
+    }
+
+    [Fact]
+    public void AMissingBinaryFailsWithASentence()
+    {
+        var e = new LlamaEngine(port: FreePort());
+        e.Start(Start());
+        Assert.Equal(EngineStatus.Failed, e.State.Status);
+        Assert.Contains("Engine niet gevonden", e.State.Message);
+    }
+
+    [Fact]
+    public async Task StartsFollowsHealthAndStopsWithABreak()
+    {
+        var marker = Path.Combine(Root, "marker.txt");
+        using var e = Fake("--marker", marker, "--delay-health", "300");
+        var states = new List<EngineState>();
+        e.StateChanged += s => { lock (states) states.Add(s); };
+        int held = SleepGuard.Holds;
+        e.Start(Start());
+        Assert.Equal(EngineStatus.Starting, e.State.Status);
+        Assert.Equal(held + 1, SleepGuard.Holds);
+        Assert.True(WaitUntil(() => e.State.IsRunning), e.State.ToString());
+        Assert.Equal(1, e.LoadProgress);
+        Assert.Equal(Qwen, e.Model);
+        Assert.Contains(e.LogTail, l => l.Contains("load_tensors"));
+        lock (states) Assert.Contains(states, s => s.Message == "Gewichten laden…");
+
+        var activity = await e.PollActivity();
+        Assert.True(activity!.Busy);
+        Assert.True(activity.Decoded > 0);
+
+        await e.StopAndWait();
+        Assert.Equal(EngineState.Stopped, e.State);
+        Assert.StartsWith("break", File.ReadAllText(marker));
+        Assert.Equal(held, SleepGuard.Holds);
+    }
+
+    [Fact]
+    public async Task AStopThatIsIgnoredEndsTheHardWay()
+    {
+        using var e = Fake("--ignore-break");
+        e.StopWait = TimeSpan.FromMilliseconds(300);
+        e.Start(Start());
+        Assert.True(WaitUntil(() => e.State.IsRunning));
+        var sw = Stopwatch.StartNew();
+        await e.StopAndWait();
+        Assert.Equal(EngineState.Stopped, e.State);
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public void ACrashSaysWhatTheEngineLastSaid()
+    {
+        using var e = Fake("--exit", "3");
+        e.Start(Start());
+        Assert.True(WaitUntil(() => e.State.Status == EngineStatus.Failed), e.State.ToString());
+        Assert.Contains("code 3", e.State.Message);
+        Assert.Contains("loading the model failed", e.State.Message);
+    }
+
+    /// <summary>engine.log and the tail: never the upstream name; the tail not the metadata dump.</summary>
+    [Fact]
+    public async Task TheLogIsFiltered()
+    {
+        using var e = Fake("--print-name");
+        e.Start(Start());
+        Assert.True(WaitUntil(() => e.State.IsRunning));
+        Assert.True(WaitUntil(() => e.LogTail.Any(l => l.Contains("[engine] loading"))));
+        Assert.DoesNotContain(e.LogTail, l => l.Contains("maya", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(e.LogTail, l => l.Contains("llama_model_loader:"));
+        await e.StopAndWait();
+        var log = File.ReadAllText(Paths.EngineLog);
+        Assert.Contains("[engine] loading", log);
+        // the dump stays in the file, cleaned
+        Assert.Contains("llama_model_loader:", log);
+        Assert.DoesNotContain("maya", log, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SlotsAreRead()
+    {
+        Assert.Null(LlamaEngine.ParseSlots(null));
+        Assert.Null(LlamaEngine.ParseSlots("not json"));
+        Assert.False(LlamaEngine.ParseSlots("[{\"id\":0,\"is_processing\":false}]")!.Busy);
+        var busy = LlamaEngine.ParseSlots("[{\"id\":0,\"is_processing\":true,\"next_token\":[{\"n_decoded\":42}]}]")!;
+        Assert.True(busy.Busy);
+        Assert.Equal(42, busy.Decoded);
+    }
+}
+
+public class TieredEngineTests : EngineTest
+{
+    private static readonly ModelInfo Glm = ModelCatalog.Shared.Model("glm-5.3-flash-compact-24")!;
+    private static readonly FakeGpuBackend Card = FakeGpuBackend.Nvidia(16);
+
+    private static EngineStart Start(ModelInfo? model = null, int context = 65_536)
+    {
+        var m = model ?? Glm;
+        var s = SystemInfo.Simulated(Card, 128, 10);
+        return new EngineStart(m, Array.Empty<string>(), MemoryPlanner.Plan(TestModels.IndexOf(m), s, context, false, EngineKind.Tiered), Card);
+    }
+
+    [Fact]
+    public void GlmArgumentsAsMeasured()
+    {
+        var args = TieredEngine.EngineArguments(Start(), 1500UL << 20);
+        var pack = Path.Combine(Paths.ModelDir(Glm.Id), "pack");
+        Assert.Equal(new[]
+        {
+            "--glm-pack", pack, "--max-context", "65536", "--expert-cache", "auto", "--prefill", "auto", "--kv-streaming", "on",
+            "--expert-profile-save", Path.Combine(Paths.ModelDir(Glm.Id), "expert-profile.bin"), "--vram-reserve-mib", "1500",
+        }, args);
+    }
+
+    /// <summary>The engine fails on a profile that is not there.</summary>
+    [Fact]
+    public void TheExpertProfileIsOnlyPassedWhenItExists()
+    {
+        var profile = Path.Combine(Paths.ModelDir(Glm.Id), "expert-profile.bin");
+        Assert.DoesNotContain("--expert-profile", TieredEngine.EngineArguments(Start(), 1UL << 30));
+        Directory.CreateDirectory(Paths.ModelDir(Glm.Id));
+        File.WriteAllText(profile, "x");
+        var args = TieredEngine.EngineArguments(Start(), 1UL << 30);
+        Assert.Equal(profile, args[args.IndexOf("--expert-profile") + 1]);
+        Assert.Equal(profile, args[args.IndexOf("--expert-profile-save") + 1]);
+    }
+
+    [Fact]
+    public void DeepSeekAndMiniMaxArguments()
+    {
+        var ds = TieredEngine.EngineArguments(Start(ModelCatalog.Shared.Model("deepseek-v4.1-flash-compact")), 1500UL << 20);
+        Assert.Equal("--pack", ds[0]);
+        Assert.Equal("1", ds[ds.IndexOf("--tp") + 1]);
+        Assert.Equal("on", ds[ds.IndexOf("--threads") + 1]);
+        Assert.Equal("none", ds[ds.IndexOf("--dspark") + 1]);
+        Assert.Equal("off", ds[ds.IndexOf("--vision") + 1]);
+        Assert.Equal("1500", ds[ds.IndexOf("--reserve-mib") + 1]);
+
+        var mm = TieredEngine.EngineArguments(Start(ModelCatalog.Shared.Model("minimax-m3.1-flash-compact")), 1536UL << 20);
+        Assert.Equal("--pack", mm[0]);
+        Assert.Equal("on", mm[mm.IndexOf("--kv-streaming") + 1]);
+        Assert.Equal("1.5", mm[mm.IndexOf("--reserve-gb") + 1]);
+    }
+
+    [Fact]
+    public void TheConfigHoldsWhatTheServerReads()
+    {
+        Settings.Shared.ApiKey = "the-key";
+        Settings.Shared.ReasoningEffort = "high";
+        var e = new TieredEngine(port: 9001);
+        var cfg = e.Config(Start(), @"C:\log.raw");
+        Assert.Equal(Path.Combine(Paths.EngineRoot, "tiered", "bin", "wam-glm.exe"), cfg["exe"]!.GetValue<string>());
+        Assert.Equal(Path.Combine(Paths.EngineRoot, "tiered"), cfg["cwd"]!.GetValue<string>());
+        Assert.Equal(Path.Combine(Paths.ModelDir(Glm.Id), "pack", "tokenizer"), cfg["tokenizer"]!.GetValue<string>());
+        Assert.Equal(Glm.Id, cfg["model_name"]!.GetValue<string>());
+        Assert.Equal(0, cfg["gpu"]![0]!.GetValue<int>());
+        Assert.Equal(0.95, cfg["sampling"]!["top_p"]!.GetValue<double>());
+        Assert.Equal("high", cfg["reasoning_effort"]!.GetValue<string>());
+        Assert.Equal(Path.Combine(Paths.EngineRoot, "tiered", "bin"), cfg["lib_dirs"]![0]!.GetValue<string>());
+        Assert.Equal(9001, cfg["port"]!.GetValue<int>());
+        Assert.Equal("127.0.0.1", cfg["host"]!.GetValue<string>());
+        Assert.Equal(@"C:\log.raw", cfg["log"]!.GetValue<string>());
+        Assert.Equal("PCI_BUS_ID", cfg["env"]!["CUDA_DEVICE_ORDER"]!.GetValue<string>());
+        Assert.Equal(0, cfg["thinking_budget"]!.GetValue<int>());
+        Assert.Equal("the-key", cfg["api_key"]!.GetValue<string>());
+        Assert.DoesNotContain(cfg["args"]!.AsArray().Select(a => a!.GetValue<string>()), a => a.Contains("the-key"));
+    }
+
+    private TieredEngine Fake(string marker, params string[] extra)
+    {
+        int port = FreePort();
+        var e = new TieredEngine(port) { ExecutableOverride = FakeExe, HealthInterval = TimeSpan.FromMilliseconds(50) };
+        e.ArgumentsOverride = new[] { "--port", port.ToString(), "--parent-pipe", "--marker", marker }.Concat(extra).ToList();
+        return e;
+    }
+
+    /// <summary>Stop by the parent pipe: that is the path on which the server gives the engine QUIT and the profile is saved.</summary>
+    [Fact]
+    public async Task StopsThroughTheParentPipeAndLeavesNoConfigBehind()
+    {
+        Settings.Shared.ApiKey = "the-key";
+        var marker = Path.Combine(Root, "marker.txt");
+        using var e = Fake(marker);
+        e.Start(Start());
+        Assert.True(WaitUntil(() => e.State.IsRunning), e.State.ToString());
+        var config = Path.Combine(Paths.ModelDir(Glm.Id), "engine-config.json");
+        Assert.True(File.Exists(config));
+        Assert.Contains("the-key", File.ReadAllText(config));
+
+        var a = await e.PollActivity();
+        Assert.True(a!.Busy);
+        Assert.Equal(12.5, a.TokS);
+        Assert.Equal(0.8, a.VramHit);
+        Assert.Equal(61, a.GpuTemperature);
+
+        await e.StopAndWait();
+        Assert.Equal(EngineState.Stopped, e.State);
+        Assert.StartsWith("pipe", File.ReadAllText(marker));
+        Assert.False(File.Exists(config));
+    }
+
+    /// <summary>What the engine exe writes to the file in the config reaches the log only through the filter.</summary>
+    [Fact]
+    public async Task TheRawLogGoesThroughTheFilter()
+    {
+        var marker = Path.Combine(Root, "marker.txt");
+        using var e = Fake(marker);
+        e.Start(Start());
+        Assert.True(WaitUntil(() => e.State.IsRunning));
+        var raw = Paths.EngineLog + ".raw";
+        File.WriteAllText(raw, "maya serve: expert profile saved\nglm: VRAM LOW, 200 MiB free\n");
+        Assert.True(WaitUntil(() => e.LogTail.Any(l => l.Contains("engine serve: expert profile saved"))), string.Join("\n", e.LogTail));
+        Assert.Contains(e.Warnings, w => w.Contains("VRAM bijna vol"));
+        await e.StopAndWait();
+        Assert.False(File.Exists(raw));
+        var log = File.ReadAllText(Paths.EngineLog);
+        Assert.Contains("engine serve: expert profile saved", log);
+        Assert.DoesNotContain("maya", log, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WithoutPackOrBinaryItFailsWithASentence()
+    {
+        var e = new TieredEngine(port: FreePort());
+        e.Start(Start());
+        Assert.Equal(EngineStatus.Failed, e.State.Status);
+        Assert.Contains("Engine niet gevonden", e.State.Message);
+    }
+
+    [Fact]
+    public void MetricsAreRead()
+    {
+        Assert.Null(TieredEngine.ParseMetrics(null));
+        Assert.Null(TieredEngine.ParseMetrics("{\"not\":\"it\"}"));
+        var idle = TieredEngine.ParseMetrics("{\"live\":{\"state\":\"idle\",\"tok_s\":null}}")!;
+        Assert.False(idle.Busy);
+        Assert.Equal(0, idle.TokS);
+        var writing = TieredEngine.ParseMetrics("{\"live\":{\"state\":\"generating\",\"tok_s\":17.5},\"tiers\":{\"now\":{\"vram_hit\":0.9}},\"hardware\":{\"gpu\":{\"temp\":70}}}")!;
+        Assert.True(writing.Busy);
+        Assert.Equal(17.5, writing.TokS);
+        Assert.Equal(0.9, writing.VramHit);
+        Assert.Equal(70, writing.GpuTemperature);
+        var reading = TieredEngine.ParseMetrics("{\"live\":{\"state\":\"reading\",\"tok_s\":null}}")!;
+        Assert.True(reading.Busy);
+        Assert.Null(reading.TokS);
+    }
+}
