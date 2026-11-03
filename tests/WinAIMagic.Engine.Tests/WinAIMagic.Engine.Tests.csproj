@@ -11,8 +11,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\WinAIMagic.Core\WinAIMagic.Core.csproj" />
-    <ProjectReference Include="..\..\src\WinAIMagic.Documents\WinAIMagic.Documents.csproj" />
+    <ProjectReference Include="..\..\src\WinAIMagic.Engine\WinAIMagic.Engine.csproj" />
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
