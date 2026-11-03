@@ -1,5 +1,5 @@
-// include/strata/platform/env_alias.hpp - Maya's settings by the names its docs give them: every MAYA_X in the
-// environment also sets the older STRATA_X, the name the code still reads (over an older value: MAYA_X counts) - so a
+// include/strata/platform/env_alias.hpp - Wam's settings by the names its docs give them: every WAM_X in the
+// environment also sets the older STRATA_X, the name the code still reads (over an older value: WAM_X counts) - so a
 // setting works under either name.  Each program calls it first thing in main().
 #pragma once
 
@@ -27,7 +27,7 @@ inline void env_aliases() {
     for (char** e = env; *e != nullptr; ++e) {
         const char* s = *e;
         const char* eq = std::strchr(s, '=');
-        if (std::strncmp(s, "MAYA_", 5) != 0 || eq == nullptr) continue;
+        if (std::strncmp(s, "WAM_", 5) != 0 || eq == nullptr) continue;
         add.emplace_back("STRATA_" + std::string(s + 5, eq), std::string(eq + 1));
     }
     for (const auto& kv : add) {

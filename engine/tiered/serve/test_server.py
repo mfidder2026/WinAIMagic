@@ -36,24 +36,24 @@ class RecordingEngine(MockEngine):
 
 
 class StampedLog(unittest.TestCase):
-    """#783: a time before each of the server's own `[maya]` lines; the engine's lines and other text are untouched."""
+    """#783: a time before each of the server's own `[wam]` lines; the engine's lines and other text are untouched."""
 
-    def test_only_maya_lines_get_a_time(self):
+    def test_only_wam_lines_get_a_time(self):
         import io
         import re
         from serve.server import StampedStdout
         buf = io.StringIO()
         out = StampedStdout(buf)
-        print("[maya] request 1 done", file=out)
-        print("[maya] in", "pieces", end="", file=out)
+        print("[wam] request 1 done", file=out)
+        print("[wam] in", "pieces", end="", file=out)
         print(" - one line", file=out)
-        print("maya ds4 serve: request 926: prompt 100 tokens", file=out)
-        print("  [maya] indented is not stamped", file=out)
+        print("wam ds4 serve: request 926: prompt 100 tokens", file=out)
+        print("  [wam] indented is not stamped", file=out)
         lines = buf.getvalue().splitlines()
         stamp = r"\d\d:\d\d:\d\d "
-        self.assertRegex(lines[0], "^" + stamp + r"\[maya\] request 1 done$")
-        self.assertRegex(lines[1], "^" + stamp + r"\[maya\] in pieces - one line$")
-        self.assertEqual(lines[2:], ["maya ds4 serve: request 926: prompt 100 tokens", "  [maya] indented is not stamped"])
+        self.assertRegex(lines[0], "^" + stamp + r"\[wam\] request 1 done$")
+        self.assertRegex(lines[1], "^" + stamp + r"\[wam\] in pieces - one line$")
+        self.assertEqual(lines[2:], ["wam ds4 serve: request 926: prompt 100 tokens", "  [wam] indented is not stamped"])
         self.assertEqual(len(re.findall(stamp, buf.getvalue())), 2)
 
 
@@ -922,20 +922,20 @@ class PrometheusMetrics(unittest.TestCase):
                 self.assertTrue(r.headers["Content-Type"].startswith("text/plain; version=0.0.4"))
                 text = r.read().decode()
             lines = dict(l.split(" ", 1) for l in text.splitlines() if not l.startswith("#"))
-            self.assertEqual(lines["maya:requests_total"], "1")
+            self.assertEqual(lines["wam:requests_total"], "1")
             self.assertGreater(int(lines["llamacpp:tokens_predicted_total"]), 0)
             self.assertEqual(lines["llamacpp:requests_deferred"], "0")
-            self.assertEqual((lines["maya:engine_tok_s"], lines["maya:engine_vram_hit"]), ("21.5", "0.95"))
+            self.assertEqual((lines["wam:engine_tok_s"], lines["wam:engine_vram_hit"]), ("21.5", "0.95"))
             for key, value in (("draft_rounds", "12"), ("draft_ms", "123.5"), ("verify_ms", "456.75")):
-                self.assertEqual(lines["maya:engine_" + key], value)
-                self.assertIn("# TYPE maya:engine_" + key + " gauge", text)
-            self.assertNotIn("maya:engine_promo", lines)          # not a number: left out
-            self.assertEqual((lines["maya:engine_eg_cache_rows"], lines["maya:engine_eg_cache_cap"],
-                              lines["maya:engine_eg_cache_row_bytes"]), ("10", "100", "264"))
+                self.assertEqual(lines["wam:engine_" + key], value)
+                self.assertIn("# TYPE wam:engine_" + key + " gauge", text)
+            self.assertNotIn("wam:engine_promo", lines)          # not a number: left out
+            self.assertEqual((lines["wam:engine_eg_cache_rows"], lines["wam:engine_eg_cache_cap"],
+                              lines["wam:engine_eg_cache_row_bytes"]), ("10", "100", "264"))
             for key in ("eg_lookup_rows", "eg_lookup_hits", "eg_lookup_reads"):
-                self.assertIn(f"# TYPE maya:engine_{key} counter", text)
+                self.assertIn(f"# TYPE wam:engine_{key} counter", text)
             for key in ("eg_cache_rows", "eg_cache_cap", "eg_cache_row_bytes"):
-                self.assertIn(f"# TYPE maya:engine_{key} gauge", text)
+                self.assertIn(f"# TYPE wam:engine_{key} gauge", text)
             self.assertIn("# TYPE llamacpp:prompt_tokens_total counter", text)
             svc.api_key = "k1"
             with self.assertRaises(urllib.error.HTTPError) as cm:
@@ -1665,6 +1665,7 @@ class CorsOptIn(unittest.TestCase):
                 parse_cors_origins(bad)
 
 
+@unittest.skip("the web dashboard is not part of this product")
 class WebApp(unittest.TestCase):
     """The web app (PR #22's dashboard idea, rebuilt): its page and files, and GET /metrics."""
 
@@ -1701,17 +1702,17 @@ class WebApp(unittest.TestCase):
                 self.assertIn(want, ctype)
 
     def test_the_model_shown_model_first(self):
-        """/health's model_label - "MiniMax M3.1 · Maya-XS", from the config's installer record (maya_quants), configs
+        """/health's model_label - "MiniMax M3.1 · Wam-XS", from the config's installer record (wam_quants), configs
         of earlier releases too - is what the sidebar shows; the API's model id stays as it was."""
-        import maya_quants
-        old = {"exe": "/m/build/maya-mm3", "args": ["--pack", "/m/X/maya-mm3"], "model_name": "minimax-m3.1-flash",
+        import wam_quants
+        old = {"exe": "/m/build/wam-mm3", "args": ["--pack", "/m/X/wam-mm3"], "model_name": "minimax-m3.1-flash",
                "installer": {"family": "minimax", "quant": "MiniMax-M3.1-Flash-Maya-XS", "mm3_quant": "gguf-xs"}}
-        self.svc.model_label = maya_quants.config_label(old)
+        self.svc.model_label = wam_quants.config_label(old)
         try:
             health = json.loads(self.get("/health")[2])
         finally:
             self.svc.model_label = None
-        self.assertEqual((health["model_label"], health["model"]), ("MiniMax M3.1 · Maya-XS", self.svc.model))
+        self.assertEqual((health["model_label"], health["model"]), ("MiniMax M3.1 · Wam-XS", self.svc.model))
         self.assertIsNone(json.loads(self.get("/health")[2])["model_label"])   # (a hand-written config: the id)
         side = (ROOT / "serve/web/sidebar.js").read_text(encoding="utf-8")   # (the sidebar's model card)
         self.assertIn("S.health.model_label || modelName(S.health.model)", side)
@@ -2130,7 +2131,7 @@ class VisionFootprint(unittest.TestCase):
         d = Path(self.tmp.name)
         (d / "mmproj.gguf").write_bytes(b"x")
         self.cache = d / "vision-memory.json"
-        self.vcfg = {"exe": "maya-vision", "mmproj": str(d / "mmproj.gguf"), "model": "vocab.gguf",
+        self.vcfg = {"exe": "wam-vision", "mmproj": str(d / "mmproj.gguf"), "model": "vocab.gguf",
                      "max_tokens": 1024}
 
     def tearDown(self):
@@ -2292,8 +2293,8 @@ class ModelManagement(unittest.TestCase):
         self.assertTrue(model_management_setting({}, env={}))
         self.assertTrue(model_management_setting({"model_management": True}, env={}))
         self.assertFalse(model_management_setting({"model_management": False}, env={}))
-        self.assertFalse(model_management_setting({"model_management": True}, env={"MAYA_MODEL_MANAGEMENT": "0"}))
-        self.assertTrue(model_management_setting({}, env={"MAYA_MODEL_MANAGEMENT": "on"}))
+        self.assertFalse(model_management_setting({"model_management": True}, env={"WAM_MODEL_MANAGEMENT": "0"}))
+        self.assertTrue(model_management_setting({}, env={"WAM_MODEL_MANAGEMENT": "on"}))
 
     def test_unload_load_and_the_state_stream(self):
         self.svc.model_management = True
@@ -2410,11 +2411,11 @@ class GoneClients(unittest.TestCase):
 
 class QueuedKeepAlives(GoneClients):
     """#483: a streamed request waiting in the queue for its first turn sends SSE keep-alive comments (every
-    MAYA_QUEUE_PING_S) - before, nothing at all, and a client with a stream-idle timeout gave up on a turn that was
+    WAM_QUEUE_PING_S) - before, nothing at all, and a client with a stream-idle timeout gave up on a turn that was
     only waiting.  The answer after the wait is the same; the OpenAI and Anthropic streams alike."""
 
     def setUp(self):
-        self.env = unittest.mock.patch.dict(os.environ, {"MAYA_QUEUE_PING_S": "0.1"})
+        self.env = unittest.mock.patch.dict(os.environ, {"WAM_QUEUE_PING_S": "0.1"})
         self.env.start()
         super().setUp()
 
@@ -2500,7 +2501,7 @@ class FailedRestartKeepsContext(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix", "the fake engine is a script with a #! line")
 class StaleDoneAfterErr(unittest.TestCase):
-    """maya-ds4 and maya-mm3 end a failed request with ERR and then DONE (a picture that cannot be read, a forward that
+    """wam-ds4 and wam-mm3 end a failed request with ERR and then DONE (a picture that cannot be read, a forward that
     failed).  The single-stream reader raised at the ERR and left the DONE queued: the next request read it as its own
     end and answered nothing.  Now the DONE after an ERR is taken."""
 
@@ -2512,7 +2513,7 @@ for line in sys.stdin:
     if not line.startswith("GEN"):
         continue
     n += 1
-    if "seed=1" in line:      # a failed request, as maya-mm3 ends it
+    if "seed=1" in line:      # a failed request, as wam-mm3 ends it
         print("ERR the picture file could not be read", flush=True)
         print("DONE 0 3 0.0 0.0 cancel 0 0 0 0 0", flush=True)
     elif "seed=2" in line:    # an ERR alone, as the GLM engine ends most errors

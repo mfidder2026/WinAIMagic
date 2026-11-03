@@ -30,7 +30,7 @@ int main() {
     // inert too. Partial coverage permits ZC-all, while its separate layer-wide predicate still protects no-wait.
     CHECK(pcie::zc_all_usable(true, false, false, true, partial));
     CHECK(!pcie::zc_all_usable(true, false, false, false, partial));   // DS4_STREAM_ZC=0
-    CHECK(!pcie::zc_all_usable(true, false, true, true, partial));    // MAYA_DS4_STREAM=2
+    CHECK(!pcie::zc_all_usable(true, false, true, true, partial));    // WAM_DS4_STREAM=2
     CHECK(!pcie::zc_all_usable(true, true, false, true, partial));    // DS4_STREAM_FORCE
 
     // #551: a 48 GB L40S beside 28 Xeon threads, MXFP4 experts all in RAM (--mmap-experts off): warm, the split never

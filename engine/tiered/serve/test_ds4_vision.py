@@ -13,7 +13,7 @@ from serve import ds4_vision as DV
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL = Path(os.environ.get("DS4_MODEL") or Path.home() / "models/DSV4")   # (the DeepSeek model's folder)
-PACK = MODEL / "maya-ds4/tokenizer"
+PACK = MODEL / "wam-ds4/tokenizer"
 TEMPLATE = ROOT / "tools/ds4/chat_template.jinja"
 
 

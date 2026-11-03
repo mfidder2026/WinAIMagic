@@ -3,8 +3,8 @@ system prompt and task first, then the conversation so far with the model's last
 time between an answer and the next turn, every agent at once.  The same seeded workload on each engine given, and
 per turn when its first token and its last came from its send.
 
-    python tools/ds4/agent_bench.py --pack <pack> --exe build/maya-ds4 [--exe <another build>] [--gpus 0,2,1]
-                                    [--config maya-ds4.json] [--agents 4] [--turns 8] [--seed 1]
+    python tools/ds4/agent_bench.py --pack <pack> --exe build/wam-ds4 [--exe <another build>] [--gpus 0,2,1]
+                                    [--config wam-ds4.json] [--agents 4] [--turns 8] [--seed 1]
 
   turn 1      the system prompt and task: 4,000-12,000 tokens
   turn 2..    a tool's result: 150-2,000 tokens nine times in ten, 5,000-20,000 (a file read) one in ten
@@ -132,7 +132,7 @@ def run(exe: str, a, tok, plan: list[dict], settings: dict) -> dict:
     tmp = tempfile.mkdtemp(prefix="ds4-agents-")
     # (--serial: the kept conversations on, as a harness runs --parallel 1 - each agent's turn takes its conversation
     #  back instead of reading it again; with lanes a conversation stays in its own)
-    env.update({"MAYA_DS4_SLOT_DIR": tmp, "MAYA_DS4_SLOT_KEEP": "1" if a.serial else "0"})
+    env.update({"WAM_DS4_SLOT_DIR": tmp, "WAM_DS4_SLOT_KEEP": "1" if a.serial else "0"})
     args = [*(("--gpus", a.gpus) if a.gpus else ()), "--pack", a.pack, "--max-context", str(a.ctx), "--dspark", a.dspark, *(("--tp", str(a.tp)) if a.tp else ()),
             "--threads", "on", *(() if a.serial else ("--parallel", str(len(plan)))), "--vision", "off",
             "--expert-profile", "none", "--serve"]   # (--serial: no --parallel at all - a build before it runs too)
@@ -206,11 +206,11 @@ def pct(xs: list[float], p: float) -> float:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="agents on --parallel N: seeded multi-turn tool-calling workload")
-    ap.add_argument("--pack", required=True, help="the model's pack dir (maya-ds4)")
+    ap.add_argument("--pack", required=True, help="the model's pack dir (wam-ds4)")
     ap.add_argument("--exe", action="append", required=True,
                     help="an engine, PATH or PATH:K=V,K=V (its own settings); repeat to compare")
     ap.add_argument("--gpus", default="", help="the GPUs (default: every visible one, the engine's own split)")
-    ap.add_argument("--config", default="", help="a model config (maya-ds4.json): its DS4_/MAYA_DS4_ settings")
+    ap.add_argument("--config", default="", help="a model config (wam-ds4.json): its DS4_/WAM_DS4_ settings")
     ap.add_argument("--env", action="append", default=[], help="K=V on every engine (repeatable)")
     ap.add_argument("--ctx", type=int, default=131072, help="--max-context")
     ap.add_argument("--agents", type=int, default=4, help="agents at once (the engine's --parallel)")

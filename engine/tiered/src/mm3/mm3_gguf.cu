@@ -1,5 +1,5 @@
-// src/mm3/mm3_gguf.cu - maya-mm3's GGUF weights on the device (mm3_gguf.cuh): the activations' rounding, the dense
-// GEMVs and GEMMs, the routed experts' passes and their combine around maya-ds4's kernels (src/ds4/ds4_iq.cu).
+// src/mm3/mm3_gguf.cu - wam-mm3's GGUF weights on the device (mm3_gguf.cuh): the activations' rounding, the dense
+// GEMVs and GEMMs, the routed experts' passes and their combine around wam-ds4's kernels (src/ds4/ds4_iq.cu).
 #include "mm3_gguf.cuh"
 
 #include "mm3_env.hpp"
@@ -132,7 +132,7 @@ void q8s(const float* x, size_t ldx, int rows, int k, int8_t* q, float* d, int* 
     q8s_kernel<<<dim3((unsigned) ((k / 32 + kWarps - 1) / kWarps), (unsigned) rows), kThreads, 0, s>>>(x, ldx, k, q, d,
                                                                                                       sums);
 }
-bool iq_q8k() {   // MAYA_MM3_IQ_Q8K=0: the experts' activations a scale a 32 (the dense GEMVs' rounding)
+bool iq_q8k() {   // WAM_MM3_IQ_Q8K=0: the experts' activations a scale a 32 (the dense GEMVs' rounding)
     static const bool on = [] {
         const char* v = ::mm3::env("MM3_IQ_Q8K");
         return v == nullptr || std::atoi(v) != 0;

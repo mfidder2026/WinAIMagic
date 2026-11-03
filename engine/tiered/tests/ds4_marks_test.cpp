@@ -1,4 +1,4 @@
-// maya-ds4's restore points (src/ds4/ds4_marks.hpp): the one a new prompt goes back to, the ones a request's read
+// wam-ds4's restore points (src/ds4/ds4_marks.hpp): the one a new prompt goes back to, the ones a request's read
 // keeps, the one that gives way to a new one - and, put together as the serve loop puts them (prompt_in: the restore,
 // then the read in pieces), the cases they are for: the last user message edited, a new question after the same
 // document, a history rendered again.  No GPU, no model: a conversation here is its tokens and its points' positions.

@@ -1,4 +1,4 @@
-// tests/ds4_multi_attn_test.cu - DS4_MULTI_ATTN (maya-ds4 --parallel): a multi step's attention for all its rows in one
+// tests/ds4_multi_attn_test.cu - DS4_MULTI_ATTN (wam-ds4 --parallel): a multi step's attention for all its rows in one
 // launch a step (attn_multi's launches) against attn_core's, a conversation's run of rows at a time, bit for bit on
 // random rings, compressed caches and selections - q's rotation, the rings' new rows and their backups, the attention's
 // output rotated back.  Decode rows (one a conversation, up to 16), verify windows (a few rows a conversation, and one

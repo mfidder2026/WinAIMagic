@@ -17,7 +17,7 @@
 #include <regex>
 #include <thread>
 
-namespace maya::metal {
+namespace wam::metal {
 
 namespace {
 
@@ -240,8 +240,8 @@ bool GlmMetal::Impl::init_backends(std::string& err) {
         }
         // a GPU without Apple7-class simdgroup support (an Intel Mac's GPU, a virtual Mac's) runs no matrix product in
         // Metal: the graphs would fall back to the CPU and stop at the first one whose weights sit in GPU-only memory
-        // (a ggml assert) - say so up front instead.  MAYA_METAL_ALLOW_ANY_GPU=1 starts anyway (CI's virtual Macs).
-        const char* any = std::getenv("MAYA_METAL_ALLOW_ANY_GPU");
+        // (a ggml assert) - say so up front instead.  WAM_METAL_ALLOW_ANY_GPU=1 starts anyway (CI's virtual Macs).
+        const char* any = std::getenv("WAM_METAL_ALLOW_ANY_GPU");
         if (!(any && *any && *any != '0')) {
             ggml_init_params ip = {3 * ggml_tensor_overhead(), nullptr, true};
             ggml_context* c = ggml_init(ip);
@@ -251,7 +251,7 @@ bool GlmMetal::Impl::init_backends(std::string& err) {
             ggml_free(c);
             if (!mm) {
                 err = std::string("this Mac's GPU (") + ggml_backend_dev_description(gpu_dev) +
-                      ") cannot run maya-metal's matrix products: Maya on a Mac needs Apple silicon (M1 or newer)";
+                      ") cannot run wam-metal's matrix products: Wam on a Mac needs Apple silicon (M1 or newer)";
                 return false;
             }
         }
@@ -449,16 +449,16 @@ bool GlmMetal::Impl::init_experts(std::string& err) {
         const size_t reserve = st.dense_bytes + st.state_bytes + ((size_t) 6 << 30);
         budget = working > reserve ? working - reserve : (size_t) 1 << 30;
         cap = budget;   // what the pool may grow to as memory frees up (GlmMetal::grow_pool)
-        // and no more than this Mac has free now, less a headroom (MAYA_GLM_RAM_HEADROOM_GB, default 6, as for the CUDA engine's RAM tier): unified memory
+        // and no more than this Mac has free now, less a headroom (WAM_GLM_RAM_HEADROOM_GB, default 6, as for the CUDA engine's RAM tier): unified memory
         // is shared with every other program, and a pool past what is free gets compressed or swapped - a graph that
         // reads it then stalls for seconds (measured: 20-57 s) instead of 10 ms
-        const char* hv = std::getenv("MAYA_GLM_RAM_HEADROOM_GB");
+        const char* hv = std::getenv("WAM_GLM_RAM_HEADROOM_GB");
         const double head_gb = hv && *hv ? std::atof(hv) : 6.0;
         const size_t avail = free_memory();
         const size_t head = (size_t) (head_gb * (double) (1ull << 30));
         const size_t fits = avail > head ? avail - head : 0;
         if (fits < budget) {
-            std::fprintf(stderr, "maya-metal: %.1f GB free now (headroom %.0f GB): the expert pool takes %.1f GB, not %.1f\n",
+            std::fprintf(stderr, "wam-metal: %.1f GB free now (headroom %.0f GB): the expert pool takes %.1f GB, not %.1f\n",
                          avail / 1e9, head_gb, fits / 1e9, budget / 1e9);
             budget = std::max(fits, (size_t) 1 << 30);
         }
@@ -483,7 +483,7 @@ bool GlmMetal::Impl::init_experts(std::string& err) {
             }
             std::fclose(f);
             if (ranked.empty())
-                std::fprintf(stderr, "maya-metal: %s is not a GLM expert profile, skipped\n", path.c_str());
+                std::fprintf(stderr, "wam-metal: %s is not a GLM expert profile, skipped\n", path.c_str());
         }
     }
     if (!ranked.empty() && !pool.all_resident() && !pool.warm(ranked, err)) return false;
@@ -578,4 +578,4 @@ bool GlmMetal::Impl::embed_raw(const int32_t* tok, int n, std::vector<float>& ou
     return true;
 }
 
-}  // namespace maya::metal
+}  // namespace wam::metal

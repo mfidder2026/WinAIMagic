@@ -1,4 +1,4 @@
-// maya-mm3: MiniMax-M3.1-Flash's vision tower (see mm3_vision.hpp)
+// wam-mm3: MiniMax-M3.1-Flash's vision tower (see mm3_vision.hpp)
 #include "mm3_vision.hpp"
 
 #include <algorithm>
@@ -516,7 +516,7 @@ struct Vision::Impl {
                 return false;
             }
             if (!lent_once)
-                std::fprintf(stderr, "maya-mm3: NOTE: vision: CUDA%d had not %zu MB free for the picture - the "
+                std::fprintf(stderr, "wam-mm3: NOTE: vision: CUDA%d had not %zu MB free for the picture - the "
                              "experts' staging slots are lent to it meanwhile (their experts copied in again after)\n",
                              dev, y.total >> 20);
             lent_once = true;

@@ -1,4 +1,4 @@
-"""tools/glm_mtp_fixture.py - the synthetic glm5-next GGUF (tools/glm_synth_gguf.py) with a NextN block, for maya-metal's
+"""tools/glm_mtp_fixture.py - the synthetic glm5-next GGUF (tools/glm_synth_gguf.py) with a NextN block, for wam-metal's
 MTP tests: the trunk is the small or big fixture unchanged, and one more block (index n_layers) carries the NextN tensors
 GLM-5.3-Flash's MTP drafter has - eh_proj, enorm, hnorm, shared_head_norm, a nope-MLA + DSA attention layer and a MoE.
 The block's weights are random: drafting with it must still decode exactly as plain decoding does, which is what the

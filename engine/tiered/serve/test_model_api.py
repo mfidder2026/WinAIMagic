@@ -1,4 +1,4 @@
-"""serve/test_model_api.py - Maya's model API: /api/tags, /api/ps, /api/show, /api/chat, /api/generate, /api/pull,
+"""serve/test_model_api.py - Wam's model API: /api/tags, /api/ps, /api/show, /api/chat, /api/generate, /api/pull,
 /api/delete, the swap on request and keep_alive - against the mock engine, no GPU.
 
     python -m unittest serve.test_model_api -v
@@ -59,11 +59,11 @@ class Pure(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             d = Path(td)
-            p = glm_quant(d, "Maya-L")
+            p = glm_quant(d, "Wam-L")
             self.assertEqual(model_api.public_name(p), p.stem)
-            for n in (p.stem, p.stem + ":latest", p.name, p.stem.removeprefix("maya-")):
+            for n in (p.stem, p.stem + ":latest", p.name, p.stem.removeprefix("wam-")):
                 self.assertEqual(model_api.find_config(d, n), p, n)
-            for n in ("", None, "../x", "nope", "maya-"):
+            for n in ("", None, "../x", "nope", "wam-"):
                 self.assertIsNone(model_api.find_config(d, n), n)
 
 
@@ -92,8 +92,8 @@ class Api(Served):
         s, b = self.req("GET", "/api/ps")
         self.assertEqual([m["name"] for m in b["models"]], [self.run_name + ":latest"])
         s, b = self.req("POST", "/api/show", {"model": self.run_name, "verbose": True})
-        self.assertEqual((s, b["maya"]["file"]), (200, self.cfg.name))
-        self.assertIn("delete_plan", b["maya"])
+        self.assertEqual((s, b["wam"]["file"]), (200, self.cfg.name))
+        self.assertIn("delete_plan", b["wam"])
         self.assertEqual(self.req("POST", "/api/show", {"model": "nope"})[0], 404)
 
     def test_chat_and_generate(self):
@@ -131,8 +131,8 @@ class Api(Served):
         other = model_api.public_name(self.other)
         msg = [{"role": "user", "content": "hi"}]
         s, b = self.req("POST", "/api/chat", {"model": other, "messages": msg})
-        self.assertEqual(s, 409)                                 # (not started by maya.sh: cannot switch itself)
-        os.environ["MAYA_RESTART_ON_UPDATE"] = "1"
+        self.assertEqual(s, 409)                                 # (not started by wam.sh: cannot switch itself)
+        os.environ["WAM_RESTART_ON_UPDATE"] = "1"
         with mock.patch.object(Service, "_restart_into") as restart:
             s, body, h = self.raw("POST", "/api/chat", {"model": other, "messages": msg})
             self.assertEqual((s, h["Retry-After"]), (503, "30"))
@@ -142,9 +142,9 @@ class Api(Served):
         self.assertEqual(s, 503)
 
     def test_delete_keeps_what_another_model_runs_from(self):
-        l = glm_quant(self.d, "Maya-L")
-        m = glm_quant(self.d, "Maya-L2", folder=l.parent / "GLM-5.3-Flash" / "Maya-L", pack_name="pack2")
-        folder = self.d / "GLM-5.3-Flash" / "Maya-L"
+        l = glm_quant(self.d, "Wam-L")
+        m = glm_quant(self.d, "Wam-L2", folder=l.parent / "GLM-5.3-Flash" / "Wam-L", pack_name="pack2")
+        folder = self.d / "GLM-5.3-Flash" / "Wam-L"
         s, b = self.req("DELETE", "/api/delete", {"model": model_api.public_name(m)})
         self.assertEqual(s, 200)
         self.assertFalse(m.exists())
@@ -159,9 +159,9 @@ class Api(Served):
     def test_delete_with_files_linked_from_another_model(self):
         """The Engram tables are hard linked (or symlinked) between model folders: a hard link frees nothing and the
         other folder keeps its data; a symlink into this folder keeps the file it points at."""
-        l = glm_quant(self.d, "Maya-L")
-        m = glm_quant(self.d, "Maya-L2")
-        lf, mf = self.d / "GLM-5.3-Flash" / "Maya-L", self.d / "GLM-5.3-Flash" / "Maya-L2"
+        l = glm_quant(self.d, "Wam-L")
+        m = glm_quant(self.d, "Wam-L2")
+        lf, mf = self.d / "GLM-5.3-Flash" / "Wam-L", self.d / "GLM-5.3-Flash" / "Wam-L2"
         shard = lf / "GLM-5.3-Flash-Maya-L-00001-of-00003.gguf"
         try:
             os.link(shard, mf / "tables-hard.bin")
@@ -201,15 +201,15 @@ class Pull(Api):
 
     def hook(self, script=None, code=0):
         script = (script or self.SCRIPT) + (f"sys.exit({code})\n" if code else "")
-        os.environ["MAYA_PULL_COMMAND"] = json.dumps([sys.executable, "-c", script])
-        self.addCleanup(os.environ.pop, "MAYA_PULL_COMMAND", None)
+        os.environ["WAM_PULL_COMMAND"] = json.dumps([sys.executable, "-c", script])
+        self.addCleanup(os.environ.pop, "WAM_PULL_COMMAND", None)
 
     def test_catalog_and_pull_stream(self):
         s, b = self.req("GET", "/api/catalog")
         ids = {m["id"] for m in b["models"]}
-        self.assertTrue({"glm-maya-s", "deepseek-maya-xs", "minimax-maya-s", "cyber-frost"} <= ids)
+        self.assertTrue({"glm-wam-s", "deepseek-wam-xs", "minimax-wam-s", "cyber-frost"} <= ids)
         self.hook()
-        s, body, _ = self.raw("POST", "/api/pull", {"model": "glm-maya-s"})
+        s, body, _ = self.raw("POST", "/api/pull", {"model": "glm-wam-s"})
         ev = [json.loads(x) for x in body.splitlines()]
         self.assertEqual(ev[-1], {"status": "success"})
         down = [e for e in ev if e.get("total")]
@@ -219,14 +219,14 @@ class Pull(Api):
     def test_pull_not_in_catalog_and_failure(self):
         self.assertEqual(self.req("POST", "/api/pull", {"model": "llama3"})[0], 400)
         self.hook("import sys\nprint('the disk is full')\n", code=3)
-        s, body, _ = self.raw("POST", "/api/pull", {"model": "glm-maya-s", "stream": False})
+        s, body, _ = self.raw("POST", "/api/pull", {"model": "glm-wam-s", "stream": False})
         self.assertEqual(s, 500)
         self.assertIn("disk is full", body)
 
     def test_one_download_at_a_time_and_cancel(self):
         self.hook("import time\ntime.sleep(30)\n")
-        first = self.svc.pull_slot().start("glm-maya-s", None)
-        s, b = self.req("POST", "/api/pull", {"model": "deepseek-maya-xs", "stream": False})
+        first = self.svc.pull_slot().start("glm-wam-s", None)
+        s, b = self.req("POST", "/api/pull", {"model": "deepseek-wam-xs", "stream": False})
         self.assertEqual(s, 409)
         s, b = self.req("DELETE", "/api/delete", {"model": model_api.public_name(self.other)})
         self.assertEqual(s, 409)                                  # (no deleting while a download runs)
@@ -237,7 +237,7 @@ class Pull(Api):
     def test_progress_line(self):
         m = model_pull.PROGRESS.search("  12.3 / 96.5 GB (13%) · 40 MB/s · 4 files at once")
         self.assertEqual((m.group(1), m.group(2), m.group(3), m.group(4)), ("12.3", "96.5", "13", "40"))
-        cmd = model_pull.setup_command("glm-maya-s", {"installer": {"models_dir": "/m"}, "backend": "hip"})
+        cmd = model_pull.setup_command("glm-wam-s", {"installer": {"models_dir": "/m"}, "backend": "hip"})
         self.assertIn("--download-model", cmd)
         self.assertEqual(cmd[cmd.index("--models-dir") + 1], "/m")
         self.assertEqual(cmd[cmd.index("--backend") + 1], "hip")

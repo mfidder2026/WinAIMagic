@@ -498,7 +498,7 @@ public:
     bool open(const std::string& shard1, int64_t n_layers, int64_t n_expert, int64_t per_layer, std::string& err);
     /// Takes up to `budget` bytes of experts into the resident arena, in `order` (hottest first; pairs on a GPU
     /// left out by the caller).  `budget` 0 = what this PC's available RAM allows (less a headroom for the OS, the
-    /// page cache the other experts and the n-gram rows are read through); MAYA_EXPERT_RAM_GB caps it.
+    /// page cache the other experts and the n-gram rows are read through); WAM_EXPERT_RAM_GB caps it.
     /// `max_pinned`: as ArenaExpertSource (0 = register what CUDA takes).  The pairs in `drop` (the GPUs' own) are
     /// released from the page cache.
     bool make_resident(const std::vector<std::pair<int32_t, int32_t>>& order, uint64_t budget, uint64_t max_pinned,

@@ -62,7 +62,7 @@ inline void cpu_relax() {
 // "not ready" is no error - it is taken back off the thread's last error, which launch_check reads after every launch.
 // A launch error already pending stays for the caller's check (no submit then).  Elsewhere a no-op.
 // STRATA_GLM_FLUSH=<n>: the decode submits after its first layer and then every n layers (submit_every), 0: never -
-// the default: on the 8065S (Maya-S, drafting with the MTP rework) a submission every 4 layers lost ~4% of the decode
+// the default: on the 8065S (Wam-S, drafting with the MTP rework) a submission every 4 layers lost ~4% of the decode
 // (26.5 against 27.7 tok/s, same answers); the runtime's own batching plus the service thread's kick keep the GPU fed.
 inline void submit_queued(cudaStream_t s) {
 #if defined(_WIN32) && defined(STRATA_USE_HIP)
@@ -85,7 +85,7 @@ inline int submit_every() {
 #endif
 }
 // ... and the prompt path after each mixer sub-batch and each layer's experts: STRATA_GLM_PREFILL_FLUSH=1 (off by
-// default: Maya-S on the 8065S, 2K / 8K / 16K prompts 271 / 323 / 325 tok/s with it against 273-276 / 323-325 /
+// default: Wam-S on the 8065S, 2K / 8K / 16K prompts 271 / 323 / 325 tok/s with it against 273-276 / 323-325 /
 // 329-339 without - the sub-batches are long enough that the runtime's batching costs nothing)
 inline bool prefill_submit() {
 #if defined(_WIN32) && defined(STRATA_USE_HIP)

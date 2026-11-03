@@ -1,6 +1,6 @@
-// src/ds4/ds4_pcie.hpp - the decode path's PCIe lane for maya-ds4 (the host side's arithmetic; ds4_model.cu runs it).
+// src/ds4/ds4_pcie.hpp - the decode path's PCIe lane for wam-ds4 (the host side's arithmetic; ds4_model.cu runs it).
 //
-// A decoded token's routed experts that VRAM does not hold were all computed by the CPU lane.  As GLM's maya does
+// A decoded token's routed experts that VRAM does not hold were all computed by the CPU lane.  As GLM's wam does
 // (glm_fast_path.cu's lane_plan), some of them can instead be read into pinned memory, copied over PCIe into a few
 // staging slots of the GPU and computed there by the same expert kernels as the VRAM ones - while the CPU lane computes
 // the rest - so the two lanes finish together.  Which ones is decided per request from this PC's measured costs: the

@@ -1,5 +1,5 @@
 {
- "_": "DeepSeek-V4.1-Flash-1017 as unsloth's GGUFs for maya-ds4 (maya.py's DeepSeek setup, tools/ds4/pack_gguf.py): dense weights BF16 (UD-Q8_K_XL) or Q8_0 (UD-Q4_K_XL), routed experts MXFP4, the Engram tables MXFP8; the smaller UD quants of unsloth's re-upload of 2026-10-28 (each pinned to that revision: its own \"revision\"; the Engram tables in the last shard, in IQ4_NL, Q5_K, Q6_K or MXFP8 - \"table\"; \"memory_gb\": the files but that shard) - every file pinned to a revision, with its size and sha256. Neither has the DSpark drafter or the vision tower (\"drafter\" and \"vision\" below: from DeepSeek's own checkpoint).",
+ "_": "DeepSeek-V4.1-Flash-1017 as unsloth's GGUFs for wam-ds4 (wam.py's DeepSeek setup, tools/ds4/pack_gguf.py): dense weights BF16 (UD-Q8_K_XL) or Q8_0 (UD-Q4_K_XL), routed experts MXFP4, the Engram tables MXFP8; the smaller UD quants of unsloth's re-upload of 2026-10-28 (each pinned to that revision: its own \"revision\"; the Engram tables in the last shard, in IQ4_NL, Q5_K, Q6_K or MXFP8 - \"table\"; \"memory_gb\": the files but that shard) - every file pinned to a revision, with its size and sha256. Neither has the DSpark drafter or the vision tower (\"drafter\" and \"vision\" below: from DeepSeek's own checkpoint).",
  "name": "DeepSeek-V4.1-Flash-1017",
  "repo": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
  "revision": "8a6ec9cf118e785a362ea94ee123c61c70553be6",
@@ -352,7 +352,7 @@
   },
   "UD-IQ3_S": {
    "about": "experts IQ2_S / IQ3_XXS / IQ3_S / Q3_K / MXFP4 by layer, dense weights Q8_0 / BF16, the Engram tables Q6_K (in its last shard)",
-   "tables_as_maya": "its table shard holds the same bytes as Maya's Q6_K pair (abliterated.engram.from; compared in full, 2026-10-30): either is read for both",
+   "tables_as_wam": "its table shard holds the same bytes as Wam's Q6_K pair (abliterated.engram.from; compared in full, 2026-10-30): either is read for both",
    "revision": "8a6ec9cf118e785a362ea94ee123c61c70553be6",
    "files": {
     "UD-IQ3_S/DeepSeek-V4.1-Flash-1017-UD-IQ3_S-00001-of-00008.gguf": [
@@ -434,58 +434,58 @@
    "memory_gb": 283
   }
  },
- "maya": {
-  "_": "Maya's quants of DeepSeek-V4.1-Flash-1017 (tools/maya_quant: per-expert statistics from the model itself, error-feedback rounding of the experts), each one GGUF split with everything in it - the Engram tables too, in Q6_K (made from DeepSeek's released weights). The files are listed here once they are uploaded, with the commit they were uploaded at. \"memory_gb\": the VRAM + RAM that hold a quant - its files but the Engram tables, which stay on the SSD, and its drafter - by which the setup recommends the context.",
-  "repo": "peasantsmith/DeepSeek-V4.1-Flash-1017-Maya-GGUF",
+ "wam": {
+  "_": "Wam's quants of DeepSeek-V4.1-Flash-1017 (tools/wam_quant: per-expert statistics from the model itself, error-feedback rounding of the experts), each one GGUF split with everything in it - the Engram tables too, in Q6_K (made from DeepSeek's released weights). The files are listed here once they are uploaded, with the commit they were uploaded at. \"memory_gb\": the VRAM + RAM that hold a quant - its files but the Engram tables, which stay on the SSD, and its drafter - by which the setup recommends the context.",
+  "repo": "peasantsmith/DeepSeek-V4.1-Flash-1017-Wam-GGUF",
   "revision": "c33d87b8c7a3b7d55e71324dc82395587a870b0b",
   "quants": {
-   "Maya-S": {
+   "Wam-S": {
     "about": "experts IQ2_XXS / IQ3_XXS, the first and last four layers IQ2_S / IQ3_S, dense weights Q8_0, the Engram tables Q6_K",
     "memory_gb": 186,
     "files": {
-     "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00001-of-00006.gguf": [
+     "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00001-of-00006.gguf": [
       47887697312,
       "1f3437f57042e69f94c141ffbcba0d5610dab63feb07244fb468be4940d6763f"
      ],
-     "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00002-of-00006.gguf": [
+     "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00002-of-00006.gguf": [
       47669578400,
       "66501fee8702ffd54e6f065323ab54bb3150d20b10b01922c589e7462c7b5ba6"
      ],
-     "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00003-of-00006.gguf": [
+     "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00003-of-00006.gguf": [
       47103347360,
       "3195b23f33337c46a07c48583946d99147c3635412bc4adc6acdc4cf42bf30ad"
      ],
-     "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00004-of-00006.gguf": [
+     "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00004-of-00006.gguf": [
       35532532032,
       "d60dba35fac9601cd5c6026439dd980c457a5bb1c009192ea539b220108ea0db"
      ],
-     "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00005-of-00006.gguf": [
+     "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00005-of-00006.gguf": [
       80641295472,
       "c98d46f96a25d17c4c54da5a60782c130255c364a22e621ea28d5c98a692ceb2"
      ],
-     "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00006-of-00006.gguf": [
+     "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00006-of-00006.gguf": [
       80643503412,
       "98d65ef4f36e0b193935d44c3586241ca09b1b47e90f118e85332cfdb5860263"
      ]
     },
     "earlier": [
      {
-      "_": "v1.1.16's Maya-S: 4 shards without the Engram tables, which came from unsloth's MXFP8 shard of them beside it in <...-GGUF>/Engram (\"engram\": either of its layouts) - used as they are when both are whole, nothing downloaded again",
+      "_": "v1.1.16's Wam-S: 4 shards without the Engram tables, which came from unsloth's MXFP8 shard of them beside it in <...-GGUF>/Engram (\"engram\": either of its layouts) - used as they are when both are whole, nothing downloaded again",
       "revision": "26c6aeaf5ecce88fe47103f780279bcc6f1f0d9b",
       "files": {
-       "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00001-of-00004.gguf": [
+       "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00001-of-00004.gguf": [
         47887697280,
         "b33d91333b463414fd91fbeb14a0939e3064a1abd820fa06310992da611eeb2e"
        ],
-       "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00002-of-00004.gguf": [
+       "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00002-of-00004.gguf": [
         47669578400,
         "8198c1a5b9e2f964affacc1141627e2f0715711571c1fe04cb81702f232c5c39"
        ],
-       "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00003-of-00004.gguf": [
+       "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00003-of-00004.gguf": [
         47103347360,
         "96b9b5e22ed60825794c377301cf2671a7a2ec463c7580b57e101f222c8ee516"
        ],
-       "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00004-of-00004.gguf": [
+       "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00004-of-00004.gguf": [
         35532532032,
         "506dd95a2ea4f17c933534d730ec72b2ef1b82eec4847770f4f23c38344f96ca"
        ]
@@ -511,23 +511,23 @@
      }
     ]
    },
-   "Maya-M": {
+   "Wam-M": {
     "about": "experts IQ3_S, dense weights Q8_0",
     "files": {}
    },
-   "Maya-XS": {
-    "about": "every routed expert IQ1_S (error-feedback rounding, calibrated layer by layer on the quantized model itself), dense weights Q8_0, the Engram tables Q6_K (Maya's pair of table shards, \"tables\" below: read from the Engram-Q6_K folder, shared with Maya-S); with its own 2-bit DSpark drafter",
+   "Wam-XS": {
+    "about": "every routed expert IQ1_S (error-feedback rounding, calibrated layer by layer on the quantized model itself), dense weights Q8_0, the Engram tables Q6_K (Wam's pair of table shards, \"tables\" below: read from the Engram-Q6_K folder, shared with Wam-S); with its own 2-bit DSpark drafter",
     "memory_gb": 121,
     "files": {
-     "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-v2-IQ1_S-00001-of-00003.gguf": [
+     "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-v2-IQ1_S-00001-of-00003.gguf": [
       47993866016,
       "9d92dd13d4603dbf07720845419963693f4c07ae098e55a5aae2f207dd44d04d"
      ],
-     "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-v2-IQ1_S-00002-of-00003.gguf": [
+     "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-v2-IQ1_S-00002-of-00003.gguf": [
       47421853600,
       "b7f26bae6d6fccfb256c911f645289c0aec8459766ef83f6a04d7ed47c7e06c8"
      ],
-     "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-v2-IQ1_S-00003-of-00003.gguf": [
+     "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-v2-IQ1_S-00003-of-00003.gguf": [
       21422979296,
       "62b98172562543126204fa2ff18f7d72d75353445ff93f4135d037355b409f35"
      ]
@@ -548,27 +548,27 @@
     },
     "earlier": [
      {
-      "_": "Maya-XS v1 (the first release): 5 shards, its n-gram tables in shards 4-5 - used as it is when the folder holds it whole, nothing downloaded again",
+      "_": "Wam-XS v1 (the first release): 5 shards, its n-gram tables in shards 4-5 - used as it is when the folder holds it whole, nothing downloaded again",
       "upgrade": true,
       "revision": "c273fcbdda76a1db074c2f414cb70edbfca2f2ef",
       "files": {
-       "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00001-of-00005.gguf": [
+       "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-IQ1_S-00001-of-00005.gguf": [
         47781530400,
         "a0cb7966afd68bc35c46f78018d1fa1d2e4bcbe3c3baf39f60cd1733ed9ad7e5"
        ],
-       "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00002-of-00005.gguf": [
+       "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-IQ1_S-00002-of-00005.gguf": [
         47775748128,
         "ba5afb43adfc667436ebcfbd82d25411fa2843ee7e1d877290611cd60f93cca1"
        ],
-       "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00003-of-00005.gguf": [
+       "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-IQ1_S-00003-of-00005.gguf": [
         19784230848,
         "1482443bb4957c8d2f005ded365445f98558ff05c50674f9ee9a96ddabc122a4"
        ],
-       "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00004-of-00005.gguf": [
+       "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-IQ1_S-00004-of-00005.gguf": [
         80641295472,
         "0d93315942c523d82f6dbc0a6e0e1751548e309f3963f96b82f92e8f9bc52e36"
        ],
-       "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00005-of-00005.gguf": [
+       "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-IQ1_S-00005-of-00005.gguf": [
         80643503412,
         "39bbc8cde8b17604fed9a7ba7fc6bc9c5e72e34733657943ac049b4b9ca2d340"
        ]
@@ -576,11 +576,11 @@
      }
     ],
     "tables": {
-     "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00004-of-00005.gguf": [
+     "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-IQ1_S-00004-of-00005.gguf": [
       80641295472,
       "0d93315942c523d82f6dbc0a6e0e1751548e309f3963f96b82f92e8f9bc52e36"
      ],
-     "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00005-of-00005.gguf": [
+     "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-IQ1_S-00005-of-00005.gguf": [
       80643503412,
       "39bbc8cde8b17604fed9a7ba7fc6bc9c5e72e34733657943ac049b4b9ca2d340"
      ]
@@ -588,7 +588,7 @@
    }
   },
   "drafter": {
-   "_": "The DSpark drafter Maya ships: DeepSeek's FP4 experts as released, its FP8 dense weights in Q8_0 (the engine's formats: used as it is, beside the quants' folders as dspark/); the shards + drafter_pack.py path (\"drafter\" below) is the fallback while this is not pinned.",
+   "_": "The DSpark drafter Wam ships: DeepSeek's FP4 experts as released, its FP8 dense weights in Q8_0 (the engine's formats: used as it is, beside the quants' folders as dspark/); the shards + drafter_pack.py path (\"drafter\" below) is the fallback while this is not pinned.",
    "files": {
     "dspark/dspark.bin": [
      7967616768,
@@ -602,7 +602,7 @@
   }
  },
  "abliterated": {
-  "_": "orcarouter's abliterated DeepSeek-V4.1-Flash-1017 (orcarouter/DeepSeek-V4.1-Flash-1017-abliterated: the refusal direction orthogonalized out of every matrix that writes the residual stream - its card: harmful prompts refused 0.874 -> 0.074, MMLU 0.91 -> 0.92) as GGUFs for maya-ds4, two versions (Mix-128G, Mix-256G: the routed experts in other low-bit types layer by layer and role by role, MXFP4 downs under IQ3 gate / ups in some layers; dense weights Q5_K / Q6_K / Q8_0, the router F32), every file at one revision with its size and sha256. Each version's shard 2 holds only the Engram (n-gram) table, IQ4_NL - DeepSeek's released table quantized, not abliterated (checked 2026-10-27: 4096 rows against Maya's Q6_K of it differ as an IQ4_NL quantization of them does, in no shared direction) - so the setup leaves that shard out (\"table\": listed, never fetched) and the pack takes Maya's Q6_K tables instead (\"engram\"), one copy for both versions. Gated on Hugging Face: accept its terms there; the download sends HF_TOKEN (or the token of `hf auth login`). Neither the DSpark drafter nor the vision tower is in it: DeepSeek's (\"drafter\", \"vision\" below), as for unsloth's GGUFs - the drafter only drafts (each token checked by the model), so its answers are the model's own.",
+  "_": "orcarouter's abliterated DeepSeek-V4.1-Flash-1017 (orcarouter/DeepSeek-V4.1-Flash-1017-abliterated: the refusal direction orthogonalized out of every matrix that writes the residual stream - its card: harmful prompts refused 0.874 -> 0.074, MMLU 0.91 -> 0.92) as GGUFs for wam-ds4, two versions (Mix-128G, Mix-256G: the routed experts in other low-bit types layer by layer and role by role, MXFP4 downs under IQ3 gate / ups in some layers; dense weights Q5_K / Q6_K / Q8_0, the router F32), every file at one revision with its size and sha256. Each version's shard 2 holds only the Engram (n-gram) table, IQ4_NL - DeepSeek's released table quantized, not abliterated (checked 2026-10-27: 4096 rows against Wam's Q6_K of it differ as an IQ4_NL quantization of them does, in no shared direction) - so the setup leaves that shard out (\"table\": listed, never fetched) and the pack takes Wam's Q6_K tables instead (\"engram\"), one copy for both versions. Gated on Hugging Face: accept its terms there; the download sends HF_TOKEN (or the token of `hf auth login`). Neither the DSpark drafter nor the vision tower is in it: DeepSeek's (\"drafter\", \"vision\" below), as for unsloth's GGUFs - the drafter only drafts (each token checked by the model), so its answers are the model's own.",
   "name": "DeepSeek-V4.1-Flash-1017-abliterated",
   "repo": "orcarouter/DeepSeek-V4.1-Flash-1017-abliterated-GGUF",
   "revision": "349470a09c1fca35862b0796e726b9fe00a947df",
@@ -675,19 +675,19 @@
    }
   },
   "engram": {
-   "_": "Maya's Q6_K Engram tables (DeepSeek's released ones) for both versions: the two shards of a Maya quant that hold them (the \"maya\" entry's files and sha256), in their own folder beside the versions' (<models>/DeepSeek-V4.1-Flash-1017-abliterated-GGUF/Engram-Q6_K) - hard-linked from a Maya quant set up on the same drive (no second copy), else downloaded from Maya's repo (161.3 GB). Either quant's pair gives the same tables (their headers differ).",
+   "_": "Wam's Q6_K Engram tables (DeepSeek's released ones) for both versions: the two shards of a Wam quant that hold them (the \"wam\" entry's files and sha256), in their own folder beside the versions' (<models>/DeepSeek-V4.1-Flash-1017-abliterated-GGUF/Engram-Q6_K) - hard-linked from a Wam quant set up on the same drive (no second copy), else downloaded from Wam's repo (161.3 GB). Either quant's pair gives the same tables (their headers differ).",
    "folder": "Engram-Q6_K",
    "from": {
-    "Maya-XS": [
-     "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00004-of-00005.gguf",
-     "Maya-XS/DeepSeek-V4.1-Flash-1017-Maya-XS-IQ1_S-00005-of-00005.gguf"
+    "Wam-XS": [
+     "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-IQ1_S-00004-of-00005.gguf",
+     "Wam-XS/DeepSeek-V4.1-Flash-1017-Wam-XS-IQ1_S-00005-of-00005.gguf"
     ],
-    "Maya-S": [
-     "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00005-of-00006.gguf",
-     "Maya-S/DeepSeek-V4.1-Flash-1017-Maya-S-IQ2_XXS-00006-of-00006.gguf"
+    "Wam-S": [
+     "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00005-of-00006.gguf",
+     "Wam-S/DeepSeek-V4.1-Flash-1017-Wam-S-IQ2_XXS-00006-of-00006.gguf"
     ]
    },
-   "download": "Maya-XS"
+   "download": "Wam-XS"
   }
  },
  "drafter": {
@@ -710,7 +710,7 @@
   }
  },
  "vision": {
-  "_": "DeepSeek's vision tower (the GGUFs leave it out; every GGUF of the model shares it, the Maya quants too): shard 1 of DeepSeek's own checkpoint holds only the tower (vision.*) and the aligner (aligner.*), BF16, and config.json their geometry; the picture span's three marker rows sit beside the embedding in shard 2, so only their 30 KB are read from it (\"marks\": an HTTP range request, each row [offset in the file, bytes, sha256]). tools/ds4/vision_pack.py makes them vision.bin + vision.json, beside the quants' folders.",
+  "_": "DeepSeek's vision tower (the GGUFs leave it out; every GGUF of the model shares it, the Wam quants too): shard 1 of DeepSeek's own checkpoint holds only the tower (vision.*) and the aligner (aligner.*), BF16, and config.json their geometry; the picture span's three marker rows sit beside the embedding in shard 2, so only their 30 KB are read from it (\"marks\": an HTTP range request, each row [offset in the file, bytes, sha256]). tools/ds4/vision_pack.py makes them vision.bin + vision.json, beside the quants' folders.",
   "repo": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
   "revision": "1bae0e1088993b9b82de08f59de5be5a34e42170",
   "files": {

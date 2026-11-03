@@ -7,20 +7,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "serve"), str(ROOT / "tools"), str(ROOT)]
-import maya_quants as Q  # noqa: E402
+import wam_quants as Q  # noqa: E402
 import models as M  # noqa: E402
 import server  # noqa: E402
 
-GLM = {"exe": "x/maya", "args": ["--glm-pack", "p"], "installer": {"quant": "Maya-XS-IQ1_S"}}
-GLM_S24 = {"exe": "x/maya", "args": ["--glm-pack", "p"], "installer": {"quant": "Maya-S24"}}
-DS = {"exe": "x/maya-ds4", "args": ["--pack", "p"]}
+GLM = {"exe": "x/wam", "args": ["--glm-pack", "p"], "installer": {"quant": "Wam-XS-IQ1_S"}}
+GLM_S24 = {"exe": "x/wam", "args": ["--glm-pack", "p"], "installer": {"quant": "Wam-S24"}}
+DS = {"exe": "x/wam-ds4", "args": ["--pack", "p"]}
 
 
 class Default(unittest.TestCase):
     def test_only_glm_xs_gets_8192(self):
         self.assertEqual(Q.default_thinking_budget(GLM_S24), 32768)
         self.assertIsNone(Q.thinking_budget_for(GLM_S24))
-        for q in ("Maya-S-v2-IQ2_XXS", "Maya-M", "Maya-M-Derisked", "Maya-L", None):
+        for q in ("Wam-S-v2-IQ2_XXS", "Wam-M", "Wam-M-Derisked", "Wam-L", None):
             c = {**GLM, "installer": {"quant": q}}
             self.assertEqual(Q.default_thinking_budget(c), 32768, q)
             self.assertIsNone(Q.thinking_budget_for(c), q)
@@ -35,11 +35,11 @@ class Default(unittest.TestCase):
         self.assertIsNone(Q.thinking_budget_for({**GLM, "thinking_budget": 16000}))
         self.assertIsNone(Q.thinking_budget_for({**GLM, "thinking_budget": 0}))
         self.assertIsNone(Q.thinking_budget_for({**GLM, "thinking_budget": 32768,
-                                                 "installer": {"quant": "Maya-XS", "thinking_budget_set": True}}))
+                                                 "installer": {"quant": "Wam-XS", "thinking_budget_set": True}}))
 
     def test_switch_writes_it(self):
         with tempfile.TemporaryDirectory() as d:
-            p = Path(d) / "maya-x.json"
+            p = Path(d) / "wam-x.json"
             p.write_text(json.dumps({**GLM, **dict(zip(("sampling", "reasoning_effort"), Q.model_defaults(GLM)))}))
             self.assertTrue(M.own_defaults(p))
             self.assertEqual(json.loads(p.read_text())["thinking_budget"], 8192)
@@ -66,7 +66,7 @@ class Field(unittest.TestCase):
 
     def test_apply_live_and_save(self):
         with tempfile.TemporaryDirectory() as d:
-            p = Path(d) / "maya-x.json"
+            p = Path(d) / "wam-x.json"
             p.write_text(json.dumps(GLM))
             s = self.svc(str(p))
             self.assertEqual(s.think_budget_info(), {"budget": 8192, "supported": True, "saved": True})
@@ -87,8 +87,8 @@ class Field(unittest.TestCase):
             s.set_think_budget(1024)
 
 
-class GlmMayaXS(unittest.TestCase):
-    """The catalog entry of GLM-5.3-Flash Maya-XS and the defaults it brings."""
+class GlmWamXS(unittest.TestCase):
+    """The catalog entry of GLM-5.3-Flash Wam-XS and the defaults it brings."""
 
     def test_defaults(self):
         self.assertEqual(Q.model_defaults(GLM)[0], {"temperature": 0.7, "top_p": 0.95, "min_p": 0.05})
@@ -96,14 +96,14 @@ class GlmMayaXS(unittest.TestCase):
         self.assertEqual(Q.default_thinking_budget(GLM), 8192)
 
     def test_entry(self):
-        import maya
-        m = maya.MODELS["Maya-XS-IQ1_S"]
+        import wam
+        m = wam.MODELS["Wam-XS-IQ1_S"]
         self.assertEqual(m["revision"], "6728cf78a5b198a6a6f84b7fb88956a17ec56521")
-        self.assertEqual(maya.shard_names(m), ["GLM-5.3-Flash-Maya-XS-IQ1_S-0000%d-of-00002.gguf" % i for i in (1, 2)])
-        self.assertEqual(set(m["sha256"]), set(maya.shard_names(m)))
+        self.assertEqual(wam.shard_names(m), ["GLM-5.3-Flash-Maya-XS-IQ1_S-0000%d-of-00002.gguf" % i for i in (1, 2)])
+        self.assertEqual(set(m["sha256"]), set(wam.shard_names(m)))
         self.assertEqual((m["kv"], m["context"]), ("int8", 131072))
-        self.assertEqual(maya.recommended_context(("download", "Maya-S-v2-IQ2_XXS"), {"gpus": []}), maya.DEFAULT_CONTEXT)
-        self.assertEqual(maya.glm_sampling(("download", "Maya-XS-IQ1_S"), "Maya-XS-IQ1_S"),
+        self.assertEqual(wam.recommended_context(("download", "Wam-S-v2-IQ2_XXS"), {"gpus": []}), wam.DEFAULT_CONTEXT)
+        self.assertEqual(wam.glm_sampling(("download", "Wam-XS-IQ1_S"), "Wam-XS-IQ1_S"),
                          {"temperature": 0.7, "top_p": 0.95, "min_p": 0.05})
 
 

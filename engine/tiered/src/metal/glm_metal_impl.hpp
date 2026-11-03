@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-namespace maya::metal {
+namespace wam::metal {
 
 struct TensorLoc {
     int fd = -1;
@@ -146,4 +146,4 @@ struct GlmMetal::Impl {
                  std::string& err);
 };
 
-}  // namespace maya::metal
+}  // namespace wam::metal

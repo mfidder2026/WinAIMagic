@@ -1,4 +1,4 @@
-// tests/ds4_lane_bench.cpp - the CPU lane's time for one routed expert of DeepSeek-V4.1-Flash, by format, as maya-ds4's
+// tests/ds4_lane_bench.cpp - the CPU lane's time for one routed expert of DeepSeek-V4.1-Flash, by format, as wam-ds4's
 // PCIe lane times it at load (ds4_model.cu's lane_time): calls of 1 and 3 experts of one token - each call's gate / up
 // rows in 64-row jobs on a pool of the physical cores (the caller helping), then its down rows, as cpu_experts_mx /
 // cpu_experts_iq run them - the experts in turn from more than the caches hold; an expert's time c and a call's oc

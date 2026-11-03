@@ -1,4 +1,4 @@
-// Decode-only, model-free benchmark of the GLM decode attention's two largest kernels at Maya-M's geometry (090 C10:
+// Decode-only, model-free benchmark of the GLM decode attention's two largest kernels at Wam-M's geometry (090 C10:
 // at the near-full 128K point the indexer's scores and MLA's split attention are its largest attention stages): the
 // original kernels against the take-two shapes (glm_fast.cu dsa_score2 / mla_split2 + mla_combine2), every shape
 // checked bit for bit - the scores, the selected cells and the attention's context - before it is timed.

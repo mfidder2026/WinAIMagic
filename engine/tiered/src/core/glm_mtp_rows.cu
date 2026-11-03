@@ -148,7 +148,7 @@ bool Glm5Model::mtpw_alloc(std::string& err) {
     };
     const auto fail = [&](const std::string& what) {
         err = "glm multi mtp: " + what + " did not allocate on CUDA" + std::to_string(dev_) +
-              " - fewer conversations at once (--parallel), a smaller MAYA_GLM_SEQ_CTX or fewer drafts";
+              " - fewer conversations at once (--parallel), a smaller WAM_GLM_SEQ_CTX or fewer drafts";
         return false;
     };
     M->kin.assign((size_t) n, nullptr);
@@ -410,7 +410,7 @@ bool Glm5Model::mtpw_part(const int* seqs, const int* counts, int n, const int32
 
 bool Glm5Model::mtpw_front(const int* seqs, const int* counts, int n, const int32_t* tokens, std::string& err) {
     if (!mtpw_ok()) {
-        err = "glm multi mtp: not set up (MAYA_GLM_MULTI_MTP with --parallel, the NextN block loaded)";
+        err = "glm multi mtp: not set up (WAM_GLM_MULTI_MTP with --parallel, the NextN block loaded)";
         return false;
     }
     if (seq_[0].hop_h == nullptr && !seq_pipe_ready(err)) return false;

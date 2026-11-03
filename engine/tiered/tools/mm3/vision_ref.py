@@ -1,5 +1,5 @@
 """tools/mm3/vision_ref.py - MiniMax-M3.1's vision tower and projector in torch, for one picture's pixels: the oracle
-for `maya-mm3 --encode-image`.
+for `wam-mm3 --encode-image`.
 
     python tools/mm3/vision_ref.py --model DIR --rgb FILE --size WxH --out FILE [--device cuda:0] [--dtype f32|bf16]
     python tools/mm3/vision_ref.py --model DIR --image PICTURE --rgb-out FILE   (the server's resize, for both sides)

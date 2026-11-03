@@ -1,4 +1,4 @@
-// src/ds4/ds4_watchdog.hpp - maya-ds4 --serve's watchdog rule (#539, #494): a request has hung when its heartbeat - a
+// src/ds4/ds4_watchdog.hpp - wam-ds4 --serve's watchdog rule (#539, #494): a request has hung when its heartbeat - a
 // prompt chunk or window read, a token, a step between them - has not moved for `limit` seconds while it runs.  It
 // measures the time since the last beat, never the request's length: a long prompt that keeps reading chunks beats
 // with each of them, however long it takes as a whole.  Waiting for a request (not busy) never counts.

@@ -1631,7 +1631,7 @@ static std::vector<int> glm_search_bounds(const std::string& pack_dir, int64_t m
     const bool df_pipe = dflash > 0 && dflash_pipelined(n);
     constexpr double kDfKept = 1.5;
     // ... and there each layer also costs a fixed time a token beyond its reads (launches, the CPU lane's answer, the
-    // hops): Maya-L over 9 GPUs measured ~0.78 ms a layer on a 5060 Ti and ~0.59 on the 3090 (2.1x its bandwidth),
+    // hops): Wam-L over 9 GPUs measured ~0.78 ms a layer on a 5060 Ti and ~0.59 on the 3090 (2.1x its bandwidth),
     // ~0.4 ms of it fixed - priced by reads alone the 3090 took 10 layers and paced every draft (5.9 ms a kept draft;
     // 8 layers: 4.9 ms, 57.1 / 58.9 -> 61.6 / 63.1 tok/s).  STRATA_GLM_SPLIT_LAYER_MS overrides it
     const double layer_fixed = !df_pipe ? 0.0
@@ -1721,7 +1721,7 @@ static std::vector<int> glm_search_bounds(const std::string& pack_dir, int64_t m
         if (c.bw <= 0) c.bw = 1e11;   // (no reading: every card the same, and the misses decide)
     const double host_bps = host_read_bps();
     // each part's lane, all at once - except under a DFlash pipelined window (3+ GPUs): there ONE pool serves every
-    // part's misses as they come (fast_setup), at about half the host's all-core read speed (Maya-L over 9 GPUs: 0.14-
+    // part's misses as they come (fast_setup), at about half the host's all-core read speed (Wam-L over 9 GPUs: 0.14-
     // 0.27 ms an 8.7 MB expert, 32-62 GB/s of 77; the host's / 9 priced a miss at ~1 ms and kept the 5060 Tis to the
     // layers their pools held whole, the 3090 to 9-10)
     const double miss_bps =
@@ -1992,7 +1992,7 @@ bool Glm5Model::load_pack_place(const std::string& pack_dir, int64_t max_ctx, st
     std::vector<int> bounds, devs, named;
     const char* dv = getenv("STRATA_GLM_DEVS");
     if (dv != nullptr && !ints(dv, named)) {
-        err = std::string("MAYA_GLM_DEVS: not a device list: ") + dv;
+        err = std::string("WAM_GLM_DEVS: not a device list: ") + dv;
         return false;
     }
     if (!spec.empty() && spec != "auto") {
@@ -2803,7 +2803,7 @@ static bool pack_shard_mmap(const std::string& path, strata::core::Glm5Model::Sh
 
 // Windows: while a file has a mapped view, every unbuffered read of it takes NTFS's cache-coherency path - the
 // decode's expert reads ran 3x as long (an expert in 24 parallel reads: 5.4 ms with the shards mapped, 1.8 ms
-// without; RTX 5090 Laptop, Intel RST RAID 0 of two NVMe drives, Maya-S24).  Once the load is done the fast path
+// without; RTX 5090 Laptop, Intel RST RAID 0 of two NVMe drives, Wam-S24).  Once the load is done the fast path
 // reads the shards through h_direct only, and token_embd through pack_emb_src_: the table moves to the heap
 // (~0.7 GB for GLM-5.3-Flash's Q8_0 rows) and the views go.  Kept when a shard has no unbuffered handle (its reads
 // fall back to the view) or with STRATA_GLM_KEEP_MAP=1.
@@ -3041,7 +3041,7 @@ bool strata::core::Glm5Model::load_pack(const std::string& pack_dir, int64_t max
     // token_embd at all (the embedding row is dequantized on the host from the shard mapping)
     fast_mode_ = getenv("STRATA_GLM_SLOW") == nullptr;
     if (exl3_ && !fast_mode_) {
-        err = "pack: an EXL3 model runs on the fast path only (unset MAYA_GLM_SLOW)";
+        err = "pack: an EXL3 model runs on the fast path only (unset WAM_GLM_SLOW)";
         return false;
     }
     const auto keep16 = [&](const Row& r, const strata::TensorInfo* t) {
@@ -3345,7 +3345,7 @@ bool strata::core::Glm5Model::load_pack(const std::string& pack_dir, int64_t max
         const bool own = find_tensor("blk." + std::to_string(g_.n_layers) + ".nextn.eh_proj.weight") != nullptr;
         auto extra = std::make_unique<strata::GgufFile>(mtp_gguf);
         if (extra->find("blk." + std::to_string(g_.n_layers) + ".nextn.eh_proj.weight") == nullptr) {
-            err = std::string("MAYA_GLM_MTP_GGUF: ") + mtp_gguf + " has no blk." + std::to_string(g_.n_layers) +
+            err = std::string("WAM_GLM_MTP_GGUF: ") + mtp_gguf + " has no blk." + std::to_string(g_.n_layers) +
                   " draft block";
             return false;
         }
@@ -3636,7 +3636,7 @@ bool strata::core::Glm5Model::load_pack(const std::string& pack_dir, int64_t max
     dflash_on_ = fast_mode_ && !dflash_path_.empty();
     if (!dflash_path_.empty() && l1_ == g_.n_layers) {
         if (!fast_mode_)
-            std::fprintf(stderr, "glm dflash: the draft needs the fast path (MAYA_GLM_SLOW is set) - drafting off\n");
+            std::fprintf(stderr, "glm dflash: the draft needs the fast path (WAM_GLM_SLOW is set) - drafting off\n");
         else if (!dflash_load(dflash_path_, dev_, err))
             return false;
     }

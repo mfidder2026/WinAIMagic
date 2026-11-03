@@ -34,17 +34,17 @@ td.log
 /run-*.sh
 /strata-*.json
 /strata-*.log
-/maya-*.json
-/maya-*.json.prev
-/.maya-switch.json
+/wam-*.json
+/wam-*.json.prev
+/.wam-switch.json
 /token-savings.json*
 /vision-memory.json
-/run-maya-*.sh
-/run-maya-*.bat
-/maya-report.txt
-/maya-bench.txt
+/run-wam-*.sh
+/run-wam-*.bat
+/wam-report.txt
+/wam-bench.txt
 /build-strata.bat
-/build-maya*.bat
+/build-wam*.bat
 
 # image encoder (setup.py --vision): build output and the generated build script
 build-vision*/

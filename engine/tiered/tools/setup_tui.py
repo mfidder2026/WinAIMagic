@@ -1,13 +1,13 @@
-"""The setup on a screen of its own (./maya.sh's first run and --setup), laid out like binsider
+"""The setup on a screen of its own (./wam.sh's first run and --setup), laid out like binsider
 (github.com/orhun/binsider) in the dashboard's colours (setup_look.py): the steps as tabs along the top, the logo, a
 card with what runs now and its progress, the output in a box below it, a question in a box of its own, and the keys
 in the bottom border.  Tab / Shift+Tab show an earlier step's output, Esc the live one.  Textual (MIT) draws it: it
-comes with Maya in third_party/wheels, and maya.py puts it into .venv from there (setup_screen).
+comes with Wam in third_party/wheels, and wam.py puts it into .venv from there (setup_screen).
 
 The setup is the same code as without the screen: it runs in a thread of its own, and setup.py's output functions
 (say, step, ok, warn, fail, ask, run, progress) hand everything to a Bridge (setup_bridge.py) instead of printing it
 (setup.UI).  When the screen closes the terminal gets the steps with their results - and when the setup ended early,
-that step's messages and the end of its output - and maya-setup.log keeps all of it.
+that step's messages and the end of its output - and wam-setup.log keeps all of it.
 """
 from __future__ import annotations
 
@@ -32,11 +32,11 @@ from setup_dash import Dashboard
 from setup_look import (ACCENT, ACCENT_TEXT, DANGER, EDGE, FAINT, INK, LINE, MUTED, OK, OK_TEXT, SETUP_CSS, THEME,
                         TINT, Card, Output, StopScreen, clock, hints, serving_card, setup_card, splash, styled, title)
 
-# maya.py's steps (setup.step) as tabs, the tuning after them, then Maya running (Bridge.serve): its dashboard, its log
+# wam.py's steps (setup.step) as tabs, the tuning after them, then Wam running (Bridge.serve): its dashboard, its log
 STEPS = {1: "This PC", 2: "Choices", 3: "Packages", 4: "Engine", 5: "Model", 6: "Pack", 7: "Images", 8: "Config",
          9: "Tuning", 10: "Dashboard", 11: "Log"}
 SERVE, LOG = 10, 11
-ROOT = Path(__file__).resolve().parents[1]              # the Maya folder (top right)
+ROOT = Path(__file__).resolve().parents[1]              # the Wam folder (top right)
 READY = re.compile(r"(?:^|\s|\x1b\[[0-9;]*m)ready: http")      # the server's "ready:" line, wherever it sits in the chunk
 PROBE_S = 3.0                                       # while it loads: ask /health this often (a missed "ready:" line)
 
@@ -46,7 +46,7 @@ def is_ready(line: str) -> bool:
 
 
 def health_ok(api: str) -> bool:
-    """Maya's server answers /health: it is up (api: http://host:port/v1)."""
+    """Wam's server answers /health: it is up (api: http://host:port/v1)."""
     import urllib.request
     try:
         with urllib.request.urlopen(api.rstrip("/").removesuffix("/v1") + "/health", timeout=2) as r:
@@ -70,15 +70,15 @@ class SetupApp(App):
                 Binding("shift+tab", "browse(-1)", show=False, priority=True),
                 Binding("escape", "live", show=False)]
     ENABLE_COMMAND_PALETTE = False
-    TITLE = "Project Maya"
+    TITLE = "Project Wam"
 
     def __init__(self, bridge: Bridge, body, version: str, me: str, log_path: Path | None, steps: bool = True):
         super().__init__()
         self.bridge, self.body, self.version, self.me, self.log_path = bridge, body, version, me, log_path
-        self.steps = steps                              # False: Maya's start alone - no setup steps, no setup log
+        self.steps = steps                              # False: Wam's start alone - no setup steps, no setup log
         self.state = {n: "wait" for n in STEPS}
         self.times: dict = {}                           # step -> [start, end or None]
-        self.titles: dict = {}                          # step -> its title, as maya.py says it
+        self.titles: dict = {}                          # step -> its title, as wam.py says it
         self.warned: set = set()
         self.cur = 0                                    # the step running now
         self.view = None                                # the step whose output the box shows (None: the live one)
@@ -90,13 +90,13 @@ class SetupApp(App):
         self.shown = 0                                  # the Bridge's entries handled so far
         self.written, self.flow = 0, 0                  # lines in the output box, and the width they wrap at
         self.printed = ""                               # print() from other threads, until its line ends
-        self.serving = None                             # Maya's server, once it runs here: what the card shows
+        self.serving = None                             # Wam's server, once it runs here: what the card shows
         self.probed, self.probing = 0.0, None            # the last /health look while it loads, and its thread
         self.served = deque(maxlen=5000)                # its output (only here: it can run for days)
 
     def get_css_variables(self) -> dict[str, str]:
-        return {**super().get_css_variables(), "maya-edge": EDGE, "maya-line": LINE, "maya-tint": TINT,
-                "maya-muted": MUTED, "maya-accent-text": ACCENT_TEXT}
+        return {**super().get_css_variables(), "wam-edge": EDGE, "wam-line": LINE, "wam-tint": TINT,
+                "wam-muted": MUTED, "wam-accent-text": ACCENT_TEXT}
 
     # ---------------------------------------------------------------------------------------- layout
     def compose(self) -> ComposeResult:
@@ -115,13 +115,13 @@ class SetupApp(App):
                         yield Static(id="intro")
                         yield OptionList(id="options")
                         yield Static(id="about")
-            yield Dashboard(id="dash")                  # Maya's, once it runs
+            yield Dashboard(id="dash")                  # Wam's, once it runs
 
     def on_mount(self) -> None:
         self.register_theme(THEME)
-        self.theme = "maya"
+        self.theme = "wam"
         self.query_one("#dash").display = False
-        self.query_one("#top").border_title = Text.assemble(("│", EDGE), ("Project Maya", f"bold {INK}"),
+        self.query_one("#top").border_title = Text.assemble(("│", EDGE), ("Project Wam", f"bold {INK}"),
                                                             (f" v{self.version}", MUTED), ("│", EDGE))
         out = self.query_one("#output")
         out.border_title = title("Output")
@@ -136,7 +136,7 @@ class SetupApp(App):
 
     def stop_on_signals(self) -> None:
         """SIGTERM / SIGHUP (a service manager, `kill`, the terminal closed) stop the screen as a confirmed Ctrl+C does:
-        the setup's thread ends, Maya's server and its engine end (POSIX; on Windows the server ends with this process:
+        the setup's thread ends, Wam's server and its engine end (POSIX; on Windows the server ends with this process:
         its --parent-pipe and job object).  A signal that is ignored (nohup) stays ignored."""
         import os
         import signal
@@ -175,7 +175,7 @@ class SetupApp(App):
         self.bridge.entries.extend((self.bridge.step_no, "out", line) for line in lines)
 
     def work(self) -> None:
-        """The setup's thread: maya.py's set_up, then the screen closes."""
+        """The setup's thread: wam.py's set_up, then the screen closes."""
         try:
             end = ("done", self.body())
         except KeyboardInterrupt:
@@ -296,7 +296,7 @@ class SetupApp(App):
             self.draw_tabs()
 
     def ev_serve(self, info: dict) -> None:
-        """The setup is done: Maya's server runs on this screen now."""
+        """The setup is done: Wam's server runs on this screen now."""
         self.end_step()
         self.cur, self.state[SERVE], self.times[SERVE] = SERVE, "run", [time.monotonic(), None]
         self.state[LOG], self.times[LOG] = "done", [time.monotonic(), None]
@@ -380,7 +380,7 @@ class SetupApp(App):
         self.abouts = [" ".join(x for x in (o[2], " ".join(outro)) if x) for o in options]
         box = self.query_one("#ask")
         named = kind != "fail" and len(question) <= 40  # a short question names the box, a long one opens it
-        stopped = "Maya stopped" if self.serving is not None else "The setup stopped"   # (once Maya ran: its server)
+        stopped = "Wam stopped" if self.serving is not None else "The setup stopped"   # (once Wam ran: its server)
         box.border_title = title(stopped, f"bold {DANGER}") if kind == "fail" else \
             title(question if named else "Question")
         body = Text.assemble((question, f"bold {DANGER if kind == 'fail' else INK}") if not named else "",
@@ -459,7 +459,7 @@ class SetupApp(App):
             self.show_view(None)
 
     def show_view(self, view) -> None:
-        """The output of a step, or Maya's log - or (None) the live page: the setup's, then Maya's dashboard."""
+        """The output of a step, or Wam's log - or (None) the live page: the setup's, then Wam's dashboard."""
         self.view = view
         dash = self.serving is not None and view is None
         self.query_one("#dash").display, self.query_one("#page").display = dash, not dash
@@ -482,12 +482,12 @@ class SetupApp(App):
     # ---------------------------------------------------------------------------------------- drawing
     def animating(self) -> bool:
         """Whether anything on the screen moves faster than the clock: the spinner (a step or the model loading, a
-        question waiting, a stop) - not Maya waiting for requests, which only counts seconds."""
+        question waiting, a stop) - not Wam waiting for requests, which only counts seconds."""
         s = self.serving
         return s is None or bool(self.pending) or s["state"] != "ready" or self.state.get(self.cur) == "run"
 
     def set_tick(self, every: float) -> None:
-        """The card's and the tabs' timer at `every` seconds.  A screen that only counts seconds (Maya ready, no
+        """The card's and the tabs' timer at `every` seconds.  A screen that only counts seconds (Wam ready, no
         request) ticks once a second instead of eight times: each tick that changes a line lays the screen out again."""
         if every != self.tick_every:
             self.tick_every = every
@@ -511,8 +511,8 @@ class SetupApp(App):
         spin = SPIN[self.frame % len(SPIN)]
         tabs = []
         for n in STEPS:
-            if n > 8 and n not in self.times or n < SERVE and not self.steps:   # (the tuning and Maya: once
-                continue                                                        # they start; a start: Maya's only)
+            if n > 8 and n not in self.times or n < SERVE and not self.steps:   # (the tuning and Wam: once
+                continue                                                        # they start; a start: Wam's only)
             state = self.state[n]
             style = {"wait": FAINT, "run": f"bold {INK}", "ready": f"bold {OK}", "fail": f"bold {DANGER}"}.get(
                 state, ACCENT_TEXT) + (" bold underline" if n == self.view else "")   # (done, warned or not: alike)
@@ -535,16 +535,16 @@ class SetupApp(App):
         elif kind:
             keys = [("Enter", "Choose"), ("↑↓", "Move")] + ([(f"1-{len(self.pending[1])}", "Pick")]
                                                             if kind == "choose" else [])
-        live, maya = self.view is None, self.serving is not None
-        keys += [("↑↓", "Scroll")] * (maya and live) + \
-            [("Tab", "Log" if maya and live else "Steps" if self.steps else "Dashboard")] + \
-            ([] if live or not self.steps else [("Esc", "Dashboard" if maya else "Live")]) + \
-            [("Ctrl+C", "Stop Maya" if maya else "Stop")]
+        live, wam = self.view is None, self.serving is not None
+        keys += [("↑↓", "Scroll")] * (wam and live) + \
+            [("Tab", "Log" if wam and live else "Steps" if self.steps else "Dashboard")] + \
+            ([] if live or not self.steps else [("Esc", "Dashboard" if wam else "Live")]) + \
+            [("Ctrl+C", "Stop Wam" if wam else "Stop")]
         self.query_one("#main").border_subtitle = hints(*keys)
 
 
 def run(body, version: str, log_path: Path | None, me: str, steps: bool = True):
-    """body() - maya.py's set_up (and Maya's start), or the start alone (steps False) - on the setup's screen; returns
+    """body() - wam.py's set_up (and Wam's start), or the start alone (steps False) - on the setup's screen; returns
     what it returns.  A fail() in it, read on the screen, is printed once the screen has closed and ends the setup as
     without it; a stop is a KeyboardInterrupt here.  log_path: the setup's whole output (None: none kept)."""
     import setup as S
@@ -569,17 +569,17 @@ def run(body, version: str, log_path: Path | None, me: str, steps: bool = True):
     if log_path:
         print(f"\n  The setup's whole output: {log_path}")
     bridge.log.close()
-    if app.serving is not None and kind != "done":      # Maya ran here: the end of its server's output
+    if app.serving is not None and kind != "done":      # Wam ran here: the end of its server's output
         print("\n" + "\n".join(list(app.served)[-TAIL:]))
     if bridge.interrupted is not None:
         print("  Stopping ...", flush=True)
         bridge.finish()
     if kind == "done":
         return value
-    if kind == "fail":                                  # (once Maya ran, the setup had not stopped: Maya's server did)
+    if kind == "fail":                                  # (once Wam ran, the setup had not stopped: Wam's server did)
         S.fail(*value, end=S.STOPPED if app.serving is None else None)
     if kind == "error":
         raise value
-    print(f"  Maya stopped: {me} starts it again." if app.serving else
+    print(f"  Wam stopped: {me} starts it again." if app.serving else
           f"  Stopped: everything finished so far is kept, and {me} continues where it stopped.")
     raise KeyboardInterrupt

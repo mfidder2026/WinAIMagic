@@ -1,9 +1,9 @@
-# cmake/build_id.cmake - the commit and the release maya-ds4 is built from, for `maya-ds4 --version` and the
-# "ds4: build <commit>" line --verbose prints.  Run at every build (the maya_build_id target), so a commit made since
+# cmake/build_id.cmake - the commit and the release wam-ds4 is built from, for `wam-ds4 --version` and the
+# "ds4: build <commit>" line --verbose prints.  Run at every build (the wam_build_id target), so a commit made since
 # the last build is seen without configuring again; the header is rewritten only when it changes, and only then is
 # ds4_main.cpp compiled again.
 #   cmake -DSRC=<source dir> -DOUT=<header> [-DID=<id>] -P cmake/build_id.cmake
-# The id: ID when given (-DMAYA_BUILD_ID=... at configure), else a BUILD_ID file's first line (a source archive has no
+# The id: ID when given (-DWAM_BUILD_ID=... at configure), else a BUILD_ID file's first line (a source archive has no
 # .git: whoever packs it writes the commit there), else git's commit (12 hex digits, "-dirty" with changes to tracked
 # files not committed), else "unknown".  The release: the VERSION file's (what the server's About page shows).
 set(id "${ID}")
@@ -39,7 +39,7 @@ if(release STREQUAL "")
 endif()
 string(REPLACE "\"" "" id "${id}")
 string(REPLACE "\"" "" release "${release}")
-file(WRITE "${OUT}.tmp" "// written by cmake/build_id.cmake at every build\n#define MAYA_BUILD_ID \"${id}\"\n"
-                        "#define MAYA_RELEASE \"${release}\"\n")
+file(WRITE "${OUT}.tmp" "// written by cmake/build_id.cmake at every build\n#define WAM_BUILD_ID \"${id}\"\n"
+                        "#define WAM_RELEASE \"${release}\"\n")
 file(COPY_FILE "${OUT}.tmp" "${OUT}" ONLY_IF_DIFFERENT)
 file(REMOVE "${OUT}.tmp")

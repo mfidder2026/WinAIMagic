@@ -1,6 +1,6 @@
 // include/strata/platform/env_report.hpp - one start-up line naming the engine's tuning settings that came from the
 // environment (#6): they are read with getenv where they are used and nothing else shows that they took effect.
-// Each one under the name it was set by (MAYA_X, or the older STRATA_X when only that one is set), with the value the
+// Each one under the name it was set by (WAM_X, or the older STRATA_X when only that one is set), with the value the
 // engine uses when it differs (a setting the engine clamps to its range).  Host code only.
 #pragma once
 
@@ -19,7 +19,7 @@ struct EnvRange {
     const char* why;    // said with the clamped value, e.g. "at most 2"
 };
 
-// The settings `env` (a NULL-ended "NAME=value" table, the process's environ) holds under MAYA_<group>* or
+// The settings `env` (a NULL-ended "NAME=value" table, the process's environ) holds under WAM_<group>* or
 // STRATA_<group>*, as "<what>: NAME=value, NAME=value (used: 2, at most 2), ..."; "" when none is set.
 inline std::string env_report(char** env, const char* group, const char* what, const EnvRange* ranges = nullptr,
                               size_t n_ranges = 0) {
@@ -30,13 +30,13 @@ inline std::string env_report(char** env, const char* group, const char* what, c
         const char* s = *e;
         const char* eq = std::strchr(s, '=');
         if (eq == nullptr) continue;
-        const bool maya = std::strncmp(s, "MAYA_", 5) == 0, strata = std::strncmp(s, "STRATA_", 7) == 0;
-        const char* rest = maya ? s + 5 : strata ? s + 7 : nullptr;
+        const bool wam = std::strncmp(s, "WAM_", 5) == 0, strata = std::strncmp(s, "STRATA_", 7) == 0;
+        const char* rest = wam ? s + 5 : strata ? s + 7 : nullptr;
         if (rest == nullptr || rest >= eq || std::strncmp(rest, group, gl) != 0) continue;
         const std::string key(rest, eq), full(s, eq);
         if (key == "GLM_VISION_LEND_MB") continue;   // the server sets it itself when vision is on, not the user
         auto it = set.find(key);
-        if (it == set.end() || maya) set[key] = {full, std::string(eq + 1)};   // (MAYA_X wins, as env_aliases does)
+        if (it == set.end() || wam) set[key] = {full, std::string(eq + 1)};   // (WAM_X wins, as env_aliases does)
     }
     std::string out;
     for (const auto& [key, nv] : set) {

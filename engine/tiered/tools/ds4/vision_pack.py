@@ -60,7 +60,7 @@ def read_range(url: str, start: int, n: int, total: int | None = None, timeout: 
             raise RangeError(f"{p}: {len(b)} of {n} bytes at {start}")
         return b
     end = start + n - 1
-    req = urllib.request.Request(url, headers={"User-Agent": "maya-setup", "Range": f"bytes={start}-{end}",
+    req = urllib.request.Request(url, headers={"User-Agent": "wam-setup", "Range": f"bytes={start}-{end}",
                                                "Accept-Encoding": "identity"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:

@@ -1,4 +1,4 @@
-// src/ds4/ds4_gguf_cpu.hpp - a GGUF's MXFP4 experts on the CPU lane of maya-ds4 (the format: ds4_gguf.cuh).  The
+// src/ds4/ds4_gguf_cpu.hpp - a GGUF's MXFP4 experts on the CPU lane of wam-ds4 (the format: ds4_gguf.cuh).  The
 // weights are read where they lie (the GGUF file's mapping), each block decoded once for all the activations of a
 // call (mx_rows: int8 dots, the CPU's best vector tier at run time; a scalar loop otherwise).
 #pragma once
@@ -35,7 +35,7 @@ void iq_cpu_gate_up(const IqCpu& f, const uint8_t* gate, const uint8_t* up, cons
                     float* const* ff, int r0, int r1, float limit);
 /// out[t][r] = down_r . hq[t] for rows [r0, r1).
 void iq_cpu_down(const IqCpu& f, const uint8_t* down, const void* const* hq, int nt, float* const* out, int r0, int r1);
-/// One matrix's rows alone (maya-mm3: MiniMax's gate and up, of different types or not, then its own swigluoai):
+/// One matrix's rows alone (wam-mm3: MiniMax's gate and up, of different types or not, then its own swigluoai):
 /// out[t][r] = row_r . act[t] for rows [r0, r1) of a matrix of `type` with k inputs (rb bytes a row), act[t]
 /// iq_cpu_quant(iq_cpu_act_type(type), ...)'s - the arithmetic of iq_cpu_down's rows (ggml-cpu's dot, or the own rows
 /// where they are its bits).  iq_cpu_act_type: the activations' ggml type for `type` (-1: not one ggml-cpu takes).

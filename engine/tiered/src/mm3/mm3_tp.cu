@@ -1,4 +1,4 @@
-// src/mm3/mm3_tp.cu - maya-mm3's tensor-parallel path (see mm3_tp.hpp)
+// src/mm3/mm3_tp.cu - wam-mm3's tensor-parallel path (see mm3_tp.hpp)
 #include "mm3_tp.hpp"
 
 #include <cublas_v2.h>
@@ -681,7 +681,7 @@ struct TpEngine::Impl {
                     if (o.vision_must) return false;
                     info.push_back("NOTE: vision off: the tower did not load on CUDA" + std::to_string(vd) + " (" + err +
                                    ") - text only");
-                    std::fprintf(stderr, "maya-mm3: %s\n", info.back().c_str());
+                    std::fprintf(stderr, "wam-mm3: %s\n", info.back().c_str());
                     err.clear();
                     cudaGetLastError();
                     vis.reset();
@@ -1200,7 +1200,7 @@ struct TpEngine::Impl {
         // head, the DSpark draft and its taps) left as many bytes idle on the others (4x RTX 3090 at --tp 2: 3.2 GB on
         // GPU 1 beside the drafter on GPU 0).  That room, less the reserve every member keeps, now holds the member's
         // slices of the next most routed experts outside VRAM (place_extra).  Not with --resident-cap;
-        // MAYA_MM3_TP_EXTRA=0: as before
+        // WAM_MM3_TP_EXTRA=0: as before
         if (pool != nullptr && o.resident_cap < 0) {
             const char* xv = ::mm3::env("MM3_TP_EXTRA");
             if (xv == nullptr || std::atoi(xv) != 0) place_extra();

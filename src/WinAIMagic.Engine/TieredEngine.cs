@@ -19,7 +19,7 @@ namespace WinAIMagic.Engine;
 public sealed class TieredEngine : EngineBase
 {
     /// <summary>The upstream server's name for this engine family; an argument between us and the server, it is not shown.</summary>
-    private const string ServerEngineName = "maya";
+    private const string ServerEngineName = "wam";
     private string? configFile;
     private string RawLog => LogPath + ".raw";
     private CancellationTokenSource? tailCts;

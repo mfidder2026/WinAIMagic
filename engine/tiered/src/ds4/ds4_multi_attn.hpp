@@ -1,4 +1,4 @@
-// src/ds4/ds4_multi_attn.hpp - maya-ds4 --parallel, DS4_MULTI_ATTN: a multi step's attention for all its rows in one
+// src/ds4/ds4_multi_attn.hpp - wam-ds4 --parallel, DS4_MULTI_ATTN: a multi step's attention for all its rows in one
 // launch a step instead of one a conversation.  A run is one conversation's consecutive rows (a decoded token, a verify
 // window, a drafter block); attn_core gives each run the window buffer alone (its ring's win rows, then its own rows),
 // here every run has its block of one shared buffer, side by side, so one launch serves all the rows, each reading its

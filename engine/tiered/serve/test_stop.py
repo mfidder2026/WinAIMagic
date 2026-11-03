@@ -1,5 +1,5 @@
-"""Every way of stopping maya.py stops Maya's server and its engine (v1.1.18): the server's stop signals, --parent-pipe
-(its stdin a pipe from maya.py: EOF when maya.py ends, however it ends), the orphan check, and maya.run_server - with
+"""Every way of stopping wam.py stops Wam's server and its engine (v1.1.18): the server's stop signals, --parent-pipe
+(its stdin a pipe from wam.py: EOF when wam.py ends, however it ends), the orphan check, and wam.run_server - with
 the real server and serve/fake_multi_engine.py as its engine (a process that ends on QUIT or when its input closes), in
 real processes.  No GPU needed; psutil (setup installs it) finds the processes."""
 from __future__ import annotations
@@ -28,7 +28,7 @@ try:
 except ImportError:                                     # (the CI's and setup's environments have it)
     psutil = None
 try:
-    import regex  # noqa: F401  (the GLM tokenizer's, which --engine maya loads: else the mock engine, no process)
+    import regex  # noqa: F401  (the GLM tokenizer's, which --engine wam loads: else the mock engine, no process)
     FAKE_ENGINE = True
 except ImportError:
     FAKE_ENGINE = False
@@ -58,14 +58,14 @@ def fake_config(d: Path) -> Path:
         exe.write_text(f'@"{sys.executable}" "{engine}" %*\r\n', encoding="utf-8")
     else:
         exe = engine
-    cfg = d / "maya-fake.json"
+    cfg = d / "wam-fake.json"
     cfg.write_text(json.dumps({"exe": str(exe), "args": ["1"], "tokenizer": str(tok), "model_name": "fake",
                                "log": str(d / "engine.log")}), encoding="utf-8")
     return cfg
 
 
 def server_cmd(cfg: Path, port: int) -> list:
-    engine = ["--engine", "maya", "--config", str(cfg)] if FAKE_ENGINE else ["--engine", "mock"]
+    engine = ["--engine", "wam", "--config", str(cfg)] if FAKE_ENGINE else ["--engine", "mock"]
     return [sys.executable, str(ROOT / "serve" / "server.py"), *engine, "--port", str(port)]
 
 
@@ -196,14 +196,14 @@ class ServerStops(unittest.TestCase):
     def ended(self, p: Proc, why: str):
         self.assertEqual(p.p.wait(timeout=60), 0)
         out = p.rest()
-        self.assertIn(f"[maya] stopping ({why}): the engine ends", out)
+        self.assertIn(f"[wam] stopping ({why}): the engine ends", out)
         self.assertEqual(gone(self.engine), [], "the engine outlived the server")
 
     @unittest.skipUnless(FAKE_ENGINE, "the tokenizer's regex module")
     def test_old_engine_name(self):
         """--engine strata (the old name, in older run scripts) starts the configured engine, not the mock one."""
         cmd = server_cmd(self.cfg, free_port())
-        cmd[cmd.index("maya")] = "strata"
+        cmd[cmd.index("wam")] = "strata"
         p = Proc(cmd, stdin=subprocess.DEVNULL)
         self.addCleanup(p.close)
         self.assertTrue(p.until("ready:"), "the server did not start:\n" + "\n".join(p.seen))
@@ -236,17 +236,17 @@ class ServerStops(unittest.TestCase):
 DRIVER = """
 import sys
 sys.path.insert(0, {root!r})
-sys.argv = ["maya.py"]
-import maya
-maya.stop_signals()
-print("maya pid", flush=True)
-sys.exit(maya.run_server({cmd!r}, wait_s=60))
+sys.argv = ["wam.py"]
+import wam
+wam.stop_signals()
+print("wam pid", flush=True)
+sys.exit(wam.run_server({cmd!r}, wait_s=60))
 """
 
 
 @unittest.skipIf(psutil is None, "psutil is not installed")
-class MayaStops(unittest.TestCase):
-    """maya.run_server as maya.py runs it: a stop of maya.py alone - SIGTERM, SIGHUP, even SIGKILL / Task Manager -
+class WamStops(unittest.TestCase):
+    """wam.run_server as wam.py runs it: a stop of wam.py alone - SIGTERM, SIGHUP, even SIGKILL / Task Manager -
     ends the server and its engine."""
 
     def setUp(self):
@@ -254,37 +254,37 @@ class MayaStops(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         cfg = fake_config(Path(self.tmp.name))
         code = DRIVER.format(root=str(ROOT), cmd=server_cmd(cfg, free_port()))
-        self.maya = Proc([sys.executable, "-c", code], stdin=subprocess.DEVNULL)
+        self.wam = Proc([sys.executable, "-c", code], stdin=subprocess.DEVNULL)
         self.addCleanup(self.cleanup)
-        self.assertTrue(self.maya.until("ready:"), "the server did not start:\n" + "\n".join(self.maya.seen))
-        self.tree = descendants(self.maya.p.pid)        # the server (and venv launchers) and the engine
+        self.assertTrue(self.wam.until("ready:"), "the server did not start:\n" + "\n".join(self.wam.seen))
+        self.tree = descendants(self.wam.p.pid)        # the server (and venv launchers) and the engine
         self.assertGreaterEqual(len(self.tree), 2 if FAKE_ENGINE else 1, self.tree)
 
     def cleanup(self):
-        kill_all([self.maya.p.pid] + self.tree)
-        self.maya.close()
+        kill_all([self.wam.p.pid] + self.tree)
+        self.wam.close()
 
     @unittest.skipIf(WIN, "POSIX signals")
-    def test_sigterm_to_maya_alone(self):
-        self.maya.p.send_signal(signal.SIGTERM)
-        self.assertEqual(self.maya.p.wait(timeout=60), 0)          # (it waited for the server, which ended well)
-        self.assertIn("[maya] stopping (the program that started it ended)", self.maya.rest())
+    def test_sigterm_to_wam_alone(self):
+        self.wam.p.send_signal(signal.SIGTERM)
+        self.assertEqual(self.wam.p.wait(timeout=60), 0)          # (it waited for the server, which ended well)
+        self.assertIn("[wam] stopping (the program that started it ended)", self.wam.rest())
         self.assertEqual(gone(self.tree), [])
 
     @unittest.skipIf(WIN, "POSIX signals")
-    def test_sighup_to_maya_alone(self):
-        self.maya.p.send_signal(signal.SIGHUP)
-        self.assertEqual(self.maya.p.wait(timeout=60), 0)
+    def test_sighup_to_wam_alone(self):
+        self.wam.p.send_signal(signal.SIGHUP)
+        self.assertEqual(self.wam.p.wait(timeout=60), 0)
         self.assertEqual(gone(self.tree), [])
 
-    def test_maya_killed(self):
+    def test_wam_killed(self):
         """SIGKILL (POSIX: the pipe's EOF stops the server, which ends its engine) or TerminateProcess (Windows: the
         job object ends them at once)."""
-        self.maya.p.kill()
-        self.maya.p.wait(timeout=30)
+        self.wam.p.kill()
+        self.wam.p.wait(timeout=30)
         self.assertEqual(gone(self.tree), [])
         if not WIN:
-            self.assertIn("[maya] stopping (the program that started it ended)", self.maya.rest())
+            self.assertIn("[wam] stopping (the program that started it ended)", self.wam.rest())
 
 
 SCREEN = """
@@ -311,23 +311,23 @@ def listening(port: int, timeout: float = 60) -> bool:
 @unittest.skipIf(psutil is None, "psutil is not installed")
 class ScreenStops(unittest.TestCase):
     """The server on the setup's screen (Bridge.serve: in a session / process group of its own, out of reach of the
-    terminal's signals) ends with maya.py too when maya.py is ended by force."""
+    terminal's signals) ends with wam.py too when wam.py is ended by force."""
 
-    def test_maya_killed(self):
+    def test_wam_killed(self):
         with tempfile.TemporaryDirectory() as d:
             port = free_port()
             code = SCREEN.format(root=str(ROOT), tools=str(ROOT / "tools"),
                                  cmd=server_cmd(fake_config(Path(d)), port))
-            maya = subprocess.Popen([sys.executable, "-c", code], stdin=subprocess.DEVNULL)
+            wam = subprocess.Popen([sys.executable, "-c", code], stdin=subprocess.DEVNULL)
             try:
                 self.assertTrue(listening(port), "the server did not start")
-                tree = descendants(maya.pid)
+                tree = descendants(wam.pid)
                 self.assertGreaterEqual(len(tree), 2 if FAKE_ENGINE else 1, tree)
-                maya.kill()
-                maya.wait(timeout=30)
+                wam.kill()
+                wam.wait(timeout=30)
                 self.assertEqual(gone(tree), [])
             finally:
-                kill_all(descendants(maya.pid) + [maya.pid])
+                kill_all(descendants(wam.pid) + [wam.pid])
 
 
 TREE = """

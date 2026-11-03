@@ -21,5 +21,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\WinAIMagic.Core\WinAIMagic.Core.csproj" />
+    <ProjectReference Include="..\WinAIMagic.Engine\WinAIMagic.Engine.csproj" />
+    <ProjectReference Include="..\WinAIMagic.Chat\WinAIMagic.Chat.csproj" />
+    <ProjectReference Include="..\WinAIMagic.Studio\WinAIMagic.Studio.csproj" />
   </ItemGroup>
 </Project>

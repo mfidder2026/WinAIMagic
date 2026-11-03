@@ -1,7 +1,7 @@
-// src/mm3/mm3_exl3.hpp - EXL3 (exllamav3) quantized weights on the device for maya-mm3 (MiniMax-M3.1-Flash): the
+// src/mm3/mm3_exl3.hpp - EXL3 (exllamav3) quantized weights on the device for wam-mm3 (MiniMax-M3.1-Flash): the
 // decode GEMV, the routed experts, and the full reconstruction for the prompt path.
 //
-// maya-mm3's own copy of include/strata/kernels/exl3.hpp (the GLM and DeepSeek engines keep theirs): the same format
+// wam-mm3's own copy of include/strata/kernels/exl3.hpp (the GLM and DeepSeek engines keep theirs): the same format
 // and interface in namespace strata::mm3::exl3, with the routed experts' activation MiniMax's swigluoai -
 // g = min(g, limit), u = clamp(u, -limit, limit), h = g * sigmoid(kSwigluAlpha g) * (u + 1) - instead of the clamped
 // swiglu.  Before sm_80: Volta / Turing's tensor cores (nvcuda::wmma) for every tile, and the prompt path's busy

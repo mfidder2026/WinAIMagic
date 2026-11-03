@@ -10,10 +10,10 @@
 cmake_minimum_required(VERSION 3.24)
 project(strata VERSION 0.1.27 LANGUAGES CXX)
 
-# Maya's build options by the names its docs give them: -DMAYA_X=... sets STRATA_X, the name this file reads
-get_cmake_property(_maya_cache CACHE_VARIABLES)
-foreach(_v IN LISTS _maya_cache)
-  if(_v MATCHES "^MAYA_(.+)$")
+# Wam's build options by the names its docs give them: -DWAM_X=... sets STRATA_X, the name this file reads
+get_cmake_property(_wam_cache CACHE_VARIABLES)
+foreach(_v IN LISTS _wam_cache)
+  if(_v MATCHES "^WAM_(.+)$")
     set(STRATA_${CMAKE_MATCH_1} "${${_v}}")
   endif()
 endforeach()
@@ -62,7 +62,7 @@ endif()
 # build without it does not link (found by @boxwrench in #17)
 if(STRATA_ENABLE_HIP AND NOT STRATA_PREFILL_MMQ)
   message(FATAL_ERROR "A HIP build needs -DSTRATA_PREFILL_MMQ=ON: the GLM prompt path multiplies its experts with "
-                      "MMQ (./maya.sh --backend hip sets it)")
+                      "MMQ (./wam.sh --backend hip sets it)")
 endif()
 if(STRATA_ENABLE_CUDA AND STRATA_ENABLE_HIP)
   message(FATAL_ERROR "STRATA_ENABLE_CUDA and STRATA_ENABLE_HIP are separate backends; enable only one")
@@ -78,9 +78,9 @@ endif()
 option(STRATA_BUILD_TESTS "Build the test suite" ${_strata_tests_default})
 option(STRATA_WERROR "Treat compiler warnings as errors" OFF)
 
-# Apple Silicon: maya-metal (GLM-5.3-Flash through ggml's Metal backend, cmake/metal_backend.cmake) and nothing else
-option(MAYA_ENABLE_METAL "Build maya-metal for Apple Silicon (GLM-5.3-Flash on the Metal GPU)" OFF)
-if(MAYA_ENABLE_METAL)   # (the CUDA / AMD options do not apply to this build)
+# Apple Silicon: wam-metal (GLM-5.3-Flash through ggml's Metal backend, cmake/metal_backend.cmake) and nothing else
+option(WAM_ENABLE_METAL "Build wam-metal for Apple Silicon (GLM-5.3-Flash on the Metal GPU)" OFF)
+if(WAM_ENABLE_METAL)   # (the CUDA / AMD options do not apply to this build)
   include(cmake/metal_backend.cmake)
   return()
 endif()
@@ -124,35 +124,35 @@ if(STRATA_ENABLE_CUDA)
     endforeach()
     if(NOT _kept)
       message(FATAL_ERROR
-        "CMAKE_CUDA_ARCHITECTURES=native, but none of this PC's GPUs (${CMAKE_CUDA_ARCHITECTURES_NATIVE}) is one Maya "
+        "CMAKE_CUDA_ARCHITECTURES=native, but none of this PC's GPUs (${CMAKE_CUDA_ARCHITECTURES_NATIVE}) is one Wam "
         "builds for (compute capability 6.0 or newer): name the architecture, e.g. -DCMAKE_CUDA_ARCHITECTURES=70.")
     endif()
     if(_left)
       list(JOIN _left ", " _left_s)
-      message(STATUS "Maya: CMAKE_CUDA_ARCHITECTURES=native left out ${_left_s} (a display card beside the GPUs)")
+      message(STATUS "Wam: CMAKE_CUDA_ARCHITECTURES=native left out ${_left_s} (a display card beside the GPUs)")
     endif()
     set(CMAKE_CUDA_ARCHITECTURES "${_kept}")
   endif()
   foreach(_a IN LISTS CMAKE_CUDA_ARCHITECTURES)
     string(REGEX REPLACE "-.*$" "" _base "${_a}")     # 120-real / 120-virtual are still 120
-    # Developed on sm_120 (RTX 50) and Volta (sm_70: GLM, maya-ds4 and maya-mm3 run on V100s); GLM also builds for
-    # Pascal (sm_6x, experimental - maya.py's MIN_CC).  Below sm_60 is refused.  maya-mm3 is built for sm_70 and
+    # Developed on sm_120 (RTX 50) and Volta (sm_70: GLM, wam-ds4 and wam-mm3 run on V100s); GLM also builds for
+    # Pascal (sm_6x, experimental - wam.py's MIN_CC).  Below sm_60 is refused.  wam-mm3 is built for sm_70 and
     # newer only (its kernels take more than Pascal's 4 KB of parameters: _mm3_archs below).
     if(_base STREQUAL "native" OR _base STREQUAL "all" OR _base STREQUAL "all-major")
       continue()
     endif()
     if(_base LESS 60)
       message(FATAL_ERROR
-        "Maya needs an NVIDIA GPU of compute capability 6.0 or newer (Pascal experimental, Volta / V100 and the "
+        "Wam needs an NVIDIA GPU of compute capability 6.0 or newer (Pascal experimental, Volta / V100 and the "
         "RTX 20 / 30 / 40 / 50 series), but CMAKE_CUDA_ARCHITECTURES is '${CMAKE_CUDA_ARCHITECTURES}'.")
     endif()
   endforeach()
-  message(STATUS "Maya: CUDA enabled, arch ${CMAKE_CUDA_ARCHITECTURES}")
-  # Pascal (sm_6x - a "native" build on a Tesla P40, as maya.py's arch_setting() asks for below sm_75): GP102 / GP104
+  message(STATUS "Wam: CUDA enabled, arch ${CMAKE_CUDA_ARCHITECTURES}")
+  # Pascal (sm_6x - a "native" build on a Tesla P40, as wam.py's arch_setting() asks for below sm_75): GP102 / GP104
   # cache global loads in L2 only unless the code is compiled to cache them in L1 as well, and the decode's GEMVs - many
-  # small loads of weights, scales and the q8_1 activations every warp of a block reads - starve there (Maya-L's Q6_K
+  # small loads of weights, scales and the q8_1 activations every warp of a block reads - starve there (Wam-L's Q6_K
   # dense GEMV ran at a quarter of a P40's bandwidth or less).  -dlcm=ca caches them in L1, as Volta and newer do by
-  # default: two P40s, decode 9.7 -> 16.9 tok/s with Maya-L and 9.4 -> 28.0 with Maya-S24, the same answers (#212).
+  # default: two P40s, decode 9.7 -> 16.9 tok/s with Wam-L and 9.4 -> 28.0 with Wam-S24, the same answers (#212).
   # A build for sm_70 and newer only is unchanged.
   set(_strata_archs "${CMAKE_CUDA_ARCHITECTURES}")
   if(_strata_archs MATCHES "native")
@@ -162,7 +162,7 @@ if(STRATA_ENABLE_CUDA)
     string(REGEX REPLACE "-.*$" "" _base "${_a}")
     if(_base MATCHES "^6[0-9]$")
       string(APPEND CMAKE_CUDA_FLAGS " -Xptxas -dlcm=ca")
-      message(STATUS "Maya: Pascal (sm_${_base}): global loads cached in L1 (-Xptxas -dlcm=ca)")
+      message(STATUS "Wam: Pascal (sm_${_base}): global loads cached in L1 (-Xptxas -dlcm=ca)")
       break()
     endif()
   endforeach()
@@ -233,14 +233,14 @@ if(STRATA_BUILD_TESTS)
   add_test(NAME ds4_pcie_test COMMAND ds4_pcie_test)
   add_executable(ds4_ram_slice_test tests/ds4_ram_slice_test.cpp)
   add_test(NAME ds4_ram_slice_test COMMAND ds4_ram_slice_test)
-  # maya-ds4 --serve's watchdog: it fires on a request that stopped moving, never on a long one still moving (#539)
+  # wam-ds4 --serve's watchdog: it fires on a request that stopped moving, never on a long one still moving (#539)
   add_executable(ds4_watchdog_test tests/ds4_watchdog_test.cpp)
   add_test(NAME ds4_watchdog_test COMMAND ds4_watchdog_test)
-  # maya-ds4's restore points: the one a prompt goes back to, the ones a read keeps (marks= / shared=), the cases
+  # wam-ds4's restore points: the one a prompt goes back to, the ones a read keeps (marks= / shared=), the cases
   add_executable(ds4_marks_test tests/ds4_marks_test.cpp)
   target_link_libraries(ds4_marks_test PRIVATE strata_warnings)
   add_test(NAME ds4_marks_test COMMAND ds4_marks_test)
-  # maya-ds4's log-probabilities (GEN logprobs=): the reference, the penalties, ties, the kernel's pieces, the LP line
+  # wam-ds4's log-probabilities (GEN logprobs=): the reference, the penalties, ties, the kernel's pieces, the LP line
   add_executable(ds4_logprobs_test tests/ds4_logprobs_test.cpp)
   target_link_libraries(ds4_logprobs_test PRIVATE strata_warnings)
   add_test(NAME ds4_logprobs_test COMMAND ds4_logprobs_test)
@@ -253,14 +253,14 @@ if(STRATA_BUILD_TESTS)
   target_link_libraries(ds4_ablate_test PRIVATE strata_artifact)
   add_test(NAME ds4_ablate_test COMMAND ds4_ablate_test)
 endif()
-# maya-ds4's Engram reader: a batch read ahead (a prompt's next part's rows) waits behind the others, every read the
+# wam-ds4's Engram reader: a batch read ahead (a prompt's next part's rows) waits behind the others, every read the
 # file's bytes (src/ds4/ds4_engram_io.hpp; a file in the temp folder, host code only)
 if(NOT WIN32 AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ds4_engram_reader_test.cpp")
   add_executable(ds4_engram_reader_test EXCLUDE_FROM_ALL tests/ds4_engram_reader_test.cpp)
   target_link_libraries(ds4_engram_reader_test PRIVATE strata_warnings Threads::Threads)
   add_test(NAME ds4_engram_reader_test COMMAND ds4_engram_reader_test)
 endif()
-# maya-ds4 --parallel, DS4_MULTI_ATTN: a multi step's window buffers side by side and the attention's launches over them
+# wam-ds4 --parallel, DS4_MULTI_ATTN: a multi step's window buffers side by side and the attention's launches over them
 # (src/ds4/ds4_multi_attn.hpp; host code only, so a build without the suite builds it by name)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ds4_multi_attn_plan_test.cpp")
   add_executable(ds4_multi_attn_plan_test EXCLUDE_FROM_ALL tests/ds4_multi_attn_plan_test.cpp)
@@ -358,7 +358,7 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
              COMMAND strata-load --file ${CMAKE_CURRENT_SOURCE_DIR}/pack/full/experts.bin --layers 1)
     set_tests_properties(expert_arena_load PROPERTIES PASS_REGULAR_EXPRESSION "per-layer checksums")
   else()
-    message(STATUS "maya: pack/full/experts.bin absent - the expert arena load test is NOT registered")
+    message(STATUS "wam: pack/full/experts.bin absent - the expert arena load test is NOT registered")
   endif()
 
   # ---- strata_kernels (P2.S2) ----
@@ -634,38 +634,38 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
     target_link_libraries(tune_hipblaslt PRIVATE hip::host roc::hipblas roc::hipblaslt)
   endif()
 
-  add_executable(maya src/program/generate.cpp)
-  target_include_directories(maya PRIVATE ${_strata_gpu_include_directories})
-  target_link_libraries(maya PRIVATE strata_engine strata_prefill strata_spec ${_strata_gpu_runtime_target})
+  add_executable(wam src/program/generate.cpp)
+  target_include_directories(wam PRIVATE ${_strata_gpu_include_directories})
+  target_link_libraries(wam PRIVATE strata_engine strata_prefill strata_spec ${_strata_gpu_runtime_target})
 
   # DeepSeek-V4.1-Flash (EXL3, tools/ds4/pack.py; or a GGUF, tools/ds4/pack_gguf.py): its own engine over the kernel
   # libraries (src/ds4)
   # (CUDA, or HIP through include/strata/hip_compat as the GLM engine; Linux and Windows)
   if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
-    add_executable(maya-ds4 src/ds4/ds4_main.cpp src/ds4/ds4_model.cu src/ds4/ds4_kernels.cu src/ds4/ds4_vision.cu
+    add_executable(wam-ds4 src/ds4/ds4_main.cpp src/ds4/ds4_model.cu src/ds4/ds4_kernels.cu src/ds4/ds4_vision.cu
                               src/ds4/ds4_gguf.cu src/ds4/ds4_gguf_cpu.cpp src/ds4/ds4_iq.cu src/ds4/ds4_iq_cpu.cpp
                               src/ds4/ds4_lt.cu src/ds4/ds4_host_ar.cpp src/ds4/ds4_packinfo.cpp)
-    target_include_directories(maya-ds4 PRIVATE ${_strata_gpu_include_directories} third_party/ggml)
-    # the commit and the release `maya-ds4 --version` and --verbose name, written at every build (cmake/build_id.cmake:
-    # git's commit, a source archive's BUILD_ID file, or -DMAYA_BUILD_ID=...; the release from VERSION)
-    set(MAYA_BUILD_ID "" CACHE STRING "maya-ds4 --version's build id (empty: git's commit, or the BUILD_ID file)")
-    add_custom_target(maya_build_id
+    target_include_directories(wam-ds4 PRIVATE ${_strata_gpu_include_directories} third_party/ggml)
+    # the commit and the release `wam-ds4 --version` and --verbose name, written at every build (cmake/build_id.cmake:
+    # git's commit, a source archive's BUILD_ID file, or -DWAM_BUILD_ID=...; the release from VERSION)
+    set(WAM_BUILD_ID "" CACHE STRING "wam-ds4 --version's build id (empty: git's commit, or the BUILD_ID file)")
+    add_custom_target(wam_build_id
       COMMAND ${CMAKE_COMMAND} -DSRC=${CMAKE_CURRENT_SOURCE_DIR}
-              -DOUT=${CMAKE_CURRENT_BINARY_DIR}/generated/maya_build_id.h -DID=${MAYA_BUILD_ID}
+              -DOUT=${CMAKE_CURRENT_BINARY_DIR}/generated/wam_build_id.h -DID=${WAM_BUILD_ID}
               -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_id.cmake
-      BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/generated/maya_build_id.h
+      BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/generated/wam_build_id.h
       VERBATIM)
-    add_dependencies(maya-ds4 maya_build_id)
-    target_include_directories(maya-ds4 PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
-    target_link_libraries(maya-ds4 PRIVATE strata_kernels strata_kernels_cpu strata_spec ${_strata_gpu_runtime_target}
+    add_dependencies(wam-ds4 wam_build_id)
+    target_include_directories(wam-ds4 PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
+    target_link_libraries(wam-ds4 PRIVATE strata_kernels strata_kernels_cpu strata_spec ${_strata_gpu_runtime_target}
                           ${_strata_gpu_blas_target})
     if(STRATA_ENABLE_HIP AND STRATA_HIPBLASLT_AVAILABLE)   # (the prompt path's dense GEMMs: ds4_lt.cu)
       set_source_files_properties(src/ds4/ds4_lt.cu PROPERTIES COMPILE_DEFINITIONS STRATA_HIPBLASLT_AVAILABLE=1)
-      target_link_libraries(maya-ds4 PRIVATE roc::hipblaslt)
+      target_link_libraries(wam-ds4 PRIVATE roc::hipblaslt)
     endif()
     if(STRATA_ENABLE_HIP)
-      target_sources(maya-ds4 PRIVATE src/ds4/ds4_peer_calibrate.cu)
-      target_link_libraries(maya-ds4 PRIVATE strata_mmq)
+      target_sources(wam-ds4 PRIVATE src/ds4/ds4_peer_calibrate.cu)
+      target_link_libraries(wam-ds4 PRIVATE strata_mmq)
     endif()
     if(NOT WIN32)   # mmap / mbind (NUMA)
       add_executable(ds4_cpu_bench tests/ds4_cpu_bench.cpp)
@@ -717,7 +717,7 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
     target_include_directories(ds4_multi_attn_test PRIVATE ${_strata_gpu_include_directories} include)
     target_link_libraries(ds4_multi_attn_test PRIVATE ${_strata_gpu_runtime_target})
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ds4_packinfo_test.cpp")
-      # maya-ds4 --pack-info on packs written for it (healthy, dead, short, a type no kernel takes, a drafter its
+      # wam-ds4 --pack-info on packs written for it (healthy, dead, short, a type no kernel takes, a drafter its
       # metadata leaves out, a profile of another size): host code only, no GPU
       enable_testing()
       add_executable(ds4_packinfo_test tests/ds4_packinfo_test.cpp src/ds4/ds4_packinfo.cpp)
@@ -727,7 +727,7 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
   endif()
 
   # MiniMax-M3.1-Flash (EXL3, tools/mm3/pack.py): its own engine (src/mm3), with its own copy of the EXL3 device kernels
-  # (swigluoai) - none of the other engines' code but maya-ds4's OS helpers (src/ds4/ds4_os.hpp).  CUDA and AMD (HIP),
+  # (swigluoai) - none of the other engines' code but wam-ds4's OS helpers (src/ds4/ds4_os.hpp).  CUDA and AMD (HIP),
   # on Linux and Windows.  CUDA: sm_70 and newer only - its EXL3 kernels take more than the 4 KB of parameters before Volta allows
   # (a "native" build on a PC with an older display card beside its GPUs - a Quadro P400 - leaves that card out).
   set(_mm3_archs)
@@ -743,31 +743,31 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
       endif()
     endforeach()
     if(_mm3_filter AND NOT _mm3_archs)
-      message(STATUS "Maya: maya-mm3 not built - it needs sm_70 or newer, arch ${_strata_archs}")
+      message(STATUS "Wam: wam-mm3 not built - it needs sm_70 or newer, arch ${_strata_archs}")
     endif()
   endif()
   if((STRATA_ENABLE_CUDA AND (_mm3_archs OR NOT _mm3_filter)) OR STRATA_ENABLE_HIP)
-    # (a GGUF's weights - tools/mm3/pack_gguf.py, MiniMax's Maya quants: maya-ds4's ggml block-type kernels, src/ds4/ds4_iq,
+    # (a GGUF's weights - tools/mm3/pack_gguf.py, MiniMax's Wam quants: wam-ds4's ggml block-type kernels, src/ds4/ds4_iq,
     #  on the device and its CPU rows on the CPU lane - mm3_gguf.cu, mm3_cpu_gg.cpp)
     set(_mm3_gguf_sources src/mm3/mm3_gguf.cu src/mm3/mm3_gv.cu src/ds4/ds4_iq.cu src/ds4/ds4_lt.cu)   # (ds4_lt: mm3_gguf.cu's AMD GEMMs)
     set(_mm3_gguf_cpu_sources src/mm3/mm3_cpu_gg.cpp src/ds4/ds4_iq_cpu.cpp src/ds4/ds4_gguf_cpu.cpp)
     # (AMD (HIP) builds the same engine: the EXL3 kernels' HIP paths as the shared exl3.cu's, tensor parallel over
     #  peer copies, the DSpark draft and the vision tower through hipBLAS - include/strata/hip_compat)
     set(_mm3_nv_sources src/mm3/mm3_exl3.cu src/mm3/mm3_dspark.cu src/mm3/mm3_vision.cu src/mm3/mm3_tp.cu)
-    add_executable(maya-mm3 src/mm3/mm3_main.cpp src/mm3/mm3_model.cu src/mm3/mm3_kernels.cu src/mm3/mm3_cpu.cpp
+    add_executable(wam-mm3 src/mm3/mm3_main.cpp src/mm3/mm3_model.cu src/mm3/mm3_kernels.cu src/mm3/mm3_cpu.cpp
                             src/mm3/mm3_host.cpp ${_mm3_nv_sources} ${_mm3_gguf_sources} ${_mm3_gguf_cpu_sources})
-    target_include_directories(maya-mm3 PRIVATE ${_strata_gpu_include_directories} include src/mm3 third_party/ggml)
+    target_include_directories(wam-mm3 PRIVATE ${_strata_gpu_include_directories} include src/mm3 third_party/ggml)
     # (the CPU lane: the shared CPU EXL3 kernels, used as they are; ggml-cpu's dots for a GGUF's experts)
-    target_link_libraries(maya-mm3 PRIVATE strata_kernels_cpu ${_strata_gpu_runtime_target} ${_strata_gpu_blas_target})
-    # (ds4_iq.cu without the rest of maya-ds4: its dependent launch (src/ds4/ds4_pdl.cuh) and its AMD prompt experts'
-    #  MMQ (MAYA_DS4_EXPERT_MMQ) left out - MiniMax's kernels launch as before)
-    target_compile_definitions(maya-mm3 PRIVATE MAYA_DS4_IQ_ONLY)
+    target_link_libraries(wam-mm3 PRIVATE strata_kernels_cpu ${_strata_gpu_runtime_target} ${_strata_gpu_blas_target})
+    # (ds4_iq.cu without the rest of wam-ds4: its dependent launch (src/ds4/ds4_pdl.cuh) and its AMD prompt experts'
+    #  MMQ (WAM_DS4_EXPERT_MMQ) left out - MiniMax's kernels launch as before)
+    target_compile_definitions(wam-mm3 PRIVATE WAM_DS4_IQ_ONLY)
     if(STRATA_ENABLE_HIP AND STRATA_HIPBLASLT_AVAILABLE)   # (the prompt path's dense GEMMs on AMD: ds4_lt.cu, measured)
       set_source_files_properties(src/ds4/ds4_lt.cu PROPERTIES COMPILE_DEFINITIONS STRATA_HIPBLASLT_AVAILABLE=1)
-      target_link_libraries(maya-mm3 PRIVATE roc::hipblaslt)
+      target_link_libraries(wam-mm3 PRIVATE roc::hipblaslt)
     endif()
     if(STRATA_BUILD_TESTS)
-      # maya-mm3's EXL3 kernels against the scalar CPU reference (random matrices, no model): exl3_test's cases with
+      # wam-mm3's EXL3 kernels against the scalar CPU reference (random matrices, no model): exl3_test's cases with
       # swigluoai, the Volta / Turing tensor-core tiles and the FP16 GEMM path before sm_80
       add_executable(mm3_exl3_test tests/mm3_exl3_test.cu src/mm3/mm3_exl3.cu ${_mm3_gguf_sources})
       target_include_directories(mm3_exl3_test PRIVATE ${_strata_gpu_include_directories} include src/mm3 third_party/ggml)
@@ -776,7 +776,7 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
       if(STRATA_ENABLE_HIP AND STRATA_HIPBLASLT_AVAILABLE)
         target_link_libraries(mm3_exl3_test PRIVATE roc::hipblaslt)
       endif()
-      target_compile_definitions(mm3_exl3_test PRIVATE MAYA_DS4_IQ_ONLY)
+      target_compile_definitions(mm3_exl3_test PRIVATE WAM_DS4_IQ_ONLY)
       add_test(NAME mm3_exl3_test COMMAND mm3_exl3_test)
       set_tests_properties(mm3_exl3_test PROPERTIES TIMEOUT 300)
       # the GGUF weights (no model): the dense types' values, rows and GEMVs against ggml's dequantize_row_*, the GEMMs,
@@ -790,7 +790,7 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
       if(STRATA_ENABLE_HIP AND STRATA_HIPBLASLT_AVAILABLE)
         target_link_libraries(mm3_gguf_test PRIVATE roc::hipblaslt)
       endif()
-      target_compile_definitions(mm3_gguf_test PRIVATE MAYA_DS4_IQ_ONLY)
+      target_compile_definitions(mm3_gguf_test PRIVATE WAM_DS4_IQ_ONLY)
       add_test(NAME mm3_gguf_test COMMAND mm3_gguf_test)
       set_tests_properties(mm3_gguf_test PROPERTIES TIMEOUT 600)
       # iq_mmvq's multi-column path against single-column calls: every supported IQ format and width, compared
@@ -809,7 +809,7 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
       add_test(NAME mm3_kv_test COMMAND mm3_kv_test)
       set_tests_properties(mm3_kv_test PROPERTIES TIMEOUT 600)
       if(NOT WIN32 OR STRATA_ENABLE_HIP)
-        # maya-mm3's kernels against F64 host references: the candidates' top-k, the INT8 / rotated K / V attention and
+        # wam-mm3's kernels against F64 host references: the candidates' top-k, the INT8 / rotated K / V attention and
         # its split, the sampled draft step, the pipeline's waits (no model)
         add_executable(mm3_kernels_test tests/mm3_kernels_test.cu src/mm3/mm3_kernels.cu)
         target_include_directories(mm3_kernels_test PRIVATE ${_strata_gpu_include_directories} include src/mm3)
@@ -842,12 +842,12 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
       endif()
     endif()
     if(_mm3_filter)
-      foreach(_t maya-mm3 mm3_exl3_test mm3_gguf_test mm3_kv_test mm3_kernels_test)
+      foreach(_t wam-mm3 mm3_exl3_test mm3_gguf_test mm3_kv_test mm3_kernels_test)
         if(TARGET ${_t})
           set_target_properties(${_t} PROPERTIES CUDA_ARCHITECTURES "${_mm3_archs}")
         endif()
       endforeach()
-      message(STATUS "Maya: maya-mm3 for ${_mm3_archs}")
+      message(STATUS "Wam: wam-mm3 for ${_mm3_archs}")
     endif()
   endif()
 
@@ -1238,7 +1238,7 @@ if(STRATA_BUILD_TESTS)
   add_executable(draft_policy_test src/spec/draft_policy_test.cpp)
   target_link_libraries(draft_policy_test PRIVATE strata_spec)
   add_test(NAME draft_policy_test COMMAND draft_policy_test)
-  # the cost-aware window (maya-ds4's DS4_DRAFT_COST=1): synthetic round times and acceptance, the lookup unchanged
+  # the cost-aware window (wam-ds4's DS4_DRAFT_COST=1): synthetic round times and acceptance, the lookup unchanged
   add_executable(draft_cost_test src/spec/draft_cost_test.cpp)
   target_link_libraries(draft_cost_test PRIVATE strata_spec)
   add_test(NAME draft_cost_test COMMAND draft_cost_test)
@@ -1272,8 +1272,8 @@ elseif(STRATA_CPU_X86)
   # GCC/Clang spell it differently, and `-mavx512vnni` alone is not enough: VBMI is a separate feature bit.
   # A toolchain whose assembler has no VNNI (#535: Rocky Linux 9's GCC 11 + binutils 2.35, "unsupported instruction
   # `vpdpbusd'") builds the kernel with AVX512-BW's u8 x s8 dot products instead - the same sums (expert.cpp) - and
-  # MAYA_CPU_VNNI_EMULATE=ON chooses that on any toolchain (tests)
-  option(MAYA_CPU_VNNI_EMULATE "CPU expert kernel: AVX512-BW in place of VNNI's dot products" OFF)
+  # WAM_CPU_VNNI_EMULATE=ON chooses that on any toolchain (tests)
+  option(WAM_CPU_VNNI_EMULATE "CPU expert kernel: AVX512-BW in place of VNNI's dot products" OFF)
   include(CheckCXXSourceCompiles)
   set(CMAKE_REQUIRED_FLAGS "-mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512vbmi -mf16c -mfma")
   check_cxx_source_compiles([=[
@@ -1281,14 +1281,14 @@ elseif(STRATA_CPU_X86)
 __m256i f(__m256i a, __m256i b, __m256i c) { return _mm256_dpbusd_epi32(a, b, c); }
 __m512i g(__m512i a, __m512i b, __m512i c) { return _mm512_dpbusd_epi32(a, b, c); }
 int main() { return 0; }
-]=] MAYA_CPU_VNNI_ASM)
+]=] WAM_CPU_VNNI_ASM)
   unset(CMAKE_REQUIRED_FLAGS)
-  if(MAYA_CPU_VNNI_ASM AND NOT MAYA_CPU_VNNI_EMULATE)
+  if(WAM_CPU_VNNI_ASM AND NOT WAM_CPU_VNNI_EMULATE)
     set_source_files_properties(src/kernels/cpu/expert.cpp
                                 PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512bw;-mavx512vl;-mavx512dq;-mavx512vnni;-mavx512vbmi;-mf16c;-mfma")
   else()
-    if(NOT MAYA_CPU_VNNI_EMULATE)
-      message(STATUS "Maya: the compiler or its assembler has no AVX512-VNNI - the CPU expert kernel uses AVX512-BW's "
+    if(NOT WAM_CPU_VNNI_EMULATE)
+      message(STATUS "Wam: the compiler or its assembler has no AVX512-VNNI - the CPU expert kernel uses AVX512-BW's "
                      "dot products (the same sums)")
     endif()
     set_source_files_properties(src/kernels/cpu/expert.cpp
@@ -1534,7 +1534,7 @@ if(STRATA_NATIVE_EXPERTS)
     target_link_libraries(strata_prefill PUBLIC strata_mmq)
     target_compile_definitions(strata_prefill PUBLIC STRATA_PREFILL_MMQ=1)
 
-    # Maya's GLM batched prompt path calls MMQ and BLAS directly, as on CUDA.
+    # Wam's GLM batched prompt path calls MMQ and BLAS directly, as on CUDA.
     target_link_libraries(strata_engine PUBLIC strata_mmq ${_strata_gpu_blas_target})
     # Numerical diagnostic: synthetic layouts by default, optional first-expert IQ3_XXS/IQ4_NL check with a pack.
     add_executable(hip_prefill_mmq_parity tests/hip/prefill_mmq_parity.cpp)
@@ -1617,7 +1617,7 @@ if(STRATA_BUILD_TESTS)
     target_link_libraries(direct_file_async_test PRIVATE Threads::Threads)
     add_test(NAME direct_file_async_test COMMAND direct_file_async_test)
   endif()
-  # maya-ds4's RAM expert store (--ssd-cache, src/ds4/ds4_store.hpp) over files of fake experts written in the build
+  # wam-ds4's RAM expert store (--ssd-cache, src/ds4/ds4_store.hpp) over files of fake experts written in the build
   # directory (~1 MB, removed): reads, where they land, eviction, the read queue, giving RAM back, preload, the miss
   # split's order, put - host code only, no GPU
   add_executable(ds4_store_test tests/ds4_store_test.cpp)

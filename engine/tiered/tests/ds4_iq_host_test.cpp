@@ -1,4 +1,4 @@
-// tests/ds4_iq_host_test.cpp - maya-ds4's i-quant pieces that run on the host, no GPU:
+// tests/ds4_iq_host_test.cpp - wam-ds4's i-quant pieces that run on the host, no GPU:
 //   - IQ1_M's code table (the persistent device kernels' decode: src/ds4/ds4_iq1_codes.hpp), built here as the device
 //     builds it from ggml's grid: each entry against the codes worked out value by value from ggml's int8 grid, then
 //     every value of IQ1_M blocks decoded through it (codes, scales, d / 8: the products the kernels take) equal to

@@ -1,4 +1,4 @@
-"""MAYA_DS4_RESTORE_POINTS: where the server asks the DeepSeek engine to keep restore points (its GEN line's marks= and
+"""WAM_DS4_RESTORE_POINTS: where the server asks the DeepSeek engine to keep restore points (its GEN line's marks= and
 shared=), computed from the chat as the template renders it - no GPU, no engine (the mock engine).
 
     python -m unittest serve.test_ds4_restore_points -v
@@ -17,11 +17,11 @@ from serve import ds41_encoding as reference  # noqa: E402
 from serve.frontend import ChatTemplate, openai_to_messages  # noqa: E402
 from serve.server import (ByteTokenizer, MockEngine, Service, StrataEngine, deepseek_restore_points,  # noqa: E402
                           openai_chunks, openai_collect, restore_point_settings)
-import maya_names  # noqa: E402  (tools/, on the path server.py set)
+import wam_names  # noqa: E402  (tools/, on the path server.py set)
 
 ROOT = Path(__file__).resolve().parents[1]
-ON = maya_names.read_as("MAYA_DS4_RESTORE_POINTS")
-TAIL = maya_names.read_as("MAYA_DS4_RESTORE_TAIL")
+ON = wam_names.read_as("WAM_DS4_RESTORE_POINTS")
+TAIL = wam_names.read_as("WAM_DS4_RESTORE_TAIL")
 # one id a byte (the stand-in tokenizer): a system prompt and its tools of ~2,900 tokens
 SYSTEM = "You are a careful assistant; answer from the documents you are given. " * 40
 TOOL = {"type": "function", "function": {"name": "lookup", "description": "Looks a thing up. " * 20, "parameters": {
@@ -171,7 +171,7 @@ class RestorePoints(unittest.TestCase):
         self.assertIn(f"shared={pts['shared']}", keys)
         self.assertIn("temperature=0.7", StrataEngine.sampling_keys({**sampling, "temperature": 0.7}).split())
         self.assertIn(f"shared={pts['shared']}", StrataEngine.sampling_keys({**sampling, "temperature": 0.7}).split())
-        # MAYA_DS4_RESTORE_TAIL moves the tail point
+        # WAM_DS4_RESTORE_TAIL moves the tail point
         _, sampling = self.run_request([{"role": "user", "content": DOC}], {ON: "4", TAIL: "100"})
         self.assertEqual(sampling["_restore"]["tail"], len(self.engine.last_prompt) - 100)
         self.assertNotIn("marks", sampling["_restore"])

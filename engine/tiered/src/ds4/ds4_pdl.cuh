@@ -28,9 +28,9 @@ __device__ __forceinline__ void pdl_trigger() {
 }
 
 /// Whether the current device takes programmatic launches: compute capability 9.0 or later, unless DS4_PDL=0.
-/// (MAYA_DS4_IQ_ONLY: ds4_iq.cu built into another engine without the rest of maya-ds4 - maya-mm3 and its tests: their
+/// (WAM_DS4_IQ_ONLY: ds4_iq.cu built into another engine without the rest of wam-ds4 - wam-mm3 and its tests: their
 /// launches as before)
-#if defined(MAYA_DS4_IQ_ONLY)
+#if defined(WAM_DS4_IQ_ONLY)
 inline bool pdl_on() { return false; }
 #else
 bool pdl_on();

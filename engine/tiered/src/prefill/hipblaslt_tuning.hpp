@@ -121,7 +121,7 @@ private:
 };
 
 // The tuning-table list (STRATA_HIPBLASLT_TUNING): paths joined by the OS's path-list separator, ':' on Linux and
-// ';' on Windows (maya.py joins them with os.pathsep). On Windows a ':' still separates too, for configs written
+// ';' on Windows (wam.py joins them with os.pathsep). On Windows a ':' still separates too, for configs written
 // before the switch, except the one of a drive prefix ("C:\..." or "C:/..."), which belongs to the path.
 // Empty entries are skipped.
 inline std::vector<std::string> split_table_list(const std::string& list, bool windows) {

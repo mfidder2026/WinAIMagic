@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace maya::metal {
+namespace wam::metal {
 
 namespace {
 
@@ -108,4 +108,4 @@ int32_t pick(const std::vector<float>& logits, const Sampling& p, const std::vec
 }
 
 
-}  // namespace maya::metal
+}  // namespace wam::metal

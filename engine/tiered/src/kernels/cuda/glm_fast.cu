@@ -873,7 +873,7 @@ template<> __device__ __forceinline__ float dw<23>(const uint8_t* row, int kbx, 
     sumi *= ls - 32;
     return __half2float(bq4->d) * x.d * sumi;
 }
-// ---- the other i-quants of the Maya quants (docs/QUANT-PLAN.md): vecdotq's IQ2_XS, IQ2_S, IQ3_S and IQ1_M (the
+// ---- the other i-quants of the Wam quants (docs/QUANT-PLAN.md): vecdotq's IQ2_XS, IQ2_S, IQ3_S and IQ1_M (the
 // expressions iq_kernels.cu transcribes) in the same activation-preloaded, table-in-shared-memory form
 template<> __device__ __forceinline__ float dw<17>(const uint8_t* row, int kbx, int iqs, const XV& x, const uint32_t* tab) {
     const block_iq2_xs* bq2 = (const block_iq2_xs*) row + kbx;
@@ -1319,7 +1319,7 @@ __device__ __forceinline__ void rows_dot(const uint8_t* const* rows, const block
             for (int r = 0; r < NR; ++r) acc[r] += dwk<T>(rows[r], kbx, iqs, xk);
         }
     } else if constexpr (T == 8 || T == 12 || T == 13 || T == 14) {
-        // Q4_K / Q5_K / Q6_K experts (K-quant GGUFs other than Maya's): no shared-activation form yet - each row
+        // Q4_K / Q5_K / Q6_K experts (K-quant GGUFs other than Wam's): no shared-activation form yet - each row
         // takes the dense GEMV's dot (row_dot), the activation re-read per row
         for (int k = lane; k < nb * Fm::ipb; k += 32) {
             const int kbx = k / Fm::ipb, iqs = Fm::step * (k % Fm::ipb);
@@ -2129,7 +2129,7 @@ __global__ void __launch_bounds__(256) mvc_kernel_bf16(const STRATA_GRID_CONSTAN
 
 #if defined(STRATA_USE_HIP)
 // ---------------------------------------------------------------- the dense GEMV on RDNA3 (gfx11)
-// Q6_K is ~64% of a decode token's bytes (Maya-S: the KDA/DSA projections, the shared experts, the dense FFN and the
+// Q6_K is ~64% of a decode token's bytes (Wam-S: the KDA/DSA projections, the shared experts, the dense FFN and the
 // head), and on a Radeon 8065S row_dot<14> ran them at 165-220 GB/s of the 273 the LPDDR5X gives: its loop is not
 // unrolled, so each wave keeps ONE 210-byte block (9 loads) in flight and then waits ~1-2 us for it - the APU's
 // memory latency, not its bandwidth, set the pace.  These kernels issue the loads of U blocks before the arithmetic of
@@ -4314,7 +4314,7 @@ __global__ void __launch_bounds__(ROUTE_THREADS) moe_route_kernel(const STRATA_G
         // PREFETCH: the predicted experts of the next layer that are not in VRAM but are in the RAM tier claim
         // that layer's spares now (one spare stays for its real misses); the side stream copies them while this
         // layer and the next one's attention compute, and the next route sees them as resident.  Only the
-        // prediction's first pf_rank ranks (STRATA_GLM_PREFETCH_RANK): its top guesses are right almost always (Maya-M
+        // prediction's first pf_rank ranks (STRATA_GLM_PREFETCH_RANK): its top guesses are right almost always (Wam-M
         // on a 3090 + 3060, the next layer used rank 0 / 1 / 2 / 3 96 / 88 / 75 / 62 % of the time, ranks 4..7 52 .. 24 %)
         // - the first NON-resident guess is often a low rank, and a wrong copy costs the link what a right one saves
         int npf = 0;
@@ -5445,7 +5445,7 @@ constexpr int kMaxRdnaNt = 8;
 // The device the launch runs on: by default the RDNA 3.5 APUs (gfx115x - measured on a Radeon 8065S), whose LPDDR5X
 // latency the in-flight loads hide; STRATA_GLM_MV_RDNA=1 on any gfx11 (an RX 7900's GDDR6: not measured yet),
 // STRATA_GLM_MV_RDNA=0 keeps mv_kernel_t and the generic kernel (A/B)
-// Which dense GEMV kernels a device's decode runs, once per device: the engine's own record that MAYA_GLM_MV_RDNA reached
+// Which dense GEMV kernels a device's decode runs, once per device: the engine's own record that WAM_GLM_MV_RDNA reached
 // the dispatch - or did not
 void note_mv(int device, bool on) {
     static std::atomic<unsigned> seen{0};
@@ -6742,7 +6742,7 @@ bool rdna3_expert_device(bool allow_gfx1151 = true) {
     }
     return gfx1100 || gfx120x || (allow_gfx1151 && gfx1151);
 }
-// IQ2_S gate/up (Maya-M's) on IQ2_XXS's tuned path above - opt-in (STRATA_GLM_GU22_TUNED=1) until it is measured end
+// IQ2_S gate/up (Wam-M's) on IQ2_XXS's tuned path above - opt-in (STRATA_GLM_GU22_TUNED=1) until it is measured end
 // to end: the expert bench's sweep (--exact, gu22/down18) found it bit-identical to the original kernel on gfx1100 and
 // gfx1151 and 1.34-1.43x (gfx1100, device memory) / 1.12x (gfx1151, pinned host memory) faster at 4-8 experts a call
 bool gu22_tuned() {
@@ -6753,7 +6753,7 @@ bool gu22_tuned() {
     return on;
 }
 // Which kernel IQ2_S gate/up ran, once per device and call path (0 the token path, 1 the window's multi-token launch):
-// the engine's own record that MAYA_GLM_GU22_TUNED reached the dispatch - or did not
+// the engine's own record that WAM_GLM_GU22_TUNED reached the dispatch - or did not
 void note_gu22(bool tuned, int path) {
     static std::atomic<unsigned> seen{0};
     int dev = -1;

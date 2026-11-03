@@ -1,4 +1,4 @@
-// src/mm3/mm3_cpu_gg.cpp - maya-mm3's CPU lane for a GGUF's routed experts (mm3_cpu.hpp's gg_run): maya-ds4's CPU rows
+// src/mm3/mm3_cpu_gg.cpp - wam-mm3's CPU lane for a GGUF's routed experts (mm3_cpu.hpp's gg_run): wam-ds4's CPU rows
 // (src/ds4/ds4_iq_cpu.cpp - ggml-cpu's dots, or its own multi-token rows where they are their bits) on the lane's
 // threads, with MiniMax's swigluoai between gate / up and down.
 //

@@ -1,4 +1,4 @@
-// src/mm3/mm3_host.cpp - maya-mm3's x86 host helpers (mm3_host.hpp), moved here from mm3_tp.cu as they were.
+// src/mm3/mm3_host.cpp - wam-mm3's x86 host helpers (mm3_host.hpp), moved here from mm3_tp.cu as they were.
 #include "mm3_host.hpp"
 
 #include <cmath>

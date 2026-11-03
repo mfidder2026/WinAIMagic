@@ -1,11 +1,11 @@
 """tools/vision/glm5next_ref.py - the reference for the glm5next encoder: transformers' own Glm5NextVisionModel with
-the checkpoint's BF16 weights (float32 compute), and a vocab-only GGUF for maya-vision (GLM-5.3's tokenizer under an
+the checkpoint's BF16 weights (float32 compute), and a vocab-only GGUF for wam-vision (GLM-5.3's tokenizer under an
 architecture the pinned llama.cpp knows: mtmd needs the text model only for its vocabulary and n_embd).
 
     python glm5next_ref.py image --ckpt DIR --out test.png --pixels pix.npy   # a 448x448 picture + pixel_values
     python glm5next_ref.py ref --ckpt DIR --pixels pix.npy --out ref.npy
     python glm5next_ref.py vocab --gguf <model>-00001-of-0000N.gguf --out vocab.gguf [--gguf-py DIR]
-    python glm5next_ref.py compare --ref ref.npy --sve out.sve        # maya-vision's output against the reference
+    python glm5next_ref.py compare --ref ref.npy --sve out.sve        # wam-vision's output against the reference
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def cmd_image(a):
     d.polygon([(60, 400), (180, 230), (300, 400)], fill=(40, 160, 70))
     for i in range(12):
         d.line([(320 + i * 8, 280), (440 - i * 6, 430)], fill=(20 + i * 18, 20, 120), width=3)
-    d.text((40, 200), "MAYA 42", fill=(10, 10, 10))
+    d.text((40, 200), "WAM 42", fill=(10, 10, 10))
     im.save(a.out)
     # the processor's pixel_values for it, as Glm5NextImageProcessor.patchify lays them out (448 = 16 x 28: no resize)
     pre = json.load(open(pathlib.Path(a.ckpt) / "processor_config.json"))["image_processor"]
@@ -73,7 +73,7 @@ def cmd_vocab(a):
     import gguf
     r = gguf.GGUFReader(a.gguf)
     w = gguf.GGUFWriter(a.out, arch="llama")
-    w.add_string("general.name", "GLM-5.3-Flash vocabulary (for maya-vision)")
+    w.add_string("general.name", "GLM-5.3-Flash vocabulary (for wam-vision)")
     w.add_uint32("llama.context_length", 65536)
     w.add_uint32("llama.embedding_length", 4096)
     w.add_uint32("llama.block_count", 1)

@@ -528,7 +528,7 @@ void x3_run_set(const X3Lane& L, const uint8_t* wbase, int n_exp, size_t stride,
             strata::core::mma_rows_short_parse(getenv("STRATA_GLM_EXL3_MMA_ROWS_SHORT"));
         if (r.rows > 0)
             std::fprintf(stderr, "glm prefill: EXL3 experts with up to %d rows through the tensor-core kernels in chunks "
-                                 "of up to %d tokens (MAYA_GLM_EXL3_MMA_ROWS_SHORT), %d in longer ones\n",
+                                 "of up to %d tokens (WAM_GLM_EXL3_MMA_ROWS_SHORT), %d in longer ones\n",
                          r.rows, r.max_tokens, mma_base);
         return r;
     }();
@@ -1168,7 +1168,7 @@ bool Glm5Model::prefill_setup(std::string& err) {
     if (const char* v = getenv("STRATA_GLM_PRESTAGE")) ring_max = has_moe ? std::max(0, std::atoi(v)) : 0;
     // A COMPLETE pool to come (fast_setup: every expert and the spares in each layer's main slots, this path's buffers
     // in the tail beyond them - the Windows APU's carve-out): no expert is outside VRAM, so there is nothing to prestage
-    // (the ring only copies RAM-tier experts: Maya-S lent 1153 MB for it, ~4 slots a layer more for nothing) and
+    // (the ring only copies RAM-tier experts: Wam-S lent 1153 MB for it, ~4 slots a layer more for nothing) and
     // nothing to land from the disk (the smallest landing ring: ~0.4 GB of the 8065S's 32 GB of OS RAM less pinned).
     // Priced with the largest chunk's buffers and a margin; fast_setup decides from what is free then (short of it
     // there, the pool is the capped one - without a prestage buffer).  STRATA_GLM_COMPLETE_POOL=0: never (on by
@@ -1224,7 +1224,7 @@ bool Glm5Model::prefill_setup(std::string& err) {
         // A test for a prestage buffer (floor > 0) is searched from kPreMinT up: a shorter chunk carves none, so it
         // "passed" any floor, the test was not monotonic there, and a card whose pool could not hold the whole ring
         // beside a 1024-token chunk got 768-token chunks with no ring at all instead of the largest chunk with a part
-        // of it (#673: a 20 GB card, Maya-S24 at 256K: 768 where 10240 fit, half the prompt speed)
+        // of it (#673: a 20 GB card, Wam-S24 at 256K: 768 where 10240 fit, half the prompt speed)
         const auto biggest = [&](int64_t floor) -> int64_t {
             int64_t lo = floor > 0 && gstride > 0 ? kPreMinT / 256 : 1, hi = ceiling / 256, best = 0;
             while (lo <= hi) {
@@ -1760,7 +1760,7 @@ bool Glm5Model::lend_tail(size_t limit, uint64_t& moved, uint64_t& dropped, std:
                 // the victim: a RAM-tier expert of a lower LFU count - and on EQUAL counts the one a route used less
                 // recently (STRATA_GLM_LEND_PARK_LRU=0: strictly lower only, as before).  The counts age (all halve every
                 // 32768 routing events), so most sit at the same small value, often 0, and the strict rule picked badly:
-                // Maya-S24, one V100, 512 tokens after a fresh 24K prompt (the run's second lend), two rounds each, disk
+                // Wam-S24, one V100, 512 tokens after a fresh 24K prompt (the run's second lend), two rounds each, disk
                 // reads 520-578 -> 309-317, of them the lend's RAM victims 392-465 -> 208-213; decode 31.6-32.5 ->
                 // 33.1-33.3 tok/s, VRAM hits 72.2-74.0 -> 73.7-74.5 %
                 static const bool lru_ties = getenv("STRATA_GLM_LEND_PARK_LRU") == nullptr ||
@@ -2367,7 +2367,7 @@ bool Glm5Model::prefill_half(int64_t p0, int T, std::string& err, const int32_t*
     // the start-up timing's gate: the CPU lane takes prompt experts only when PCIe moves one more than this many times
     // slower than the lane computes it (STRATA_GLM_PREFILL_CPU_GATE, default 2; the per-expert plan below still
     // balances both lanes, so a lower gate only lets it try: one RTX 5070 on PCIe 4.0 x16 beside an EPYC 7302,
-    // 0.357 vs 0.252 ms, Maya-S24 2K / 8K-token prompts 309 / 323 -> 404 / 428 tok/s at 0)
+    // 0.357 vs 0.252 ms, Wam-S24 2K / 8K-token prompts 309 / 323 -> 404 / 428 tok/s at 0)
     static const double pf_cpu_gate = [] {
         const char* v = getenv("STRATA_GLM_PREFILL_CPU_GATE");
         return v != nullptr ? std::atof(v) : 2.0;
@@ -2529,7 +2529,7 @@ bool Glm5Model::prefill_half(int64_t p0, int T, std::string& err, const int32_t*
                 sgemm_bf16(Ly.g_b, DI, HD, B.ga, HD, B.g2, DI, tn, 1.0f);
                 S->mark("kda_proj", s);
                 // the recurrence over n_head x 4 blocks (kda_rec_split: the value columns are independent) instead of
-                // one block a head - 32 blocks for a V100's 80 SMs.  Maya-S24, 27K prompts: kda_rec 4.7 / 5.1 -> 3.5 s
+                // one block a head - 32 blocks for a V100's 80 SMs.  Wam-S24, 27K prompts: kda_rec 4.7 / 5.1 -> 3.5 s
                 // (8 blocks a head: 5.3 / 5.5 s); state and output within 1e-7 of the one-block kernel.
                 // STRATA_GLM_KDA_SPLIT=0 / 8: the one-block kernel / 8 a head.  STRATA_GLM_KDA_SPLIT_CHECK=1 (debug):
                 // the one-block kernel on a copy too, compared
@@ -4222,7 +4222,7 @@ int64_t Glm5Model::prefill_floor(int64_t nn, int call_min) const {
             strata::core::prefill_min_chunks_parse(getenv("STRATA_GLM_PREFILL_MIN_CHUNKS"));
         if (s.n > 1)
             std::fprintf(stderr, "glm prefill: on a split a prompt-path call is cut into %d chunks at least, none under "
-                                 "%d tokens (MAYA_GLM_PREFILL_MIN_CHUNKS), so the parts pipeline it\n", s.n, s.min_tokens);
+                                 "%d tokens (WAM_GLM_PREFILL_MIN_CHUNKS), so the parts pipeline it\n", s.n, s.min_tokens);
         return s;
     }();
     if (split_next_ == nullptr) return 1;
@@ -4237,7 +4237,7 @@ bool Glm5Model::prefill(const std::vector<int32_t>& tokens, std::string& err, in
     for (Glm5Model* m = this; m != nullptr; m = m->split_next_.get())   // (a tail lent to the vision encoder: the
         if (m->pf_ == nullptr || m->fast_ == nullptr || m->vis_lent_) return false;   // token path, until it is back)
     // a handful of tokens costs less through the token path (the batched path streams every expert they touch).  One
-    // GPU: from 8 tokens - an agent session's later turns (13.5K of history + a short user turn, Maya-S24 on a V100,
+    // GPU: from 8 tokens - an agent session's later turns (13.5K of history + a short user turn, Wam-S24 on a V100,
     // two cooled rounds of three turns): prompt 1,041 / 648 / 521 ms at 32 -> 488 / 405 / 577 at 8 (4: 508 / 397 /
     // 576, 16: 502 / 716 / 540); a split keeps 32
     int64_t min_n = split_next_ == nullptr && n_parts_ <= 1 ? 8 : 32;
@@ -4289,7 +4289,7 @@ bool Glm5Model::prefill(const std::vector<int32_t>& tokens, std::string& err, in
         return v ? std::max(0, std::atoi(v)) : 0;
     }();
     if (ok && stall_test > 0) {
-        progress_at("the prompt: MAYA_GLM_STALL_TEST's pause");
+        progress_at("the prompt: WAM_GLM_STALL_TEST's pause");
         std::this_thread::sleep_for(std::chrono::seconds(stall_test));
     }
     // a DFlash drafter reads only the prompt's last positions (its window): the captures start there
@@ -4467,7 +4467,7 @@ bool Glm5Model::calc_prefill_ready() {
     cudaSetDevice(dev_);
     if (!ok) {
         cudaGetLastError();
-        std::fprintf(stderr, "glm prefill: the waiting GPU's share (MAYA_GLM_PREFILL_CALC) stays off: its events or pinned "
+        std::fprintf(stderr, "glm prefill: the waiting GPU's share (WAM_GLM_PREFILL_CALC) stays off: its events or pinned "
                              "buffers did not allocate\n");
         return false;
     }

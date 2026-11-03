@@ -1,4 +1,4 @@
-// src/mm3/mm3_pack.hpp - maya-mm3's pack (tools/mm3/pack.py): the geometry (mm3.txt) and every tensor of the model's
+// src/mm3/mm3_pack.hpp - wam-mm3's pack (tools/mm3/pack.py): the geometry (mm3.txt) and every tensor of the model's
 // safetensors read in place (tensors.txt), each shard mapped once.
 //
 //   mm3.txt      `key value` lines; lists comma-separated

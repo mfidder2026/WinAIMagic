@@ -2,11 +2,11 @@
 //
 // The whole forward is a ggml graph: ggml-metal already has every op this architecture needs (gated delta net for
 // KDA, the mHC hyper-connection ops, MoE mul_mat_id, the i-quant matvecs), so the numerics are the pinned
-// llama.cpp's - the same code Maya's CUDA kernels were validated against.  The graph follows
+// llama.cpp's - the same code Wam's CUDA kernels were validated against.  The graph follows
 // ref/upstream-llama.cpp/glm5-next.cpp op for op; where ref/glm.py and that file differ, glm.py's
 // fixtures (data/glm5-synth*.gguf + dumps) decide.
 //
-// What is Maya's own is the memory plan.  A Mac has one pool of unified memory, usually smaller than the model:
+// What is Wam's own is the memory plan.  A Mac has one pool of unified memory, usually smaller than the model:
 // dense weights, caches and state stay resident, the routed experts (95 % of the bytes) live in a resident slot
 // pool that the CPU fills from the SSD.  The graph is cut after each MoE router: the host reads the layer's top-k,
 // makes every selected expert resident (parallel pread into the pool), and the next graph runs the experts by
@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-namespace maya::metal {
+namespace wam::metal {
 
 struct GlmGeometry {
     int n_vocab = 0;
@@ -66,15 +66,15 @@ struct GlmOptions {
                                       // mul_mm_id's 32-column tiles (at 512, ~14: +20-37% prefill measured, ~0.3 GB)
     int attn_chunk = 32;              // tokens per sparse-attention gather inside a slice
     bool dsa_mm = true;               // DSA products with the heads as matrix columns (ggml-metal's mul_mm, half
-                                      // tiles); false: one f32 matvec per head (MAYA_METAL_DSA_MM=0)
+                                      // tiles); false: one f32 matvec per head (WAM_METAL_DSA_MM=0)
     bool dsa_kernel = true;           // with dsa_mm and a ggml built with metal-sparse-mla.patch: the
                                       // sparse attention as one kernel reading the cache rows in place (no gather, no
-                                      // transpose; MAYA_METAL_DSA_KERNEL=0 keeps the gather + mul_mm)
+                                      // transpose; WAM_METAL_DSA_KERNEL=0 keeps the gather + mul_mm)
     bool kv_f16 = false;              // MLA latent cache in F16 (as llama.cpp and the CUDA engine; half the bytes,
                                       // ~1e-4 logit error on the fixtures); default F32: ~1e-6.  On the GPU with
                                       // dsa_mm the latent is F16 unless kv_f32 (mul_mm rounds it to half anyway)
     bool kv_f32 = false;              // keep the latent F32 on the GPU with dsa_mm too: the fused kernel reads F32 rows
-                                      // (--kv-f32 / MAYA_METAL_KV_F32=1; twice the cache bytes, for A/B runs)
+                                      // (--kv-f32 / WAM_METAL_KV_F32=1; twice the cache bytes, for A/B runs)
     size_t expert_budget = 0;         // bytes for the routed-expert pool; 0: derive from the GPU's working set
     int pool_slots = 0;               // >0: force this many slots per expert group (tests)
     int io_threads = 16;
@@ -142,7 +142,7 @@ public:
     bool dflash_draft(int32_t token, int n, float p_min, int n_min, float p_cum, std::vector<int32_t>& drafts,
                       std::string& err);
 
-    // images: the rows (n_embd each, maya-vision's) that replace the token embeddings at these absolute positions;
+    // images: the rows (n_embd each, wam-vision's) that replace the token embeddings at these absolute positions;
     // empty: none.  Kept until the next call.
     void set_image_rows(std::vector<int64_t> pos, std::vector<float> rows);
     // the recurrent state (KDA conv + S) at the current position; restore rewinds to it.  The MLA latent and
@@ -173,4 +173,4 @@ private:
     std::unique_ptr<Impl> p_;
 };
 
-}  // namespace maya::metal
+}  // namespace wam::metal

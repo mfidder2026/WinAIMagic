@@ -1,4 +1,4 @@
-// tests/mm3_sampler_test.cpp - maya-mm3's sampler (src/mm3/mm3_sample.hpp) on the CPU:
+// tests/mm3_sampler_test.cpp - wam-mm3's sampler (src/mm3/mm3_sample.hpp) on the CPU:
 //   1. a row's distribution from its candidates (host_cands with cands_for's kc and extra ids, the device's topk_rows
 //      semantics) is the whole row's, bit for bit - temperature, top_k, top_p, min_p, penalties, ties;
 //   2. speculative sampling with sampled drafts (keep d ~ q with min(1, p(d) / q(d)), else draw_residual) gives p.

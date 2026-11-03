@@ -1,4 +1,4 @@
-// src/mm3/mm3_cpu.hpp - maya-mm3's CPU lane: a token's routed experts that are not in VRAM, computed on the CPU from
+// src/mm3/mm3_cpu.hpp - wam-mm3's CPU lane: a token's routed experts that are not in VRAM, computed on the CPU from
 // host memory while the GPU computes the others (the shared CPU EXL3 kernels, include/strata/kernels/cpu/exl3_cpu.hpp,
 // with MiniMax-M3.1's swigluoai between gate / up and down).
 #pragma once
@@ -65,7 +65,7 @@ private:
     Impl* p;
 };
 
-/// GGUF experts on the lane (mm3_cpu_gg.cpp: maya-ds4's CPU rows - ggml-cpu's arithmetic - with MiniMax's swigluoai):
+/// GGUF experts on the lane (mm3_cpu_gg.cpp: wam-ds4's CPU rows - ggml-cpu's arithmetic - with MiniMax's swigluoai):
 /// the layer's format (false and err: ggml-cpu takes no dot for a type), then run() / run_multi()'s contracts for
 /// experts of one layer whose gf / gg are set, on the lane's threads.
 bool gg_fmt(int tg, int tu, int td, int dim, int ff, GgFmt& f, std::string& err);

@@ -1,4 +1,4 @@
-// Decode-only, model-free benchmark of the dense GEMV (glmf::mv) at Maya's real shapes: synthetic Q6_K
+// Decode-only, model-free benchmark of the dense GEMV (glmf::mv) at Wam's real shapes: synthetic Q6_K
 // and BF16 weights (each case cycles enough copies to defeat the 32 MB last-level cache), the engine's job batches,
 // one row (the decode's mv).  Run from the build directory:
 //   glm_mv_bench                 parity of every configuration against the original kernels, then the timings
@@ -43,7 +43,7 @@ struct Case {
     const char* name;
     std::vector<Shape> jobs;
 };
-// the engine's batches (glm_fast_path.cu / glm_mtp.cu), Maya-S v2 types
+// the engine's batches (glm_fast_path.cu / glm_mtp.cu), Wam-S v2 types
 const std::vector<Case> kCases = {
     {"kda_proj", {{14, 4096, 8192}, {14, 4096, 8192}, {14, 4096, 8192}, {30, 4096, 128}, {30, 4096, 128}, {30, 4096, 64}}},
     {"kda_out", {{14, 8192, 4096}}},

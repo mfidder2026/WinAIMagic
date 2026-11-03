@@ -2,7 +2,7 @@
 
     python tools/mm3/pack.py --model ~/models/MiniMax-M3.1-Flash-EXL3-3.5bpw
 
-writes <model>/maya-mm3/:
+writes <model>/wam-mm3/:
   mm3.txt       the geometry, `key value` lines (lists comma-separated), from config.json's text_config (its
                 sparse_attention_config flattened to sparse_attention_config.<key>), the DSpark draft's config as
                 dspark.<key> (dflash_config.<key> as dspark.dflash.<key>), the special token ids the engine needs and
@@ -10,7 +10,7 @@ writes <model>/maya-mm3/:
   tensors.txt   every tensor of the model's safetensors and of dspark/'s: `file <i> <path>` lines (paths relative to
                 the model directory), then `t <name> <dtype> <file> <offset> <bytes> <dims...>` - the draft's names
                 prefixed `dspark.`
-  tokenizer/    the server's tokenizer (tools/strata_tokenizer.py's layout, pre "minimax") and Maya's chat template
+  tokenizer/    the server's tokenizer (tools/strata_tokenizer.py's layout, pre "minimax") and Wam's chat template
                 (this directory's chat_template.jinja: MiniMax's own plus thinking turned off - the same for every
                 quant, whichever template its files carry)
 
@@ -29,7 +29,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from st import SafeTensors  # noqa: E402
 
-TEMPLATE = HERE / "chat_template.jinja"     # (Maya's: MiniMax's own template plus thinking off)
+TEMPLATE = HERE / "chat_template.jinja"     # (Wam's: MiniMax's own template plus thinking off)
 MUL1 = 0x83DCD12D                          # the mul1 codebook multiplier, the one the engine decodes
 P = "language_model.model."
 
@@ -158,10 +158,10 @@ def flat(f, prefix: str, d: dict):
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True)
-    ap.add_argument("--out", help="default: <model>/maya-mm3")
+    ap.add_argument("--out", help="default: <model>/wam-mm3")
     a = ap.parse_args()
     model = pathlib.Path(a.model).expanduser().resolve()
-    out = pathlib.Path(a.out).expanduser() if a.out else model / "maya-mm3"
+    out = pathlib.Path(a.out).expanduser() if a.out else model / "wam-mm3"
     cfg = json.loads((model / "config.json").read_text())
     t = cfg["text_config"]
     q = cfg.get("quantization_config", {})

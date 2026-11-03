@@ -8,7 +8,7 @@
 using namespace strata::ds4;
 static void check(bool ok, const char* what) { if (!ok) { std::cerr << what << '\n'; std::exit(1); } }
 int main() {
-    char name[] = "/tmp/maya-engram-ram-XXXXXX";
+    char name[] = "/tmp/wam-engram-ram-XXXXXX";
     int fd = mkstemp(name); check(fd >= 0, "mkstemp"); close(fd);
     std::vector<uint8_t> data(4096);
     for (size_t i = 0; i < data.size(); ++i) data[i] = (uint8_t) (i % 251);

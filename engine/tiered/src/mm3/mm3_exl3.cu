@@ -1,4 +1,4 @@
-// src/mm3/mm3_exl3.cu - maya-mm3's EXL3 device kernels (the format: mm3_exl3.hpp): a copy of the shared
+// src/mm3/mm3_exl3.cu - wam-mm3's EXL3 device kernels (the format: mm3_exl3.hpp): a copy of the shared
 // src/kernels/cuda/exl3.cu with MiniMax-M3.1's swigluoai in the routed experts.  Before sm_80 (V100, T4, RTX 20) the
 // tiles run on the tensor cores through nvcuda::wmma (EXL3_WM70 below) on every path, and the prompt path's busy
 // matrices through cuBLAS' FP16 GEMMs over their decoded weights (blas_enable).
@@ -39,7 +39,7 @@
 #include <type_traits>
 #include <utility>
 
-// (no pre-sm_80 kernels in maya-mm3's copy)
+// (no pre-sm_80 kernels in wam-mm3's copy)
 #define EXL3_LEGACY(call) (void) 0
 #define EXL3_LEGACY_MOE(a, call) (void) 0
 

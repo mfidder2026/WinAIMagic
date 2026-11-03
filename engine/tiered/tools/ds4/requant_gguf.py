@@ -1,9 +1,9 @@
 """tools/ds4/requant_gguf.py - a DeepSeek-V4.1 GGUF requantized by a recipe (the routed experts in ggml's low-bit types,
-the dense matrices in Q8_0), through ggml's own quantizers (libggml-base, ctypes) - a quick test model for maya-ds4's
-low-bit expert kernels until the real Maya quants exist.
+the dense matrices in Q8_0), through ggml's own quantizers (libggml-base, ctypes) - a quick test model for wam-ds4's
+low-bit expert kernels until the real Wam quants exist.
 
     python tools/ds4/requant_gguf.py --src ~/models/DeepSeek-V4.1-Flash-1017-GGUF/UD-Q8_K_XL \\
-        --out ~/ds4test/Maya-S-test --recipe recipe.json --lib ~/llama.cpp/build/bin/libggml-base.so --jobs 10
+        --out ~/ds4test/Wam-S-test --recipe recipe.json --lib ~/llama.cpp/build/bin/libggml-base.so --jobs 10
 
 The recipe (JSON):
     {"experts": {"gate": "IQ2_XXS", "up": "IQ2_XXS", "down": "IQ3_XXS"},
@@ -21,7 +21,7 @@ The recipe (JSON):
 
 The output has one shard a source shard (the same tensors in the same order, the metadata copied; split.tensors.count
 updated), tensors at the source's alignment; with --shards only the matching shards are written, the others linked.
-A source's low-bit types (a Maya quant's experts) are read through ggml's own dequantize_row_* (the same library).  Workers (processes) read the source with O_DIRECT, so the page cache that
+A source's low-bit types (a Wam quant's experts) are read through ggml's own dequantize_row_* (the same library).  Workers (processes) read the source with O_DIRECT, so the page cache that
 running engines rely on is neither evicted nor filled, and drop what they wrote from it; they run at SCHED_IDLE.
 
 IQ2_XXS / IQ2_XS / IQ1_* need an importance matrix: --imatrix (llama.cpp's legacy .dat) or all ones.
@@ -264,7 +264,7 @@ def to_f32(typ: int, raw: memoryview, n: int) -> np.ndarray:
         v[:, :16] = E2M1[q & 15]
         v[:, 16:] = E2M1[q >> 4]
         return (v * d[:, None]).reshape(-1)
-    if typ in GT and GT[typ][1] == 256:   # a low-bit source (a Maya quant's experts): ggml's own dequantize_row_*
+    if typ in GT and GT[typ][1] == 256:   # a low-bit source (a Wam quant's experts): ggml's own dequantize_row_*
         name = GT[typ][0]
         fn = getattr(_lib, "dequantize_row_" + (name[:-1].lower() + "K" if name.endswith("_K") else name.lower()))
         x = np.empty(n, dtype=np.float32)

@@ -1,4 +1,4 @@
-// src/mm3/mm3_dspark.hpp - maya-mm3's DSpark draft (MiniMax-M3.1-Flash's dspark/: vLLM's MiniMaxM3DSparkForCausalLM).
+// src/mm3/mm3_dspark.hpp - wam-mm3's DSpark draft (MiniMax-M3.1-Flash's dspark/: vLLM's MiniMaxM3DSparkForCausalLM).
 //
 // Context: the target's residual streams after layers 3, 17, 31, 45 and 59 of every token, concatenated, through fc
 // and the hidden norm; each of the 5 draft layers keeps the K / V of that (its k / v projections, k normed and

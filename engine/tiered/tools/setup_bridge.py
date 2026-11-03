@@ -1,8 +1,8 @@
 """The setup's side of its screen (tools/setup_tui.py): setup.UI while the screen runs.  setup.py's output functions
 hand a Bridge what they would print, ask and run; it queues all of it for the screen in order, runs the commands with
 their output on the screen as it comes, and keeps what the terminal gets when the screen closes (summary) and
-maya-setup.log.  Nothing here draws: the screen reads `events`, and answers questions through their Future.
-LoadWatch reads how far Maya's start is from its engine log, for the dashboard's loading box (setup_dash.py).
+wam-setup.log.  Nothing here draws: the screen reads `events`, and answers questions through their Future.
+LoadWatch reads how far Wam's start is from its engine log, for the dashboard's loading box (setup_dash.py).
 """
 from __future__ import annotations
 
@@ -188,7 +188,7 @@ class Bridge:
     def run(self, cmd, cwd=None, env=None, keep=True, parent_pipe=False):
         """The command with its output on the screen as it comes (stdin closed: nothing can wait for a key).  keep:
         its output also into the log and the summary (not the server's: it runs for days - "live" on the screen).
-        parent_pipe: Maya's server - its stdin a pipe from here instead (--parent-pipe: it stops when this process
+        parent_pipe: Wam's server - its stdin a pipe from here instead (--parent-pipe: it stops when this process
         ends, however it ends), and on Windows in a job object that ends it with this process (setup.end_with_me)."""
         if not self._here():
             return None
@@ -228,8 +228,8 @@ class Bridge:
         self.events.put(("out" if keep else "live", line))
 
     def serve(self, cmd, env, info: dict):
-        """Maya's server, after the setup, on the same screen until it ends: its exit code.  `info`: what the screen
-        shows of it (maya.py, server_command)."""
+        """Wam's server, after the setup, on the same screen until it ends: its exit code.  `info`: what the screen
+        shows of it (wam.py, server_command)."""
         if not self._here():
             return None
         self.events.put(("serve", info))

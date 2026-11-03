@@ -1,6 +1,6 @@
-// src/mm3/mm3_gguf.cuh - maya-mm3's GGUF weights on the device (MiniMax-M3.1-Flash's Maya quants, tools/mm3/pack_gguf.py):
+// src/mm3/mm3_gguf.cuh - wam-mm3's GGUF weights on the device (MiniMax-M3.1-Flash's Wam quants, tools/mm3/pack_gguf.py):
 // the dense matrices in ggml's block types (Q4_K, Q5_K, Q6_K, Q8_0 ...) and the routed experts in its low-bit ones (IQ1_S,
-// IQ2_XXS, IQ2_XS, IQ2_S, IQ3_XXS ...), run by maya-ds4's kernels (src/ds4/ds4_iq.cuh) with MiniMax's swigluoai.
+// IQ2_XXS, IQ2_XS, IQ2_S, IQ3_XXS ...), run by wam-ds4's kernels (src/ds4/ds4_iq.cuh) with MiniMax's swigluoai.
 //
 // They stand in for the EXL3 matrices behind the same interface (mm3_exl3.hpp: an x3::Mat / x3::ExpertLayout with fmt
 // kFmtGG; mm3_exl3.cu's entry points hand them here), so the engine's paths - the token, a verify window, the chunked
@@ -11,7 +11,7 @@
 //     cuBLAS FP16 GEMM with F32 accumulation - a few column bands at a time when the matrix is large; the output head
 //     of a short call through the GEMV instead;
 //   * the routed experts: the activations rounded as the CPU lane rounds them (ggml's Q8_K, a scale a 256 - so an
-//     expert gives the same sums on either side; MAYA_MM3_IQ_Q8K=0: a scale a 32), gate and up then swigluoai fused
+//     expert gives the same sums on either side; WAM_MM3_IQ_Q8K=0: a scale a 32), gate and up then swigluoai fused
 //     (two passes where the layer's gate and up differ in type), down, and the weighted sum in plan order with the
 //     CPU lane's part and the shared expert's - as the EXL3 kernels combine them.
 // An expert's blob: gate | up | down, each [rows][blocks] as the GGUF holds it, 256-byte aligned
@@ -68,7 +68,7 @@ int launch_errors();
 unsigned wait_timeouts();
 
 /// (tests) rows of k values (k % 256 == 0) rounded as the routed experts' activations are (Q8_K, or a scale a 32 with
-/// MAYA_MM3_IQ_Q8K=0): q[r][k] int8, d[r][k / 32] (a 256's scale in each of its eight 32-blocks).
+/// WAM_MM3_IQ_Q8K=0): q[r][k] int8, d[r][k / 32] (a 256's scale in each of its eight 32-blocks).
 void act_quant(const float* x, int rows, int k, int8_t* q, float* d, cudaStream_t s);
 /// ... and the dense GEMVs' (a scale a 32).
 void q8_quant(const float* x, size_t ldx, int rows, int k, int8_t* q, float* d, cudaStream_t s);

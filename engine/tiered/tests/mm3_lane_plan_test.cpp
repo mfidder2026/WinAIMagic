@@ -1,4 +1,4 @@
-// tests/mm3_lane_plan_test.cpp - maya-mm3's CPU lane arithmetic (src/mm3/mm3_lane_plan.hpp): the default workers on
+// tests/mm3_lane_plan_test.cpp - wam-mm3's CPU lane arithmetic (src/mm3/mm3_lane_plan.hpp): the default workers on
 // hosts with and without SMT, --cpu-threads as the lane's threads, decode's timing of the lane (#552).
 //     g++ -O2 -std=c++17 -Isrc/mm3 tests/mm3_lane_plan_test.cpp -o build/mm3_lane_plan_test && build/mm3_lane_plan_test
 #include <cmath>
@@ -13,9 +13,9 @@ int main() {
     CHECK(mm3::lane_default_workers(31, 32, 2) == 29);    // #552's VM: 32 vCPUs, no SMT -> 30 threads
     CHECK(mm3::lane_default_workers(15, 32, 2) == 15);    // 16 cores with SMT: the siblings are free, every core kept
     CHECK(mm3::lane_default_workers(39, 80, 2) == 39);    // 2 x 20 cores with SMT
-    CHECK(mm3::lane_default_workers(19, 20, 2) == 17);    // a 20-core CPU without SMT (maya-ds4's Core Ultra 7 265K)
+    CHECK(mm3::lane_default_workers(19, 20, 2) == 17);    // a 20-core CPU without SMT (wam-ds4's Core Ultra 7 265K)
     CHECK(mm3::lane_default_workers(3, 4, 2) == 3);       // 4 cores: too few to give any away
-    CHECK(mm3::lane_default_workers(31, 32, 0) == 31);    // MAYA_MM3_LANE_FREE=0: as before
+    CHECK(mm3::lane_default_workers(31, 32, 0) == 31);    // WAM_MM3_LANE_FREE=0: as before
     CHECK(mm3::lane_default_workers(0, 1, 2) == 0);
     CHECK(mm3::lane_default_workers(31, 0, 2) == 31);     // (logical CPUs not known: as before)
     // --cpu-threads N: N threads, the caller included

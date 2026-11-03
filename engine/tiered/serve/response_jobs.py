@@ -70,7 +70,7 @@ class BackgroundJobs:
             self._metrics["submitted"] += 1
             if not self._workers:
                 for index in range(self.limits["JOB_WORKERS"]):
-                    worker = threading.Thread(target=self._run, name=f"maya-response-worker-{index}", daemon=True)
+                    worker = threading.Thread(target=self._run, name=f"wam-response-worker-{index}", daemon=True)
                     self._workers.append(worker)
                     worker.start()
             self._cv.notify_all()

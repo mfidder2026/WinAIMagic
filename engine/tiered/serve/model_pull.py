@@ -1,5 +1,5 @@
 """Downloading models from the Models page and the API (/api/pull).  Nothing here downloads or verifies a file
-itself: the download is the setup's own (`maya.py --setup --model <id> --download-model --yes --plain --no-start`: curl
+itself: the download is the setup's own (`wam.py --setup --model <id> --download-model --yes --plain --no-start`: curl
 with resume, sha256 check, the pack, the config), run as a child process whose output is read for its progress line.
 One download at a time."""
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-import maya_quants as Q  # noqa: E402  (tools/) the quants the setup offers
+import wam_quants as Q  # noqa: E402  (tools/) the quants the setup offers
 
 from serve import models  # noqa: E402
 
@@ -44,8 +44,8 @@ def catalog(root: Path, glm_sizes: dict | None = None) -> list:
 def _glm_sizes() -> dict:
     try:
         sys.path.insert(0, str(ROOT))
-        import maya                                    # (the setup's own table; nothing runs on import)
-        return {k: m.get("download_gb") for k, m in maya.MODELS.items()}
+        import wam                                    # (the setup's own table; nothing runs on import)
+        return {k: m.get("download_gb") for k, m in wam.MODELS.items()}
     except Exception:  # noqa: BLE001 - a size is a nicety
         return {}
 
@@ -53,7 +53,7 @@ def _glm_sizes() -> dict:
 def setup_command(model_id: str, cfg: dict | None) -> list:
     """The setup run that downloads `model_id` the way this install was set up (its models folder and backend)."""
     inst = (cfg or {}).get("installer") or {}
-    cmd = [sys.executable, str(ROOT / "maya.py"), "--setup", "--model", model_id, "--download-model", "--yes",
+    cmd = [sys.executable, str(ROOT / "wam.py"), "--setup", "--model", model_id, "--download-model", "--yes",
            "--plain", "--no-start"]
     if inst.get("models_dir"):
         cmd += ["--models-dir", str(inst["models_dir"])]
@@ -145,7 +145,7 @@ class Puller:
         ident = str(ident or "").strip().lower()
         ident = ident.removesuffix(":latest")
         if ident not in known:
-            raise ValueError(f"{ident!r} is not in Maya's catalog (GET /api/catalog lists the ids)")
+            raise ValueError(f"{ident!r} is not in Wam's catalog (GET /api/catalog lists the ids)")
         with self._lock:
             if self.current is not None and self.current.active():
                 raise ValueError(f"{self.current.id} is downloading; wait for it or cancel it")

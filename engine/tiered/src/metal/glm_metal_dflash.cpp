@@ -1,4 +1,4 @@
-// src/metal/glm_metal_dflash.cpp - the DFlash2 drafter on maya-metal, as the CUDA engine runs it (src/core/glm_dflash.cu)
+// src/metal/glm_metal_dflash.cpp - the DFlash2 drafter on wam-metal, as the CUDA engine runs it (src/core/glm_dflash.cu)
 // and the pinned llama.cpp builds it (src/models/dflash.cpp):
 //
 //   inject  every trunk row: g = rms(fc . [the streams' mean entering each target layer]) * enc.output_norm, then
@@ -19,7 +19,7 @@
 #include <cmath>
 #include <cstring>
 
-namespace maya::metal {
+namespace wam::metal {
 
 namespace {
 
@@ -378,4 +378,4 @@ bool GlmMetal::dflash_draft(int32_t token, int n, float p_min, int n_min, float 
     return true;
 }
 
-}  // namespace maya::metal
+}  // namespace wam::metal

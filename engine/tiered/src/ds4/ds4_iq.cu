@@ -3,7 +3,7 @@
 #include "ds4_iq.cuh"
 #include "ds4_iq1_codes.hpp"
 #include "ds4_pdl.cuh"
-#if defined(STRATA_USE_HIP) && !defined(MAYA_DS4_IQ_ONLY)   // (#354; maya-mm3 builds ds4_iq.cu without it)
+#if defined(STRATA_USE_HIP) && !defined(WAM_DS4_IQ_ONLY)   // (#354; wam-mm3 builds ds4_iq.cu without it)
 #include "strata/prefill/moe_mmq.hpp"
 #if defined(STRATA_USE_HIP)
 #include "strata/prefill/moe_fused_rdna4.hpp"
@@ -76,7 +76,7 @@ template <> struct Ty<kQ3_K> { static constexpr int B = 110, TAB = 0, MIN = 0; }
 template <> struct Ty<kIQ1_S> { static constexpr int B = 50, TAB = 2048, MIN = 0; };   // (iq1s_grid_gpu)
 template <> struct Ty<kIQ1_M> { static constexpr int B = 56, TAB = 2048, MIN = 0; };
 // the dense matrices' Q6_K (ql[128] the low nibbles, qh[64] the high 2 bits, scales[16] int8 a 16 values, d) and Q8_0
-// (d, then 32 int8: a block of 32 values) - the GEMVs, the FP16 rows and decode_values (maya-mm3's MiniMax quants)
+// (d, then 32 int8: a block of 32 values) - the GEMVs, the FP16 rows and decode_values (wam-mm3's MiniMax quants)
 template <> struct Ty<kQ6_K> { static constexpr int B = 210, TAB = 0, MIN = 0; };
 template <> struct Ty<kQ8_0> { static constexpr int B = 34, TAB = 0, MIN = 0; };
 // MXFP4 (ds4_gguf.cu's own kernels everywhere else): a block of 32 values, an E8M0 scale then 16 code bytes; the light
@@ -731,9 +731,9 @@ struct Ahead {
 // block loading its codebook once (when its first live work item comes) and then taking work items round the grid - an
 // item the full grid's block (x, group), group by group.  An item's rows are the same warps' and lanes' as that block's,
 // summed in the same order: every output keeps its bits, whatever the grid.  The smaller codebooks keep the full grid (a
-// block there loads little, and one of an empty group leaves at once).  CUDA's maya-ds4 only: HIP and maya-mm3's build
-// of this file (MAYA_DS4_IQ_ONLY) keep the full grids, and so do MiniMax's epilogues (EPI 1..3).
-#if defined(STRATA_USE_HIP) || defined(MAYA_DS4_IQ_ONLY)
+// block there loads little, and one of an empty group leaves at once).  CUDA's wam-ds4 only: HIP and wam-mm3's build
+// of this file (WAM_DS4_IQ_ONLY) keep the full grids, and so do MiniMax's epilogues (EPI 1..3).
+#if defined(STRATA_USE_HIP) || defined(WAM_DS4_IQ_ONLY)
 #define DS4_IQ_PERSIST_BUILD 0
 #else
 #define DS4_IQ_PERSIST_BUILD 1
@@ -1395,7 +1395,7 @@ const Iq1Var& iq1_var() {
     return v;
 }
 
-// the persistent grids (kPersist): DS4_IQ_PERSIST (MAYA_DS4_IQ_PERSIST, read as STRATA_DS4_IQ_PERSIST): 0 off, 1 on,
+// the persistent grids (kPersist): DS4_IQ_PERSIST (WAM_DS4_IQ_PERSIST, read as STRATA_DS4_IQ_PERSIST): 0 off, 1 on,
 // unset: on for a device of compute capability 8.0 and up (measured about 2% slower on a V100); set_persist over it (tests)
 std::atomic<int> g_persist_set{-1};
 #if DS4_IQ_PERSIST_BUILD
@@ -1741,10 +1741,10 @@ bool persist_on() {
 }
 void set_persist(int on) { g_persist_set.store(on < 0 ? -1 : on != 0 ? 1 : 0, std::memory_order_relaxed); }
 
-#if defined(STRATA_USE_HIP) && !defined(MAYA_DS4_IQ_ONLY)
+#if defined(STRATA_USE_HIP) && !defined(WAM_DS4_IQ_ONLY)
 // Prompt expert sets through the existing GLM MMQ path (HIP, opt-in).
 // The same q8_1/MMA path the GLM prompt uses (strata::prefill::mmq): the packed expert is read once, activations are
-// rounded to q8_1, and the products run on int8 tensor cores.  Opt-in (MAYA_DS4_EXPERT_MMQ=1), sets of at least 32 rows;
+// rounded to q8_1, and the products run on int8 tensor cores.  Opt-in (WAM_DS4_EXPERT_MMQ=1), sets of at least 32 rows;
 // smaller sets, unsupported shapes/types and allocation failure keep the FP32 tiled kernel above.
 namespace {
 thread_local int mmq_rows = 0;
@@ -2007,7 +2007,7 @@ bool mmq_down(const SetArgs& a, cudaStream_t s) {
 
 #endif
 
-#if defined(STRATA_USE_HIP) && !defined(MAYA_DS4_IQ_ONLY)
+#if defined(STRATA_USE_HIP) && !defined(WAM_DS4_IQ_ONLY)
 // Prompt expert sets through the fused int8 experts the GLM prompt uses (strata::prefill::rdna4, gfx1151 / gfx1100 /
 // RDNA4): the weights decoded to int8 in the WMMA tiles' shared memory, the activations and the SwiGLU's H rounded to
 // int8 per 32 values (as GLM's), the products on the int8 matrix cores.  On by default where it covers the set's formats
@@ -2117,7 +2117,7 @@ bool fused_down(const SetArgs& a, cudaStream_t s) {
 #endif
 
 bool set_gate_up(const SetArgs& a, cudaStream_t s) {
-#if defined(STRATA_USE_HIP) && !defined(MAYA_DS4_IQ_ONLY)
+#if defined(STRATA_USE_HIP) && !defined(WAM_DS4_IQ_ONLY)
     if (fused_wanted(a)) {
         if (fused_gate_up(a, s)) return true;
         std::fprintf(stderr, "ds4: the fused prompt experts could not run a set\n");
@@ -2155,7 +2155,7 @@ bool set_gate_up(const SetArgs& a, cudaStream_t s) {
 }
 
 bool set_down(const SetArgs& a, cudaStream_t s) {
-#if defined(STRATA_USE_HIP) && !defined(MAYA_DS4_IQ_ONLY)
+#if defined(STRATA_USE_HIP) && !defined(WAM_DS4_IQ_ONLY)
     if (fused_wanted(a)) {
         if (fused_down(a, s)) return true;
         std::fprintf(stderr, "ds4: the fused prompt experts could not run a set's down\n");

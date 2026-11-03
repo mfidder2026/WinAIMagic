@@ -1,4 +1,4 @@
-// maya-ds4 --serve's watchdog rule (src/ds4/ds4_watchdog.hpp, #539): it fires on a request that stopped moving, never
+// wam-ds4 --serve's watchdog rule (src/ds4/ds4_watchdog.hpp, #539): it fires on a request that stopped moving, never
 // on a long one that keeps moving, never while no request runs.  No GPU, no model.
 #ifdef NDEBUG
 #undef NDEBUG
@@ -61,7 +61,7 @@ int main() {
         r.limit_s = 0;
         for (double t = 0; t < 100000; t += 100) assert(!r.stalled(true, 1, t));
     }
-    // a shorter limit (MAYA_DS4_WATCHDOG_S=60)
+    // a shorter limit (WAM_DS4_WATCHDOG_S=60)
     {
         StallRule r;
         r.limit_s = 60;

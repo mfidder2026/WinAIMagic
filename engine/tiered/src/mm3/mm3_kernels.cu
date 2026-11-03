@@ -1,4 +1,4 @@
-// src/mm3/mm3_kernels.cu - maya-mm3's kernels around the EXL3 matrices (the interface: mm3_kernels.cuh).
+// src/mm3/mm3_kernels.cu - wam-mm3's kernels around the EXL3 matrices (the interface: mm3_kernels.cuh).
 #include "mm3_kernels.cuh"
 
 #include <cuda_fp16.h>
@@ -2085,9 +2085,9 @@ const bool msa_old = std::getenv("MM3_MSA_OLD") != nullptr;
 void block_scores(const float* iq, const uint16_t* ic, const int* pos, int T, int Hi, int nblk, int blk, float* bs,
                   cudaStream_t s) {
     if (T <= 0 || nblk <= 0 || kBsV % Hi) return;
-    // a prompt's (MAYA_MM3_MSA_WIDE=0: the token kernel for them too - the same bits either way)
+    // a prompt's (WAM_MM3_MSA_WIDE=0: the token kernel for them too - the same bits either way)
     static const bool wide_on = [] {
-        const char* v = std::getenv("MAYA_MM3_MSA_WIDE");
+        const char* v = std::getenv("WAM_MM3_MSA_WIDE");
         return v == nullptr || std::atoi(v) != 0;
     }();
     if (wide_on && !msa_old && T >= 2 * (kBwV / Hi) && blk % kBwK == 0) {
@@ -2099,9 +2099,9 @@ void block_scores(const float* iq, const uint16_t* ic, const int* pos, int T, in
         check("block_scores (wide)");
         return;
     }
-    // (a token: a block a key block - MAYA_MM3_MSA_TOK=0: the tiles below for it too, the same bits)
+    // (a token: a block a key block - WAM_MM3_MSA_TOK=0: the tiles below for it too, the same bits)
     static const bool tok_on = [] {
-        const char* v = std::getenv("MAYA_MM3_MSA_TOK");
+        const char* v = std::getenv("WAM_MM3_MSA_TOK");
         return v == nullptr || std::atoi(v) != 0;
     }();
     if (tok_on && !msa_old && T == 1 && Hi <= 4 && blk <= 128) {
@@ -2135,9 +2135,9 @@ void sparse_attn(const float* q, const uint16_t* kc, const uint16_t* vc, const i
     if (T <= 0) return;
     const int S = part != nullptr && splits > 1 ? std::min({splits, topk, kCombMaxS}) : 1;
     const dim3 grid((unsigned) T, (unsigned) Hkv, (unsigned) S);
-    // (a decode token's or window's few queries: the wide kernel - the same bits; MAYA_MM3_ATTN_WIDE=0: the other)
+    // (a decode token's or window's few queries: the wide kernel - the same bits; WAM_MM3_ATTN_WIDE=0: the other)
     static const bool wide_on = [] {
-        const char* v = std::getenv("MAYA_MM3_ATTN_WIDE");
+        const char* v = std::getenv("WAM_MM3_ATTN_WIDE");
         return v == nullptr || std::atoi(v) != 0;
     }();
     const bool wide = wide_on && T <= kWideT;
@@ -2182,7 +2182,7 @@ bool plan_dev(const int* top, const float* w, int T, int K, const unsigned long 
 void submit(cudaStream_t s) {
 #if defined(_WIN32)
     static const bool on = [] {
-        const char* v = std::getenv("MAYA_MM3_WIN_SUBMIT");
+        const char* v = std::getenv("WAM_MM3_WIN_SUBMIT");
         if (v == nullptr) v = std::getenv("MM3_WIN_SUBMIT");
         return v == nullptr || std::atoi(v) != 0;
     }();
@@ -2393,12 +2393,12 @@ void mx_rows(const uint8_t* w, const uint8_t* scale, int N, int K, const float* 
         return;
     }
     // (up to 8 rows - a proposal's block, a verify window's context: mxc_kernel, CUDA - measured on the V100s; HIP and
-    //  MAYA_MM3_MXC=0: the kernel below)
+    //  WAM_MM3_MXC=0: the kernel below)
 #if defined(STRATA_USE_HIP)
     constexpr bool mxc_on = false;
 #else
     static const bool mxc_on = [] {
-        const char* v = std::getenv("MAYA_MM3_MXC");
+        const char* v = std::getenv("WAM_MM3_MXC");
         return v == nullptr || std::atoi(v) != 0;
     }();
 #endif

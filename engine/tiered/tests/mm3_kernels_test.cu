@@ -1,4 +1,4 @@
-// tests/mm3_kernels_test.cu - maya-mm3's MSA, candidate and sampling kernels on one GPU against references:
+// tests/mm3_kernels_test.cu - wam-mm3's MSA, candidate and sampling kernels on one GPU against references:
 //   block_scores / select_blocks vs a CPU reference (the same bits), a NaN query's kept list (no crash);
 //   sparse_attn split 16 ways vs one block vs an F64 reference, and INT8 K / V with and without the rotation vs BF16;
 //   topk_rows vs host_cands (the same lists); markov_sample's distribution and draw; wait_pull.

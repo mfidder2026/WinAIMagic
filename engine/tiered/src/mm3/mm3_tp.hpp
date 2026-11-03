@@ -1,4 +1,4 @@
-// src/mm3/mm3_tp.hpp - maya-mm3's tensor-parallel path (Options::tp > 0).
+// src/mm3/mm3_tp.hpp - wam-mm3's tensor-parallel path (Options::tp > 0).
 //
 // The GPUs in groups of tp (the first GPU alone when the others make whole groups: it also holds the output head, the
 // DSpark draft and the vision tower); each group a run of layers, every layer cut over its members - each member its

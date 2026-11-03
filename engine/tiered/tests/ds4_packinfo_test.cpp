@@ -1,4 +1,4 @@
-// maya-ds4 --pack-info (src/ds4/ds4_packinfo.cpp) on small packs written here: a healthy GGUF-style pack and an EXL3
+// wam-ds4 --pack-info (src/ds4/ds4_packinfo.cpp) on small packs written here: a healthy GGUF-style pack and an EXL3
 // one load (0, every file there); a pack whose model_dir is gone, or whose file is short, is a dead pack (2); a type no
 // kernel takes stops it (2); a drafter its metadata leaves unloaded (dspark_block_size 0) and an expert profile of
 // another size are warned about; the profile's most-routed experts are counted; no ds4.txt is not a pack (1).  The

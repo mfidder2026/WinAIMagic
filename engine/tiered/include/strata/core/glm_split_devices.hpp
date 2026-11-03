@@ -17,11 +17,11 @@ inline bool glm_split_devices(const std::vector<int>* named, int n_dev, int help
         for (size_t i = 0; i < named->size(); ++i) {
             const int d = (*named)[i];
             if (d == helper) {
-                err = "GLM expert helper: CUDA" + std::to_string(d) + " is the helper, not a part of the split (MAYA_GLM_DEVS)";
+                err = "GLM expert helper: CUDA" + std::to_string(d) + " is the helper, not a part of the split (WAM_GLM_DEVS)";
                 return false;
             }
             if (std::find(named->begin(), named->begin() + (long) i, d) != named->begin() + (long) i) {
-                err = "glm split: MAYA_GLM_DEVS names CUDA" + std::to_string(d) + " twice";
+                err = "glm split: WAM_GLM_DEVS names CUDA" + std::to_string(d) + " twice";
                 return false;
             }
         }

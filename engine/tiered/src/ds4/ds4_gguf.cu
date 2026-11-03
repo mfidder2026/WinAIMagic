@@ -276,7 +276,7 @@ struct Q8Round {
 // min(127, nearest_int(iscale x)) - the product rounded to F32 before the magic-number rounding, as the source does
 // (src/kernels/cuda/quantize_act.cu's note) - and d = 1 / iscale, written to each of the 256's eight 32-blocks of d:
 // the kernels' sums then take the CPU lane's int8 values and scale, so an expert gives the same sums on either lane
-// (up to their order, as MXFP4's do) wherever the placement, the expert cache or the PCIe lane puts it: Maya-S's
+// (up to their order, as MXFP4's do) wherever the placement, the expert cache or the PCIe lane puts it: Wam-S's
 // tokens no longer depend on the placement (Strix Halo, --vram-experts 1.0 vs 0.85: 96 of 96 tokens the same, 50 with
 // the per-32 rounding), the KL against the FP8 reference the same (0.162 against 0.171, two sequences), the kernels
 // as fast (6 IQ2_XXS / IQ3_XXS experts 275 against 280 us).  DS4_IQ_Q8K=0: the per-32 rounding (q8_1's), as before
@@ -1401,7 +1401,7 @@ void q8_round(const float* x, int k, int8_t* q, float* d, cudaStream_t s) {
 }
 
 // (the low-bit types ds4_iq's GEMVs take: the routed experts' and the dense matrices' beside them - Q6_K, as
-//  orcarouter's mixes and maya-mm3's GGUFs hold some; a routed expert's own: expert_type_ok)
+//  orcarouter's mixes and wam-mm3's GGUFs hold some; a routed expert's own: expert_type_ok)
 size_t type_row_bytes(int type, int64_t k) {
     if (type == kTypeMXFP4) return k % kMxBlock == 0 ? mx_row_bytes(k) : 0;
     return iq::mv_supported(type) && k % iq::block_values(type) == 0 ? iq::row_bytes(type, k) : 0;

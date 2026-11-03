@@ -211,8 +211,8 @@ class BackgroundResponses(ResponseCase):
         self.assertFalse(out["responses"]["structured_outputs"]["constrained_decoding"])
         with self.request(path="/metrics/prometheus") as response:
             text = response.read().decode()
-        self.assertIn("maya:responses_cache_bytes", text)
-        self.assertIn("maya:responses_jobs_readers", text)
+        self.assertIn("wam:responses_cache_bytes", text)
+        self.assertIn("wam:responses_jobs_readers", text)
         self.assertNotIn("private-fixture-content", text)
 
     def test_queue_admission_and_input_limits(self):

@@ -1,4 +1,4 @@
-// src/mm3/mm3_geo.hpp - maya-mm3: MiniMax-M3.1-Flash's geometry from mm3.txt (both engine paths' - mm3_model.cu,
+// src/mm3/mm3_geo.hpp - wam-mm3: MiniMax-M3.1-Flash's geometry from mm3.txt (both engine paths' - mm3_model.cu,
 // mm3_tp.cu), with the checks of what the kernels cover.
 #pragma once
 

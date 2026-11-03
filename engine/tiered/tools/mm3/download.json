@@ -1,5 +1,5 @@
 {
- "_": "MiniMax-M3.1-Flash for maya-mm3 (maya.py's MiniMax setup): Mia-AiLab's EXL3 EAQ v1 quant at 3.5 bpw, every file pinned to a revision with its size and sha256 (the LFS ones checked against Hugging Face's). The DSpark draft in its dspark/ folder is a download of its own (dspark below). The README's pictures (images/) are not needed and not listed.",
+ "_": "MiniMax-M3.1-Flash for wam-mm3 (wam.py's MiniMax setup): Mia-AiLab's EXL3 EAQ v1 quant at 3.5 bpw, every file pinned to a revision with its size and sha256 (the LFS ones checked against Hugging Face's). The DSpark draft in its dspark/ folder is a download of its own (dspark below). The README's pictures (images/) are not needed and not listed.",
  "name": "MiniMax-M3.1-Flash",
  "repo": "Mia-AiLab/MiniMax-M3.1-Flash-EXL3-EAQ-v1-3.5-bpw",
  "revision": "fe796c40546d8b28340c5ed85b892e181ee21dec",

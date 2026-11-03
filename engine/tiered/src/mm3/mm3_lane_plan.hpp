@@ -1,4 +1,4 @@
-// src/mm3/mm3_lane_plan.hpp - maya-mm3's CPU lane, its arithmetic alone (no CUDA, no threads: tests/mm3_lane_plan_test):
+// src/mm3/mm3_lane_plan.hpp - wam-mm3's CPU lane, its arithmetic alone (no CUDA, no threads: tests/mm3_lane_plan_test):
 // how many workers it takes on this host by default, and decode's own timing of it (the costs the split between the
 // CPU lane and the staging slots plans with - mm3_model.cu's lane_split).
 #pragma once
@@ -10,22 +10,22 @@ namespace mm3 {
 
 /// The lane's workers by default (no --cpu-threads): one a physical core but the caller's (`workers`, of `logical`
 /// CPUs the process may run on) - and where that leaves fewer than spare + 1 logical CPUs to the rest (no SMT siblings
-/// free: a VM's vCPUs, a CPU without SMT), `spare` cores fewer, as maya-ds4 leaves them.  The engine's other threads
+/// free: a VM's vCPUs, a CPU without SMT), `spare` cores fewer, as wam-ds4 leaves them.  The engine's other threads
 /// (the GPU's launches and waits, the copies, the server) and the OS then find a core instead of preempting a spinning
 /// worker, which holds the whole call up (#552: 32 vCPUs, no SMT - the lane on all 32 decoded 13.0 tok/s, on 28 15.8).
-/// A host with SMT keeps every core: the siblings are free (a lane of fewer cores there cost decode - maya-ds4's #394)
+/// A host with SMT keeps every core: the siblings are free (a lane of fewer cores there cost decode - wam-ds4's #394)
 inline int lane_default_workers(int workers, int logical, int spare) {
     if (workers <= 0 || logical <= 0 || spare <= 0) return std::max(0, workers);
     const bool leaves_none = logical - (workers + 1) < spare + 1;
     return leaves_none && workers > spare + 1 ? workers - spare : workers;
 }
 
-/// --cpu-threads N: the lane's threads, the caller included (as maya-ds4's, and the Models page's "CPU threads") ->
+/// --cpu-threads N: the lane's threads, the caller included (as wam-ds4's, and the Models page's "CPU threads") ->
 /// its workers besides the caller.  0: the caller alone; below 0 as given (-1: no CPU lane).  Before #552 N was the
 /// workers, so N started N + 1 threads.
 inline int lane_workers_of_threads(int n) { return n >= 1 ? n - 1 : n; }
 
-/// Decode's timing of the CPU lane (maya-ds4's lane_note, for maya-mm3's two costs): the start-up figures (an expert
+/// Decode's timing of the CPU lane (wam-ds4's lane_note, for wam-mm3's two costs): the start-up figures (an expert
 /// on the lane, and each more in the same call) are one moment's, each lane alone - a busy moment staged experts
 /// the CPU lane would have taken faster for the whole run (#552: "+1.27 ms each more" staged 2 of 4, decode 9.6 tok/s
 /// against 12.75).  Each decoded token's CPU-lane calls (n experts, ms) go into windows of kWindow experts (the first

@@ -6,7 +6,7 @@
 //
 //   glm_mmq_glu_test           the parity checks (ctest; skipped where mmq::glu_supported is false)
 //   glm_mmq_glu_test --iq-s-only  only IQ1_S/IQ2_S/IQ3_S, for targeted Compute Sanitizer checks
-//   glm_mmq_glu_test --bench   Maya-L's shape (IQ3_S, n_embd 4096, n_ff 2048, 288 experts, 8192 tokens x 8): the time
+//   glm_mmq_glu_test --bench   Wam-L's shape (IQ3_S, n_embd 4096, n_ff 2048, 288 experts, 8192 tokens x 8): the time
 //                              of the fused product against the plain product + the SwiGLU kernel
 #include "strata/kernels/glm_batch.hpp"
 #include "strata/prefill/moe_mmq.hpp"
@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
     if (argc > 1 && std::strcmp(argv[1], "--bench") == 0) return bench(s);
     const bool iq_s_only = argc > 1 && std::strcmp(argv[1], "--iq-s-only") == 0;
 
-    // Two expert sets: 288 experts of 0-64 rows (Maya-L's count; the plain product's launch then has a block per
+    // Two expert sets: 288 experts of 0-64 rows (Wam-L's count; the plain product's launch then has a block per
     // tile, as at a prompt chunk's size, and both sum every output over K in the same order: BIT FOR BIT), and six
     // experts of uneven rows - an empty one, a one-row one, one past a column tile - few enough tiles that the plain
     // product splits K over its blocks (stream-k): summed in another order there, so equal within float rounding.

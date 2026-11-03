@@ -1,7 +1,7 @@
-// src/mm3/mm3_gv.cuh - maya-mm3's dense GEMVs over a GGUF's K-quant and Q8_0 matrices (the attention, the shared and dense
-// MLPs, the output head of MiniMax's Maya quants): the sums of ds4_iq's mv to the bit, read faster.
+// src/mm3/mm3_gv.cuh - wam-mm3's dense GEMVs over a GGUF's K-quant and Q8_0 matrices (the attention, the shared and dense
+// MLPs, the output head of MiniMax's Wam quants): the sums of ds4_iq's mv to the bit, read faster.
 //
-// ds4_iq's mv (maya-ds4's, kept as it is for DeepSeek) gives each row a warp, each lane a 32-value sub-block a step
+// ds4_iq's mv (wam-ds4's, kept as it is for DeepSeek) gives each row a warp, each lane a 32-value sub-block a step
 // (lane, lane + 32, ...), its integer dot times the sub-block's scales accumulated with fmaf, then the warp's butterfly.
 // These kernels keep exactly that per row and per activation column - the same lane takes the same sub-blocks in the
 // same order, the same roundings - and change only how the bytes arrive and how often the activations are read:
@@ -42,7 +42,7 @@ bool covered(const Job& j);
 bool needs_sums(int type);
 /// The jobs (each covered, ncol <= 16), grouped by type a launch.  false: one not covered (nothing launched for it).
 bool run(const Job* jobs, int n, cudaStream_t s);
-/// MAYA_MM3_GV=0: every job through ds4_iq's mv (as before).  On by default - CUDA only: on HIP the compiler contracts
+/// WAM_MM3_GV=0: every job through ds4_iq's mv (as before).  On by default - CUDA only: on HIP the compiler contracts
 /// these kernels' multiplies and adds otherwise than ds4_iq's mv (other bits), so HIP keeps ds4_iq's mv (covered false).
 bool enabled();
 

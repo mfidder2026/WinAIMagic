@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """tools/ds4/slot_api_image_test.py - pictures in the kept conversations, through a RUNNING server's API (the real
-path: server -> resize (serve/ds4_vision.py) -> GENI -> engine slot).  Meant for the running Maya (port 8090); it reads
-maya-ds4.log for the engine's own lines.
+path: server -> resize (serve/ds4_vision.py) -> GENI -> engine slot).  Meant for the running Wam (port 8090); it reads
+wam-ds4.log for the engine's own lines.
 
     python tools/ds4/slot_api_image_test.py             (URL/LOG at the top of this file)
 
@@ -21,7 +21,7 @@ import time
 import urllib.request
 
 URL = "http://127.0.0.1:8090/v1/chat/completions"
-LOG = "/home/mark/LLM/maya/maya-ds4.log"
+LOG = "/home/mark/LLM/wam/wam-ds4.log"
 
 from PIL import Image  # noqa: E402
 
@@ -77,7 +77,7 @@ def log_mark() -> int:
 
 
 def show(name: str, lines: list[str]) -> list[str]:
-    keep = [l for l in lines if "ds4 slots:" in l or "maya ds4 serve: prompt" in l or l.startswith("PP ")]
+    keep = [l for l in lines if "ds4 slots:" in l or "wam ds4 serve: prompt" in l or l.startswith("PP ")]
     print(f"\n[{name}] engine lines:")
     for l in keep[-8:]:
         print("   " + l)

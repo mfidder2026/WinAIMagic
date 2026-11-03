@@ -1,7 +1,7 @@
 """tools/ds4/concurrent_check.py - conversations at once through a running server, each recalling a code of its own.
 
 Through the server's OpenAI API, an answer that names another conversation's code is a mix-up of their states
-(maya-ds4 --parallel's conversations, the kept conversation slots, a prompt's reuse of another's start).
+(wam-ds4 --parallel's conversations, the kept conversation slots, a prompt's reuse of another's start).
 
 Every client sends its conversation at the same moment.  Its prompt starts with text all of them share - so the
 engine sees prompts with a common start, as an agent's requests are - then its own code, then text of its own, and
@@ -99,7 +99,7 @@ def first_model(url: str, key: str | None, timeout: float) -> str:
     req = urllib.request.Request(url + "/models", headers={"Authorization": f"Bearer {key}"} if key else {})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         data = json.loads(r.read()).get("data") or []
-    return data[0]["id"] if data else "maya"
+    return data[0]["id"] if data else "wam"
 
 
 def client(i: int, a, model: str, turns_text: list, start: threading.Barrier, out: list) -> None:
@@ -141,8 +141,8 @@ def main(argv=None) -> int:
                                         "3 (--strict): an answer missed its own code")
     ap.add_argument("--url", default="http://127.0.0.1:8080/v1", help="the server's OpenAI API (default %(default)s)")
     ap.add_argument("--model", help="the model's name (default: the first /v1/models gives)")
-    ap.add_argument("--api-key", default=os.environ.get("MAYA_API_KEY") or os.environ.get("OPENAI_API_KEY"),
-                    help="the server's key, if it asks for one (default: $MAYA_API_KEY or $OPENAI_API_KEY)")
+    ap.add_argument("--api-key", default=os.environ.get("WAM_API_KEY") or os.environ.get("OPENAI_API_KEY"),
+                    help="the server's key, if it asks for one (default: $WAM_API_KEY or $OPENAI_API_KEY)")
     ap.add_argument("--clients", type=int, default=4, help="conversations at once (default %(default)s)")
     ap.add_argument("--rounds", type=int, default=1, help="runs, each with new codes (default %(default)s)")
     ap.add_argument("--turns", type=int, choices=(1, 2), default=1,

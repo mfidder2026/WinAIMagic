@@ -1,4 +1,4 @@
-// src/ds4/ds4_ablate.hpp - direction projection on Maya: a unit direction r ([dim]) that the layers project out of
+// src/ds4/ds4_ablate.hpp - direction projection on Wam: a unit direction r ([dim]) that the layers project out of
 // every residual write - y <- y - scale * r (r . y) on the attention output and on the MoE output, right before each
 // hc_post (ds4_model.cu's ablate()).  The use it is written for is abliteration, r a refusal direction.
 //

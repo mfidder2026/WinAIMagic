@@ -1,4 +1,4 @@
-"""Tune maya-ds4 for this PC (./maya.sh --calibrate on a DeepSeek-V4.1-Flash-1017 config).
+"""Tune wam-ds4 for this PC (./wam.sh --calibrate on a DeepSeek-V4.1-Flash-1017 config).
 
 The engine balances its layers across the GPUs itself, but two of its settings depend on the PC, the quant and what it
 serves, and the setup only guesses them:
@@ -18,7 +18,7 @@ rates decide together (two starts of one setting differ by a few percent: the ex
 Effective groups come from each GPU's VRAM tp_n field, not --tp: fallback duplicates close before inference and are
 not ranked as different settings. Incomplete grouping telemetry preserves the config's TP rather than guessing.
 
-    python tools/calibrate_ds4_tp.py maya-ds4.json     # measure and print; ./maya.sh --calibrate also saves it
+    python tools/calibrate_ds4_tp.py wam-ds4.json     # measure and print; ./wam.sh --calibrate also saves it
 """
 from __future__ import annotations
 
@@ -153,7 +153,7 @@ def read_rate(eng, ids: list[int]) -> float:
 
 def profile_copy(args: list, tmp: Path):
     """A function that gives an engine start's `args` a fresh copy (in `tmp`) of the expert profile the config's
-    engine reads - maya-ds4 saves it after every answer, and its next start places the experts in VRAM by it, so
+    engine reads - wam-ds4 saves it after every answer, and its next start places the experts in VRAM by it, so
     the tuning's answers must neither reach this PC's profile nor lead one candidate's placement into the next."""
     src = arg(args, "--expert-profile")
     if src == "none":
@@ -223,7 +223,7 @@ def run(cfg: dict, vram: list[float], say=print, start_engine=None) -> dict:
             return StrataEngine(c["exe"], engine_args(c), cwd=c.get("cwd"), log=c.get("log"), env=child_env(c))
     base = {**cfg, "args": CAL.without_writes(list(cfg.get("args") or []))}
     short, long_ids = prompt_ids(cfg)
-    with tempfile.TemporaryDirectory(prefix="maya-calibrate-ds4-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="wam-calibrate-ds4-") as tmp:
         return measure(base, vram, short, long_ids, start_engine, say, profile_copy(base["args"], Path(tmp)))
 
 
@@ -331,7 +331,7 @@ def measure(cfg: dict, vram: list[float], short, long_ids, start_engine, say=pri
 if __name__ == "__main__":
     import json
     if len(sys.argv) != 2:
-        sys.exit("usage: calibrate_ds4_tp.py <maya-ds4.json>")
+        sys.exit("usage: calibrate_ds4_tp.py <wam-ds4.json>")
     import setup as S
     c = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     found = {g["index"]: g for g in S.gpus() or []}

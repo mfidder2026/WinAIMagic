@@ -1,7 +1,7 @@
 """tools/ds4/dspark_ref.py - DeepSeek-V4.1's DSpark drafter in torch, straight from DeepSeek's checkpoint, against what
 the engine's drafter computed (the engine's oracle for the drafter; ref.py / ref_gguf.py cover the trunk only).
 
-    DS4_DSPARK_DUMP=d.bin maya-ds4 --pack <pack> ... --n 64        (the engine: its drafter's inputs and outputs)
+    DS4_DSPARK_DUMP=d.bin wam-ds4 --pack <pack> ... --n 64        (the engine: its drafter's inputs and outputs)
     python tools/ds4/dspark_ref.py --dump d.bin --shards <dir with model-00044..46-of-00048> --pack <pack>
                                    [--rounds 4] [--head]
 
@@ -309,7 +309,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dump", required=True)
     ap.add_argument("--shards", required=True, help="the folder with DeepSeek's model-00044..46-of-00048")
-    ap.add_argument("--pack", required=True, help="the maya-ds4 pack (ds4.txt, tensors.txt: the embedding, the head)")
+    ap.add_argument("--pack", required=True, help="the wam-ds4 pack (ds4.txt, tensors.txt: the embedding, the head)")
     ap.add_argument("--rounds", type=int, default=4, help="draft rounds to check (from --skip)")
     ap.add_argument("--skip", type=int, default=0, help="draft rounds to pass over first")
     ap.add_argument("--head", action="store_true", help="also the drafts: the trunk's head + the markov bias")

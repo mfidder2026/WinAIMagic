@@ -1,4 +1,4 @@
-// src/mm3/mm3_host.hpp - maya-mm3's x86 host helpers (AVX2), in a .cpp of their own: nvcc's front end cannot read
+// src/mm3/mm3_host.hpp - wam-mm3's x86 host helpers (AVX2), in a .cpp of their own: nvcc's front end cannot read
 // <immintrin.h> with every host compiler (CUDA 12.4 with GCC 13: the AMX intrinsics' builtins are unknown to it), so
 // the .cu files call these instead of including it.
 #pragma once

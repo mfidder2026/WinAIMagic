@@ -1,4 +1,4 @@
-"""serve/mm3_vision.py - pictures for MiniMax-M3.1-Flash (maya-mm3 runs the vision tower itself).
+"""serve/mm3_vision.py - pictures for MiniMax-M3.1-Flash (wam-mm3 runs the vision tower itself).
 
 The server's half of the model's image_processor.py: a picture is resized (aspect kept, bicubic) to sides that are
 multiples of 28 (a 14 x 14 patch grid, merged 2 x 2) with at most 672 x 672 pixels, and each ]<]image[>[ the template
@@ -114,7 +114,7 @@ def prepare(data: bytes, g: Geometry) -> Picture:
 
 
 class Vision:
-    """The server's side of maya-mm3's pictures: the resize (cached by the picture's bytes: a conversation sends its
+    """The server's side of wam-mm3's pictures: the resize (cached by the picture's bytes: a conversation sends its
     pictures with every turn) and the GENI file.  Shaped like serve.ds4_vision.Vision where the Service uses it."""
 
     def __init__(self, geometry: Geometry, directory: Path, load):

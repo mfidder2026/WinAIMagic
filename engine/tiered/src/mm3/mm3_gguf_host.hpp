@@ -1,4 +1,4 @@
-// src/mm3/mm3_gguf_host.hpp - a GGUF tensor's rows on the host for maya-mm3 (the token embedding, the indexer's Q8_0
+// src/mm3/mm3_gguf_host.hpp - a GGUF tensor's rows on the host for wam-mm3 (the token embedding, the indexer's Q8_0
 // projections): ggml's dequantize_row_* values for Q4_K, Q5_K, Q6_K and Q8_0 (ggml-quants.c's loops, the same F32
 // operations), and F32 / F16 / BF16 as they are.
 #pragma once

@@ -1,5 +1,5 @@
 """tools/glm_dflash_fixture.py - a synthetic DFlash2 drafter GGUF (arch "dflash") that fits the 45-layer synthetic
-glm5-next model (tools/glm_big_fixture.py: n_embd 256, vocab 512), for maya-metal's drafting test.  Random weights: the
+glm5-next model (tools/glm_big_fixture.py: n_embd 256, vocab 512), for wam-metal's drafting test.  Random weights: the
 drafts are mostly wrong, which is the point - drafting must still decode exactly as plain decoding does.  A small
 sliding window (64) makes the drafter's KV ring wrap within the test.
 

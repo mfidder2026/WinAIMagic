@@ -8,5 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="..\WinAIMagic.Core\WinAIMagic.Core.csproj" />
     <InternalsVisibleTo Include="WinAIMagic.Chat.Tests" />
+    <InternalsVisibleTo Include="WinAIMagic.Studio" />
   </ItemGroup>
 </Project>

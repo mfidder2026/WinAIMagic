@@ -22,9 +22,9 @@ BG, SURFACE3, LINE, EDGE = "#090a14", "#1e2240", "#252a4a", "#3d4373"
 INK, INK_SOFT, MUTED, FAINT = "#eceefe", "#c3c7e6", "#8a8fb4", "#555b88"
 ACCENT, ACCENT2, ACCENT_TEXT, INFO_TEXT = "#8b7cff", "#38bdf8", "#b4aaff", "#7dd3fc"
 OK, OK_TEXT, WARN, DANGER, TINT = "#34d399", "#6ee7b7", "#fbbf24", "#fb7185", "#1d1b37"   # TINT: --st-accent-tint
-THEME = Theme(name="maya", primary=ACCENT, secondary=ACCENT2, accent=ACCENT, foreground=INK, background=BG,
+THEME = Theme(name="wam", primary=ACCENT, secondary=ACCENT2, accent=ACCENT, foreground=INK, background=BG,
               surface="#11132a", panel="#171a34", success=OK, warning=WARN, error=DANGER, dark=True)
-# "maya." in font8x8 (public domain: the IBM PC BIOS font), 2 x 2 of its pixels to a character cell, as binsider's
+# "wam." in font8x8 (public domain: the IBM PC BIOS font), 2 x 2 of its pixels to a character cell, as binsider's
 FONT = {"m": (0x00, 0x00, 0x33, 0x7F, 0x7F, 0x6B, 0x63, 0x00), "a": (0x00, 0x00, 0x1E, 0x30, 0x3E, 0x33, 0x6E, 0x00),
         "y": (0x00, 0x00, 0x33, 0x33, 0x33, 0x3E, 0x30, 0x1F), ".": (0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C, 0x00)}
 QUADRANTS = " ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"
@@ -71,8 +71,8 @@ def hints(*keys) -> Text:
 
 def splash() -> Text:
     tagline = Text.assemble(("Set up GLM-5.3-Flash ", INK), ("on your own GPUs.", f"italic {ACCENT_TEXT}"))
-    lines = [gradient(row, "bold") for row in big("maya.")] + [
-        tagline, Text("─" * tagline.cell_len, LINE), Text("https://github.com/mw00/project-maya", f"italic {INK_SOFT}")]
+    lines = [gradient(row, "bold") for row in big("wam.")] + [
+        tagline, Text("─" * tagline.cell_len, LINE), Text("https://github.com/mw00/project-wam", f"italic {INK_SOFT}")]
     return Text("\n", justify="center").join(lines)
 
 
@@ -95,7 +95,7 @@ def styled(kind: str, text: str) -> Text:
         return Text.assemble(("› ", ACCENT_TEXT), (line, ACCENT_TEXT))
     if kind == "out":
         return Text.from_ansi(text, style=MUTED)
-    if kind == "live":                                  # Maya's server: "ready:", warnings, errors stand out
+    if kind == "live":                                  # Wam's server: "ready:", warnings, errors stand out
         return Text.from_ansi(text, style=f"bold {OK}" if text.startswith("ready:") else WARN if "WARNING" in text
                               else DANGER if re.search(r"\berror\b|Traceback", text, re.I) else INK_SOFT)
     if line.startswith("> "):                           # a command as it runs
@@ -143,11 +143,11 @@ class Card(Vertical):
 
 def setup_card(app, spin: str) -> Text:
     """The card while the setup runs (setup_tui.SetupApp): its step, what runs now, the progress - or, for a
-    start without a setup, what runs before Maya does (a compile after an update)."""
+    start without a setup, what runs before Wam does (a compile after an update)."""
     n = app.cur
-    name = app.titles.get(n, "Starting" if app.steps else "Starting Maya")
+    name = app.titles.get(n, "Starting" if app.steps else "Starting Wam")
     if app.pending is not None:
-        stopped = "Maya stopped" if app.serving is not None else "The setup stopped"
+        stopped = "Wam stopped" if app.serving is not None else "The setup stopped"
         now = Text(f"{stopped} (below)", f"bold {DANGER}") if app.pending[2] == "fail" else \
             Text("Waiting for your answer (below)", f"bold {WARN}")
     else:
@@ -164,7 +164,7 @@ def setup_card(app, spin: str) -> Text:
 
 
 def serving_card(s: dict, spin: str) -> Text:
-    """The card while Maya runs on the screen: `s` is what the screen knows of its server (setup_tui, ev_serve)."""
+    """The card while Wam runs on the screen: `s` is what the screen knows of its server (setup_tui, ev_serve)."""
     took = clock(time.monotonic() - s["since"])
     if s["state"] == "ready":
         status = Text.assemble(("● ", OK), ("Ready", f"bold {OK}"), (f" for {took}", MUTED),
@@ -184,47 +184,47 @@ def serving_card(s: dict, spin: str) -> Text:
 # the screen's layout: the top bar (tabs), the main box (logo, card, output, a question), the keys in its border
 SETUP_CSS = """
     Screen { background: $background; }
-    #top { height: 3; border: solid $maya-edge; border-title-align: center; padding: 0 1; }
+    #top { height: 3; border: solid $wam-edge; border-title-align: center; padding: 0 1; }
     #tabs { width: 1fr; text-wrap: nowrap; text-overflow: ellipsis; }
-    #where { width: auto; max-width: 40%; padding-left: 2; color: $maya-muted; text-style: italic; text-wrap: nowrap; }
+    #where { width: auto; max-width: 40%; padding-left: 2; color: $wam-muted; text-style: italic; text-wrap: nowrap; }
     .narrow #where { display: none; }
-    #main { height: 1fr; border: solid $maya-edge; border-subtitle-align: center; padding: 1 2 0 2; }
+    #main { height: 1fr; border: solid $wam-edge; border-subtitle-align: center; padding: 1 2 0 2; }
     #page { height: 1fr; }
     #splash { width: 100%; height: auto; margin-bottom: 1; text-align: center; }
     .short #splash, .tight.asking #splash, .short.asking #card { display: none; }
     #lower { height: 1fr; align-horizontal: center; }
-    #card { width: 76; max-width: 100%; height: auto; border: solid $maya-line; padding: 0 1; margin-bottom: 1; }
-    #output { width: 100%; max-width: 120; height: 1fr; min-height: 3; border: solid $maya-line; padding: 0 1;
+    #card { width: 76; max-width: 100%; height: auto; border: solid $wam-line; padding: 0 1; margin-bottom: 1; }
+    #output { width: 100%; max-width: 120; height: 1fr; min-height: 3; border: solid $wam-line; padding: 0 1;
               border-title-align: center; border-subtitle-align: right; background: $background;
-              scrollbar-size-vertical: 1; scrollbar-color: $maya-edge; scrollbar-background: $background; }
-    #ask { width: 100%; max-width: 120; height: auto; max-height: 75%; margin-top: 1; border: solid $maya-edge;
+              scrollbar-size-vertical: 1; scrollbar-color: $wam-edge; scrollbar-background: $background; }
+    #ask { width: 100%; max-width: 120; height: auto; max-height: 75%; margin-top: 1; border: solid $wam-edge;
            border-title-align: center; padding: 0 1; display: none; overflow-y: auto; scrollbar-size-vertical: 1;
-           scrollbar-color: $maya-edge; scrollbar-background: $background; }
+           scrollbar-color: $wam-edge; scrollbar-background: $background; }
     #ask.on { display: block; }
     #ask.fail { border: solid $error; }
     #intro { margin-bottom: 1; }
     #options, #options:focus { height: auto; max-height: 12; border: none; padding: 0; background: $background;
                                background-tint: $background 0%; }
     #options > .option-list--option-highlighted,
-    #options:focus > .option-list--option-highlighted { background: $maya-tint; color: $maya-accent-text;
+    #options:focus > .option-list--option-highlighted { background: $wam-tint; color: $wam-accent-text;
                                                         text-style: bold; }
-    #about { margin-top: 1; color: $maya-muted; text-style: italic; }
+    #about { margin-top: 1; color: $wam-muted; text-style: italic; }
 """
 # Ctrl+C's question, over the screen
 STOP_CSS = """
     StopScreen { align: center middle; background: $background 60%; }
-    #box { width: 64; height: auto; border: solid $maya-edge; border-title-align: center; border-subtitle-align: center;
+    #box { width: 64; height: auto; border: solid $wam-edge; border-title-align: center; border-subtitle-align: center;
            background: $background; padding: 1 2; }
     #box OptionList, #box OptionList:focus { height: auto; margin-top: 1; border: none; padding: 0;
                                              background: $background; background-tint: $background 0%; }
     #box OptionList > .option-list--option-highlighted,
-    #box OptionList:focus > .option-list--option-highlighted { background: $maya-tint; color: $maya-accent-text;
+    #box OptionList:focus > .option-list--option-highlighted { background: $wam-tint; color: $wam-accent-text;
                                                                text-style: bold; }
 """
 
 
 class StopScreen(ModalScreen):
-    """Ctrl+C: stop the setup - or Maya, once it runs?  (Ctrl+C again: yes.)"""
+    """Ctrl+C: stop the setup - or Wam, once it runs?  (Ctrl+C again: yes.)"""
 
     CSS = STOP_CSS
     BINDINGS = [Binding("escape", "dismiss(False)", show=False)]
@@ -238,11 +238,11 @@ class StopScreen(ModalScreen):
             yield Static(Text(f"The dashboard and the API close, and the model leaves the GPUs. {self.me} starts it "
                               "again." if self.serving else f"Everything finished so far is kept: {self.me} continues "
                               "where it stopped. The command running now ends.", INK_SOFT))
-            yield OptionList(*(("Keep running", "Stop Maya") if self.serving else ("Keep going", "Stop the setup")))
+            yield OptionList(*(("Keep running", "Stop Wam") if self.serving else ("Keep going", "Stop the setup")))
 
     def on_mount(self) -> None:
         box = self.query_one("#box")
-        box.border_title = title("Stop Maya?" if self.serving else "Stop the setup?")
+        box.border_title = title("Stop Wam?" if self.serving else "Stop the setup?")
         box.border_subtitle = hints(("Enter", "Choose"), ("Esc", "Back"))
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:

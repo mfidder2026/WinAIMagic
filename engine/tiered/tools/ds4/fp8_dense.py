@@ -5,7 +5,7 @@
 Some EXL3 quants (the mixed-precision ones) keep the attention, the shared experts and the indexer in DeepSeek's own
 FP8 (E4M3 values, an E8M0 power-of-two scale a block of rows x columns) instead of EXL3. The engine reads dense
 matrices as EXL3, BF16 or Q8_0: this writes every such FP8 weight (not the vision tower's) as BF16 - exactly, each FP8
-value times its block's scale is a BF16 number - into <model>/maya-dense-bf16.safetensors, under the names the engine
+value times its block's scale is a BF16 number - into <model>/wam-dense-bf16.safetensors, under the names the engine
 reads (attn.wo_a as its groups' slices, attn.wo_a.slice.<g>.weight, as pack_gguf.py lays it out). pack.py then indexes
 those in place of the FP8 originals. About twice the FP8 bytes (DeepSeek-V4.1-Flash: ~14 GB).
 """
@@ -23,7 +23,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from st import SafeTensors  # noqa: E402
 
-OUT = "maya-dense-bf16.safetensors"
+OUT = "wam-dense-bf16.safetensors"
 
 
 def e4m3_table() -> np.ndarray:

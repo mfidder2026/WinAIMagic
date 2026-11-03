@@ -223,7 +223,7 @@ bool MtpDrafter::load(const std::string& rt_dir, const ModelGeometry& g, Session
         std::string lerr;
         if (want_lend_ && experts_arena_.open(bytes, lerr)) experts_ = experts_arena_.data();
         else if (want_lend_)
-            std::fprintf(stderr, "maya mtp: the draft layer's experts cannot be mapped in pieces on this GPU (%s)\n",
+            std::fprintf(stderr, "wam mtp: the draft layer's experts cannot be mapped in pieces on this GPU (%s)\n",
                          lerr.c_str());
         if (experts_ == nullptr && cudaMalloc((void**) &experts_, bytes) != cudaSuccess) {
             experts_ = nullptr;
@@ -262,7 +262,7 @@ bool MtpDrafter::load(const std::string& rt_dir, const ModelGeometry& g, Session
     if (cudaMalloc(&state_arena_, sb) != cudaSuccess) { err = "mtp: the K/V state does not fit"; return false; }
     if (qsa_state_init(g, max_cells, state_arena_, st_, &ss.qsa_states[0], ring) == 0) {
         if (st_.kv_mode == 0) { err = "mtp: state init failed"; return false; }
-        std::fprintf(stderr, "maya mtp: no pinned RAM left for the draft layer's K/V copy; keeping it in VRAM\n");
+        std::fprintf(stderr, "wam mtp: no pinned RAM left for the draft layer's K/V copy; keeping it in VRAM\n");
         cudaGetLastError();
         cudaFree(state_arena_);
         st_ = QsaState{};
@@ -335,7 +335,7 @@ bool MtpDrafter::load(const std::string& rt_dir, const ModelGeometry& g, Session
     }
     if (cudaStreamCreateWithFlags(&cs_, cudaStreamNonBlocking) != cudaSuccess) { err = "mtp: stream"; return false; }
     const double files_s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t_files).count();
-    std::fprintf(stderr, "maya mtp: draft layer loaded, %.0f MiB of VRAM (experts %.0f, dense %.0f), files read in %.2f s (%.0f MiB/s)\n",
+    std::fprintf(stderr, "wam mtp: draft layer loaded, %.0f MiB of VRAM (experts %.0f, dense %.0f), files read in %.2f s (%.0f MiB/s)\n",
                  (double) vram_ / 1048576.0, (double) g.n_expert * strata::kernels::cpu::BLOB / 1048576.0,
                  (double) tensors_.back().off / 1048576.0, files_s,
                  files_s > 0 ? ((double) g.n_expert * strata::kernels::cpu::BLOB + (double) tensors_.back().off) /
@@ -372,7 +372,7 @@ bool MtpDrafter::bind(const WeightTable& wt, const NativeHead* head, const float
             strata::kernels::gather_rows((const uint8_t*) head->weights(), row_bytes, dvocab_, n_dvocab_, dhead_, nullptr);
             cudaDeviceSynchronize();
             vram_ += (uint64_t) (n_dvocab_ * row_bytes) + raw.size();
-            std::fprintf(stderr, "maya mtp: draft head over %lld tokens (%.1f MiB)\n", (long long) n_dvocab_,
+            std::fprintf(stderr, "wam mtp: draft head over %lld tokens (%.1f MiB)\n", (long long) n_dvocab_,
                          (double) (n_dvocab_ * row_bytes) / 1048576.0);
         }
     }

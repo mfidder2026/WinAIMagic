@@ -1,5 +1,5 @@
-"""The speed calibration for DeepSeek-V4.1 (maya-ds4) and MiniMax-M3.1 (maya-mm3): does the DSpark drafter make THIS
-PC faster?  (The setup, the first start of a config that has the drafter and no calibration yet, ./maya.sh
+"""The speed calibration for DeepSeek-V4.1 (wam-ds4) and MiniMax-M3.1 (wam-mm3): does the DSpark drafter make THIS
+PC faster?  (The setup, the first start of a config that has the drafter and no calibration yet, ./wam.sh
 --speed-calibration.)
 
 DSpark drafts up to 5 tokens a round and the model checks them in one window.  Where the model's experts sit in the
@@ -19,7 +19,7 @@ sustained speed):
 The engine reads a copy of this PC's expert profile and writes back to the copy only: the calibration's answers do not
 lead the next start's placement.
 
-    python tools/calibrate_ds4.py maya-ds4.json      # measure and print; ./maya.sh --speed-calibration applies it
+    python tools/calibrate_ds4.py wam-ds4.json      # measure and print; ./wam.sh --speed-calibration applies it
 """
 from __future__ import annotations
 
@@ -53,12 +53,12 @@ def without(args: list, name: str) -> list:
 
 
 def is_mm3(cfg: dict) -> bool:
-    """A MiniMax-M3.1-Flash config (maya-mm3): its DSpark drafter is measured the same way."""
-    return (cfg.get("installer") or {}).get("family") == "minimax" or Path(cfg.get("exe", "")).name.startswith("maya-mm3")
+    """A MiniMax-M3.1-Flash config (wam-mm3): its DSpark drafter is measured the same way."""
+    return (cfg.get("installer") or {}).get("family") == "minimax" or Path(cfg.get("exe", "")).name.startswith("wam-mm3")
 
 
 def with_dspark(cfg: dict, mode: str) -> dict:
-    """The config with --dspark `mode`: "none" (the drafter not loaded; maya-mm3 spells it "off") or "on"."""
+    """The config with --dspark `mode`: "none" (the drafter not loaded; wam-mm3 spells it "off") or "on"."""
     out = copy.deepcopy(cfg)
     if mode == "none" and is_mm3(cfg):
         mode = "off"
@@ -67,7 +67,7 @@ def with_dspark(cfg: dict, mode: str) -> dict:
 
 
 def has_drafter(cfg: dict) -> bool:
-    """The config's pack holds the DSpark drafter (an EXL3 pack's, or a GGUF pack's from drafter_pack.py; maya-mm3's
+    """The config's pack holds the DSpark drafter (an EXL3 pack's, or a GGUF pack's from drafter_pack.py; wam-mm3's
     pack indexes its dspark/ folder as dspark.* tensors)."""
     pack = option(cfg.get("args") or [], "--pack")
     t = Path(pack) / "tensors.txt" if pack else None
@@ -79,7 +79,7 @@ def has_drafter(cfg: dict) -> bool:
 
 
 def profile_copy(cfg: dict, tmp: Path) -> dict:
-    """The config reading (and writing) a copy of its expert profile in `tmp` (maya-mm3 only reads its --profile)."""
+    """The config reading (and writing) a copy of its expert profile in `tmp` (wam-mm3 only reads its --profile)."""
     if is_mm3(cfg):
         return copy.deepcopy(cfg)
     args = cfg.get("args") or []
@@ -108,7 +108,7 @@ def run(cfg: dict, say=print, start_engine=None) -> dict:
     try:
         warm, questions, n_doc = CD.requests(cfg)
         for i, (key, mode, label) in enumerate((("none", "none", "without drafting"), ("dspark", "on", "DSpark"))):
-            with tempfile.TemporaryDirectory(prefix="maya-speed-") as tmp:   # (each side from the PC's own profile)
+            with tempfile.TemporaryDirectory(prefix="wam-speed-") as tmp:   # (each side from the PC's own profile)
                 c = profile_copy(with_dspark(cfg, mode), Path(tmp))
                 res[key] = CD.measure(c, label, warm, questions, n_doc, start_engine, say, f"[{i + 1}/2] ")
     finally:
@@ -124,9 +124,9 @@ def run(cfg: dict, say=print, start_engine=None) -> dict:
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        sys.exit("usage: calibrate_ds4.py <maya-ds4.json>")
-    import maya_names
-    cfg = maya_names.env_in(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig")))
+        sys.exit("usage: calibrate_ds4.py <wam-ds4.json>")
+    import wam_names
+    cfg = wam_names.env_in(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig")))
     if not has_drafter(cfg):
         sys.exit("this config's pack has no DSpark drafter")
     print(json.dumps(run(cfg), indent=1))

@@ -1,4 +1,4 @@
-// Exercise Maya's actual fused routing request/response without loading weights.
+// Exercise Wam's actual fused routing request/response without loading weights.
 // CPU polling must see the signal and payload without a driver query or sync.
 #include <hip/hip_runtime.h>
 #include "strata/kernels/glm_fast.hpp"

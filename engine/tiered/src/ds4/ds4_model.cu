@@ -1,4 +1,4 @@
-// src/ds4/ds4_model.cu - DeepSeek-V4.1-Flash on Maya (see ds4_model.hpp).
+// src/ds4/ds4_model.cu - DeepSeek-V4.1-Flash on Wam (see ds4_model.hpp).
 //
 // The layer, for one token at position p (DeepSeek's inference/model.py, Block.forward with the lagged pre-mix):
 //   [Engram, layers 1 and 14]  h += gate(h, key) * value from 24 n-gram rows of the FP8 tables
@@ -104,7 +104,7 @@ double now_ms() {
 size_t align256(size_t n) { return (n + 255) & ~(size_t) 255; }
 
 // cudaMemGetInfo for the current device - on Windows, an APU's kept within its DEDICATED memory: HIP counts its
-// carve-out plus shared system memory there, and what fills into the shared part pages (Maya-S on a 160 GB Strix Halo,
+// carve-out plus shared system memory there, and what fills into the shared part pages (Wam-S on a 160 GB Strix Halo,
 // HIP's 172: 2.45 tok/s - strata/platform/dedicated.hpp).  Its total is then the dedicated memory, its free what of
 // that is not in use, so every budget read from it (the experts', the prompt path's room, the split's) keeps within
 // it.  DS4_APU_DEDICATED_GB=<n>: n GB (a test: a smaller carve-out), =0: HIP's figures.
@@ -117,7 +117,7 @@ uint64_t ram_avail();
 cudaError_t mem_info(size_t* free_b, size_t* total_b) {
     const cudaError_t e = cudaMemGetInfo(free_b, total_b);
 #if !defined(_WIN32) && !defined(STRATA_USE_HIP)
-    const auto env = [](const char* k) {   // (MAYA_DS4_* as STRATA_DS4_*, else DS4_*)
+    const auto env = [](const char* k) {   // (WAM_DS4_* as STRATA_DS4_*, else DS4_*)
         const char* v = std::getenv((std::string("STRATA_") + k).c_str());
         return v != nullptr ? v : std::getenv(k);
     };
@@ -252,7 +252,7 @@ std::vector<std::vector<os::Core>> node_threads() {
 // anonymous memory on one NUMA node (node < 0: wherever the first touch puts it), transparent huge pages
 void* node_map(size_t bytes, int node, int n_nodes) { return os::anon_alloc(bytes, node, n_nodes); }
 void pin_self(int cpu) { os::pin_self(cpu); }
-// ZFS's reclaimable ARC is omitted from Linux MemAvailable (as in Maya's GLM path).
+// ZFS's reclaimable ARC is omitted from Linux MemAvailable (as in Wam's GLM path).
 // Count only bytes above its floor; the cgroup limits below still cap the result.
 uint64_t zfs_arc_reclaimable() {
     std::istringstream stats(read_file("/proc/spl/kstat/zfs/arcstats"));
@@ -1513,7 +1513,7 @@ struct Model::Impl {
                                       // reasoning at a new user message re-renders the history from about there)
     // the restore points a request asked for (GEN marks= / shared=, ds4_marks.hpp): the start of the last user message,
     // a point near the prompt's tail, the end of a shared start - each a Check, taken where the read stopped for it; at
-    // most marks_cap() a conversation (MAYA_DS4_RESTORE_POINTS), none unless a request asks.  Like ck, every one is at
+    // most marks_cap() a conversation (WAM_DS4_RESTORE_POINTS), none unless a request asks.  Like ck, every one is at
     // or before pos and holds the state of the conversation's own tokens up to it
     std::vector<Check> mk;
     uint64_t mark_clock = 0;
@@ -1647,7 +1647,7 @@ struct Model::Impl {
     // for, so no mailbox seq and no wait - each wait is a round trip through the host (on Windows HIP, ~1 ms a
     // layer).  DS4_HOST_FREE=0: every layer through the host as before (the same tokens either way)
     bool host_free_on = std::getenv("DS4_HOST_FREE") == nullptr || std::atoi(std::getenv("DS4_HOST_FREE")) != 0;
-    // DS4_HOST_FREE_TP=1 (MAYA_DS4_HOST_FREE_TP): a tensor-parallel group's layer with every expert in its members' VRAM
+    // DS4_HOST_FREE_TP=1 (WAM_DS4_HOST_FREE_TP): a tensor-parallel group's layer with every expert in its members' VRAM
     // leaves the host out too - none of it on the CPU lane, and the lead's round trip would delay every member at the
     // next all-reduce.  Off: such a layer through the host as before (the same tokens either way)
     bool host_free_tp = ds4_env("DS4_HOST_FREE_TP") != nullptr && std::atoi(ds4_env("DS4_HOST_FREE_TP")) != 0;
@@ -1698,12 +1698,12 @@ struct Model::Impl {
     // the page cache and count as available - a long decode on a warm-capped pack drains every free GiB that way
     // (measured: +18.6 GB of working set over one 32k prompt and a 2k decode, private bytes flat).  The trimmer thread
     // demotes the oldest noted ranges to the standby list (os::unlock_range): a clean file page stays resident and
-    // soft-faults back unchanged, it only counts as available again.  MAYA_DS4_INPLACE_TRIM_GB is the working-set room
+    // soft-faults back unchanged, it only counts as available again.  WAM_DS4_INPLACE_TRIM_GB is the working-set room
     // the in-place pages may hold above the load's own (default 6 on Windows; 0 disables); TRIM_MS the pass interval.
     const float ip_trim_gb = [] {
 #if defined(_WIN32)
-        // (a config's env arrives renamed by tools/maya_names.py env_in: read both names, MAYA_ first, as lookup does)
-        const char* v = std::getenv("MAYA_DS4_INPLACE_TRIM_GB");
+        // (a config's env arrives renamed by tools/wam_names.py env_in: read both names, WAM_ first, as lookup does)
+        const char* v = std::getenv("WAM_DS4_INPLACE_TRIM_GB");
         if (v == nullptr) v = std::getenv("STRATA_DS4_INPLACE_TRIM_GB");
         return v != nullptr ? (float) std::atof(v) : 6.0f;
 #else
@@ -1711,7 +1711,7 @@ struct Model::Impl {
 #endif
     }();
     const int ip_trim_ms = [] {
-        const char* v = std::getenv("MAYA_DS4_INPLACE_TRIM_MS");
+        const char* v = std::getenv("WAM_DS4_INPLACE_TRIM_MS");
         if (v == nullptr) v = std::getenv("STRATA_DS4_INPLACE_TRIM_MS");
         return v != nullptr ? std::max(50, std::atoi(v)) : 250;
     }();
@@ -1963,15 +1963,15 @@ struct Model::Impl {
     std::vector<std::array<uint8_t*, kMaxNH>> ram_part;   // slot -> its parts
     std::vector<std::array<size_t, 4>> cp_lay;       // layer -> part offsets of gate, up, down rows; a part's bytes
     std::vector<int> copy_spare;                      // layer -> its spare slot (-1: none)
-    // MAYA_DS4_COPY_SWAP=1 (copy mode, opt-in; read as STRATA_DS4_COPY_SWAP, DS4_COPY_SWAP too): the copies follow the routes, as the RAM tier's do. DISK_SKIP_W never computes
+    // WAM_DS4_COPY_SWAP=1 (copy mode, opt-in; read as STRATA_DS4_COPY_SWAP, DS4_COPY_SWAP too): the copies follow the routes, as the RAM tier's do. DISK_SKIP_W never computes
     // an expert it leaves out, so its pages never come off the SSD and it is left out wherever it is picked light, all
     // through a conversation; but its heat counts those picks too. A layer's hottest expert read from the files takes
-    // the place of its coldest copy when it beats it by MAYA_DS4_COPY_SWAP_MARGIN x + 1 (1.25): read by a thread of its own
+    // the place of its coldest copy when it beats it by WAM_DS4_COPY_SWAP_MARGIN x + 1 (1.25): read by a thread of its own
     // into the layer's free slot, switched between windows, the coldest's slot then the free one. One move at a time,
-    // at most one every MAYA_DS4_COPY_SWAP_EVERY tokens (8). The copies keep their RAM (a slot a layer more), so nothing else
+    // at most one every WAM_DS4_COPY_SWAP_EVERY tokens (8). The copies keep their RAM (a slot a layer more), so nothing else
     // leaves the page cache for them. (The idea: Abyss's RAM fill for its disk tail skip - zephel01/Abyss v1.3.46,
     // issue #8 there.)
-    static const char* cs_env(const char* name) {   // STRATA_DS4_<name> (the MAYA_ name's), else DS4_<name>
+    static const char* cs_env(const char* name) {   // STRATA_DS4_<name> (the WAM_ name's), else DS4_<name>
         const char* v = std::getenv((std::string("STRATA_DS4_") + name).c_str());
         return v != nullptr ? v : std::getenv((std::string("DS4_") + name).c_str());
     }
@@ -2651,8 +2651,8 @@ struct Model::Impl {
             }
             w.swap(p);
         }
-        // MAYA_DS4_DENSE_REQ=q5_k|q4_k|iq4_xs (opt-in, CHANGES THE ANSWERS): the Q8_0 dense matrices
-        // MAYA_DS4_DENSE_REQ_MATCH names (default the attention's three largest: attn.wq_b, attn.wo_a, attn.wo_b)
+        // WAM_DS4_DENSE_REQ=q5_k|q4_k|iq4_xs (opt-in, CHANGES THE ANSWERS): the Q8_0 dense matrices
+        // WAM_DS4_DENSE_REQ_MATCH names (default the attention's three largest: attn.wq_b, attn.wo_a, attn.wo_b)
         // re-quantized at load by ggml's quantizer - fewer bytes every token reads, and VRAM the experts then take.
         // They then run as a GGUF's low-bit dense matrix does (ds4_iq's GEMV, its FP16 rows for a prompt)
         const int rq = q8 ? dense_req_type(pre) : -1;
@@ -2701,7 +2701,7 @@ struct Model::Impl {
             } else {   // (a reason once: a build without ggml says it for every matrix)
                 const std::string why = e2.empty() ? "its rows do not split in 256-value blocks" : e2;
                 if (why != dense_req_why) {
-                    std::fprintf(stderr, "ds4: MAYA_DS4_DENSE_REQ: %s stays Q8_0 (%s)\n", pre.c_str(), why.c_str());
+                    std::fprintf(stderr, "ds4: WAM_DS4_DENSE_REQ: %s stays Q8_0 (%s)\n", pre.c_str(), why.c_str());
                     dense_req_why = why;
                 }
             }
@@ -2720,11 +2720,11 @@ struct Model::Impl {
                    : q8 || lb > 0 ? (int) bytes_of((size_t) k) : k;
         return true;
     }
-    // (MAYA_DS4_DENSE_REQ) the ggml type a dense matrix `pre` is re-quantized to, -1: kept as it is
+    // (WAM_DS4_DENSE_REQ) the ggml type a dense matrix `pre` is re-quantized to, -1: kept as it is
     double dense_req_saved = 0, dense_req_ms = 0;
     int dense_req_n = 0, dense_req_cached = 0;
     std::string dense_req_why;   // (the last reason a matrix stayed Q8_0, logged once)
-    // (MAYA_DS4_DENSE_REQ in a config, read as STRATA_DS4_DENSE_REQ; DS4_DENSE_REQ also taken)
+    // (WAM_DS4_DENSE_REQ in a config, read as STRATA_DS4_DENSE_REQ; DS4_DENSE_REQ also taken)
     static const char* dense_req_env(const char* name) {
         const char* v = std::getenv((std::string("STRATA_") + name).c_str());
         return v != nullptr ? v : std::getenv(name);
@@ -2739,7 +2739,7 @@ struct Model::Impl {
             if (v == nullptr || *v == 0 || std::string(v) == "off") return -1;
             const std::string s(v);
             const int r = s == "q5_k" ? gg::iq::kQ5_K : s == "q4_k" ? gg::iq::kQ4_K : s == "iq4_xs" ? gg::iq::kIQ4_XS : -1;
-            if (r < 0) std::fprintf(stderr, "ds4: MAYA_DS4_DENSE_REQ=%s not known (q5_k, q4_k, iq4_xs): the dense matrices stay Q8_0\n",
+            if (r < 0) std::fprintf(stderr, "ds4: WAM_DS4_DENSE_REQ=%s not known (q5_k, q4_k, iq4_xs): the dense matrices stay Q8_0\n",
                                     v);
             return r;
         }();
@@ -3412,7 +3412,7 @@ struct Model::Impl {
         o = opt;
         const double t0 = now_ms();
         if (!pk.load(o.pack, err)) return false;
-        // (AMD: the prompt GEMMs' measured kernels) the pack's lt-picks.txt, or MAYA_DS4_LT_STORE's file - empty: none,
+        // (AMD: the prompt GEMMs' measured kernels) the pack's lt-picks.txt, or WAM_DS4_LT_STORE's file - empty: none,
         // each start measures its own and keeps them to itself (a pack that must not change: a run's own store instead)
         const char* lt_store = std::getenv("STRATA_DS4_LT_STORE");
         if (lt_store == nullptr) lt_store = std::getenv("DS4_LT_STORE");
@@ -3505,7 +3505,7 @@ struct Model::Impl {
                 CK(cudaMemcpy(d.abl_r, abl_dir.data(), abl_dir.size() * sizeof(float), cudaMemcpyHostToDevice));
             }
         }
-        // (MAYA_DS4_Q8_BATCH / _SHARE: their lines now, at load; MAYA_DS4_Q8_CHECK=1: the batched rounding with sharing
+        // (WAM_DS4_Q8_BATCH / _SHARE: their lines now, at load; WAM_DS4_Q8_CHECK=1: the batched rounding with sharing
         //  checked on every device first)
         if (pk.gguf) {
             gg::q8_batch();
@@ -3515,7 +3515,7 @@ struct Model::Impl {
                     if (!gg::q8_batch_check(id, err)) return false;
             }
         }
-        if (const char* v = ds4_env("DS4_HC_FUSE")) {   // (MAYA_DS4_HC_FUSE)
+        if (const char* v = ds4_env("DS4_HC_FUSE")) {   // (WAM_DS4_HC_FUSE)
             if (std::strcmp(v, "1") != 0 && std::strcmp(v, "2") != 0 && std::strcmp(v, "0") != 0) {
                 err = std::string("DS4_HC_FUSE=") + v + ": 2, 1 or 0";
                 return false;
@@ -3540,7 +3540,7 @@ struct Model::Impl {
                                            "(DS4_HC_FUSE=2)"
                                          : "");
         }
-        if (const char* v = ds4_env("DS4_HC_MIX_SPLIT")) {   // (MAYA_DS4_HC_MIX_SPLIT)
+        if (const char* v = ds4_env("DS4_HC_MIX_SPLIT")) {   // (WAM_DS4_HC_MIX_SPLIT)
             if (std::strcmp(v, "1") != 0 && std::strcmp(v, "2") != 0 && std::strcmp(v, "0") != 0) {
                 err = std::string("DS4_HC_MIX_SPLIT=") + v + ": 2, 1 or 0";
                 return false;
@@ -3550,7 +3550,7 @@ struct Model::Impl {
                 std::fprintf(stderr, "ds4: a window's HC mix and split in one launch %s (DS4_HC_MIX_SPLIT=%d)\n",
                              hc_ms == 2 ? "on the side stream too" : "where they run on the layer's stream", hc_ms);
         }
-        if (const char* v = ds4_env("DS4_MARKOV_Q8")) {   // (MAYA_DS4_MARKOV_Q8)
+        if (const char* v = ds4_env("DS4_MARKOV_Q8")) {   // (WAM_DS4_MARKOV_Q8)
             if (std::strcmp(v, "1") != 0 && std::strcmp(v, "0") != 0) {
                 err = std::string("DS4_MARKOV_Q8=") + v + ": 1 or 0";
                 return false;
@@ -3565,7 +3565,7 @@ struct Model::Impl {
                 std::fprintf(stderr, "ds4: the drafter's markov head as Q8_0 blocks, half its bytes a step - the "
                                      "drafts may change, the verified tokens do not (DS4_MARKOV_Q8)\n");
         }
-        if (const char* v = ds4_env("DS4_HEAD_COLS")) {   // (MAYA_DS4_HEAD_COLS)
+        if (const char* v = ds4_env("DS4_HEAD_COLS")) {   // (WAM_DS4_HEAD_COLS)
             char* end = nullptr;
             const long c = std::strtol(v, &end, 10);
             if (*v == 0 || end == nullptr || *end != 0 || c < 1 || c > x3::kMaxMvCols) {
@@ -3576,7 +3576,7 @@ struct Model::Impl {
             if (pk.gguf)
                 std::fprintf(stderr, "ds4: the head's GEMV %d activations a pass (DS4_HEAD_COLS)\n", head_cols_gguf);
         }
-        if (const char* v = ds4_env("DS4_DECODE_TRIM")) {   // (MAYA_DS4_DECODE_TRIM)
+        if (const char* v = ds4_env("DS4_DECODE_TRIM")) {   // (WAM_DS4_DECODE_TRIM)
             char* end = nullptr;
             const long b = std::strtol(v, &end, 10);
             if (*v == 0 || end == nullptr || *end != 0 || b < 0 || b > 15) {
@@ -3604,7 +3604,7 @@ struct Model::Impl {
                              decode_trim & 4 ? " the snapshot / latent copies one kernel each;" : "",
                              decode_trim & 8 ? " the drafter's hand-offs by xfer;" : "");
         }
-        if (const char* v = ds4_env("DS4_ROUTE_FUSE")) {   // (MAYA_DS4_ROUTE_FUSE)
+        if (const char* v = ds4_env("DS4_ROUTE_FUSE")) {   // (WAM_DS4_ROUTE_FUSE)
             if (std::strcmp(v, "1") != 0 && std::strcmp(v, "2") != 0 && std::strcmp(v, "0") != 0) {
                 err = std::string("DS4_ROUTE_FUSE=") + v + ": 2, 1 or 0";
                 return false;
@@ -3637,7 +3637,7 @@ struct Model::Impl {
         // the groups' width: o.tp, less while the experts' blocks do not split in it (a member takes n_ff / tp of each
         // expert: the down's inputs in whole blocks - a GGUF's 256-value types split n_ff 2304 in 1, 3 or 9 parts)
         int tp = o.tp;
-        // MAYA_DS4_TP_GGUF_UNEVEN=1 (read as STRATA_DS4_TP_GGUF_UNEVEN, or DS4_TP_GGUF_UNEVEN): a GGUF's experts split
+        // WAM_DS4_TP_GGUF_UNEVEN=1 (read as STRATA_DS4_TP_GGUF_UNEVEN, or DS4_TP_GGUF_UNEVEN): a GGUF's experts split
         // in whole blocks, as even as they go (no flow on its groups yet)
         const char* tpu = std::getenv("STRATA_DS4_TP_GGUF_UNEVEN");
         if (tpu == nullptr) tpu = std::getenv("DS4_TP_GGUF_UNEVEN");
@@ -3695,7 +3695,7 @@ struct Model::Impl {
         // - or, tp the number of GPUs, one group of all of them whatever their kind (its tightest member sets the
         // experts' room); threads mode for the windows (decode) where a group is 2 wide or more or --threads on, the
         // prompt path (its own thread a GPU) as asked for - also where the experts' blocks took the groups' width down
-        // to 1 (a 256-value type's: Maya's quants), which left every prompt in windows of 16 - and at --tp 1, each GPU
+        // to 1 (a 256-value type's: Wam's quants), which left every prompt in windows of 16 - and at --tp 1, each GPU
         // its own layers (--prefill-chunk 0: windows of 16)
         par = o.threads || tp > 1;
         prompt_par = true;
@@ -3750,12 +3750,12 @@ struct Model::Impl {
         const char* dc = std::getenv("DS4_CHUNK");   // (tests: down to 16, a short prompt in several chunks)
         if (dc != nullptr) chunk = prompt_par ? std::atoi(dc) : 0;
         else if (chunk > 0 && o.prefill_chunk < 0) chunk = chunk_default(chunk);
-        // (experts read from files on several GPUs: 4096 - 3x V100, Maya-XS: an 8K prompt +30%, 32K +8%, 3.5% more
+        // (experts read from files on several GPUs: 4096 - 3x V100, Wam-XS: an 8K prompt +30%, 32K +8%, 3.5% more
         // experts in VRAM, decode the same; --prefill-chunk sets it by hand)
         // (the chunk is a PC's cap, set when the model loads: a prompt shorter than it is read in one pass whatever it is,
         // a longer one in equal chunks of at most it.  4096 where the VRAM holds most of the experts; where the CPU lane
         // holds most of them a prompt streams every expert from RAM once a chunk, so the larger chunk wins and what its
-        // buffers take from the VRAM experts costs the decode little - 2 V100 with ~24 GB each, Maya-XS v2, chunk 4096 /
+        // buffers take from the VRAM experts costs the decode little - 2 V100 with ~24 GB each, Wam-XS v2, chunk 4096 /
         // 8192 / 16384: a 3K prompt 343 / 347 / 335 tok/s, 8K 567 / 675 / 654, 29K 675 / 870 / 994.  By the share of the
         // experts on the CPU lane (estimated): under 40% 4096, 40% and above 8192; 16384 is not used)
         if (dc == nullptr && o.prefill_chunk < 0 && chunk > 0 && file_experts && devs.size() > 1) {
@@ -3796,7 +3796,7 @@ struct Model::Impl {
         } else   // (only as asked for: --prefill-chunk 0, or --tp 1 with --threads off)
             std::fprintf(stderr,
                          "ds4: prompts run in windows of %d tokens (%s): long prompts prefill far slower than in\n"
-                         "     chunks (a 7-GPU RTX 3090 rig, Maya-S read in place: 8K / 32K tokens 115 / 99 tokens/s,\n"
+                         "     chunks (a 7-GPU RTX 3090 rig, Wam-S read in place: 8K / 32K tokens 115 / 99 tokens/s,\n"
                          "     461 / 1010 in chunks of %d) - %s\n",
                          kWin, o.prefill_chunk == 0 ? "--prefill-chunk 0" : "--tp 1 with --threads off", kVlRows,
                          o.prefill_chunk == 0 ? "leave --prefill-chunk out for chunks"
@@ -4020,7 +4020,7 @@ struct Model::Impl {
         }
         // the dense weights (attention, the shared experts, the head) always live in VRAM - only the routed experts
         // can go to RAM, the CPU lane or the disk - so a GPU whose free memory cannot hold its layers' dense weights
-        // cannot run them: said here, before anything loads, instead of a cudaMalloc failure part way in (Maya-XS on
+        // cannot run them: said here, before anything loads, instead of a cudaMalloc failure part way in (Wam-XS on
         // an 8 GB card: 8.46 GB of dense weights).  A device with layers of a tensor parallel group holds a part of
         // them, so only the devices whose layers are whole are checked.
         for (size_t di = 0; di < devs.size(); ++di) {
@@ -4784,14 +4784,14 @@ struct Model::Impl {
                 return false;
             if (route_fuse && !route_fuse_check(err)) return false;   // (no request yet)
             if (ds4_env("DS4_ROUTER_CHECK") != nullptr && std::atoi(ds4_env("DS4_ROUTER_CHECK")) != 0 && !router_check(err))
-                return false;   // (MAYA_DS4_ROUTER_CHECK=1: at load, no request yet)
+                return false;   // (WAM_DS4_ROUTER_CHECK=1: at load, no request yet)
             if ((decode_trim & 3) && !trim_q8_check(err)) return false;   // (DS4_DECODE_TRIM: no request yet)
             if ((decode_trim & 12) && !trim_copy_check(err)) return false;
             if (route_fuse_win && !(route_fuse_check(err, 3) && route_fuse_check(err, kWin)))   // (=2: windows too)
                 return false;
             if (tp_uneven && (std::getenv("STRATA_DS4_TP_CHECK") != nullptr || std::getenv("DS4_TP_CHECK") != nullptr) &&
                 !tp_check(err))
-                return false;   // (MAYA_DS4_TP_CHECK=1: at load, no request yet)
+                return false;   // (WAM_DS4_TP_CHECK=1: at load, no request yet)
             if (helper_n > 0 && ds4_env("DS4_HELPER_CHECK") != nullptr) helper_check();   // (before the lane runs)
             if (helper_n > 0) helper_th = std::thread([this] { helper_loop(); });
             if (helper_n > 0 && hr_want > 0 && !hr_open(err)) return false;
@@ -5003,7 +5003,7 @@ struct Model::Impl {
 
     // the default chunk where every GPU will lend the prompt path its room (a GGUF's in-place experts on the flow, each
     // layer on one GPU: Chunk::borrow) - the borrowed room is expert slots between prompts, so a larger chunk costs the
-    // decode nothing, and a long prompt runs in fewer passes over the streamed experts (one V100, Maya-S from an NVMe,
+    // decode nothing, and a long prompt runs in fewer passes over the streamed experts (one V100, Wam-S from an NVMe,
     // 32K tokens: 200 s in chunks of 8K, 183 in 16K, 157 in 32K): the largest of 32K / 16K tokens whose rows take at
     // most half of each GPU's experts' room (its free memory less the reserve and its share of the other weights,
     // estimated), and with hand-offs between groups their pinned rows (two chunks a GPU) within an eighth of the RAM;
@@ -5045,7 +5045,7 @@ struct Model::Impl {
         return c0;
     }
     // RDNA 3 / 3.5 (gfx11, HIP): chunks of 4K tokens read a 16K prompt faster than the 32K / 16K default (Strix Halo,
-    // Maya-XS, experts resident: 16K prompt 524 -> 550 tok/s, the first one after a start 475 -> 550; 1K 492, 256
+    // Wam-XS, experts resident: 16K prompt 524 -> 550 tok/s, the first one after a start 475 -> 550; 1K 492, 256
     // 340) - so the default is capped there; DS4_CHUNK_GFX11=N changes the cap, 0 leaves the default
     int gfx11_chunk_cap(int C) const {
 #if defined(STRATA_USE_HIP)
@@ -5087,7 +5087,7 @@ struct Model::Impl {
         // (mem: its free memory) the largest pair 2^k / 2^(k+1) up to 64 / 128 within 3% of it - fewer, wider GEMMs
         // and fewer FP16 reconstructions of the same weights a prompt (a Strix Halo with ~170 GB for its GPU: 64 / 128,
         // a 4K prompt +6%; 8 / 16 left the GEMMs too few tiles for its 40 CUs).  The 0.6% before left a 32 GB card at
-        // 8 / 16: slabs of 256 rows, every attention weight decoded to FP16 32 times an 8K chunk (3x V100, Maya-XS: an
+        // 8 / 16: slabs of 256 rows, every attention weight decoded to FP16 32 times an 8K chunk (3x V100, Wam-XS: an
         // 8K prompt +16%, 32K +17% at 32 / 64, decode the same within noise).  24-32 GB now 32 / 64, 16 GB 16 / 32.
         // DS4_ATTN_SLAB_MB / DS4_W16_MB set them by hand.
         const size_t row_b = (size_t) HQ * 10 + (size_t) OG * g.o_lora * 6;   // (q, o F32; o FP16; oa F32 + FP16)
@@ -5374,7 +5374,7 @@ struct Model::Impl {
     // every 64 of its rows (a prompt's chunk gives a popular expert hundreds); decoded once, to the FP16 values the tiles
     // multiply (iq::f16_rows), the library's GEMM takes them at its own speed.  DS4_FAT_ROWS=N (default 64; 0: off)
     // takes the experts of N rows or more; the same products, only the sums' order differs
-    // (3x V100, Maya-XS: 64 rows +6-8% on 8K / 32K prompts; KL vs the reference 0.276, the stock path 0.285 - the same)
+    // (3x V100, Wam-XS: 64 rows +6-8% on 8K / 32K prompts; KL vs the reference 0.276, the stock path 0.285 - the same)
     static int fat_rows() {
         static const int n = std::getenv("DS4_FAT_ROWS") ? std::max(0, std::atoi(std::getenv("DS4_FAT_ROWS"))) : 64;
         return n;
@@ -6380,7 +6380,7 @@ struct Model::Impl {
                 // the busy experts (DS4_FAT_ROWS=N: those of N rows or more): their weights decoded to FP16 once and
                 // multiplied by the library's GEMM - the tiles decode an expert's weights again for every 64 of its rows
                 // - VRAM's experts only: one streamed into the ring is used for this chunk alone, and on a card short of
-                // VRAM (most experts streamed) the path cost prompts 5-7% (a V100 held to 20 GB, Maya-XS; #438)
+                // VRAM (most experts streamed) the path cost prompts 5-7% (a V100 held to 20 GB, Wam-XS; #438)
                 std::vector<int> fat;
                 const bool ringed = wbase >= c.ring && wbase < c.ring + (size_t) c.ring_n * c.ring_stride;
                 // (low-bit experts only, both roles: the MXFP4 tiles take every row of a set)
@@ -6754,7 +6754,7 @@ struct Model::Impl {
             if (e.ev_seed != nullptr) CK(cudaStreamWaitEvent(s, e.ev_seed, 0));
         return true;
     }
-    // MAYA_DS4_DRAFT_DEV=m, or m0,m1,.. a block (read as STRATA_DS4_DRAFT_DEV, or DS4_DRAFT_DEV): the member of the
+    // WAM_DS4_DRAFT_DEV=m, or m0,m1,.. a block (read as STRATA_DS4_DRAFT_DEV, or DS4_DRAFT_DEV): the member of the
     // drafter's group each DSpark block runs on (0: the lead, as before).  place_experts gives a block's VRAM experts out
     // of its own member's room: a tensor-parallel group's members hold the same trunk slots, so every drafter byte on the
     // lead leaves as many idle on the others - with the blocks spread, the tightest member has more left for the trunk.
@@ -6829,7 +6829,7 @@ struct Model::Impl {
     int vram_cap(const Layer& l) const {
         return l.mtp && !draft_vram.empty() ? std::min(l.n_exp, draft_vram[(size_t) (l.il - g.nl)]) : l.n_exp;
     }
-    // MAYA_DS4_DRAFT_VRAM=n, or n0,n1,.. a block (read as STRATA_DS4_DRAFT_VRAM, or DS4_DRAFT_VRAM): the most VRAM
+    // WAM_DS4_DRAFT_VRAM=n, or n0,n1,.. a block (read as STRATA_DS4_DRAFT_VRAM, or DS4_DRAFT_VRAM): the most VRAM
     // experts each DSpark block keeps - its profile's hottest (place_experts' order), the rest on the CPU lane - so the
     // trunk takes the room; one value: every block.  Unset: placed as before.  Not whole numbers 0 .. the block's
     // experts, a count of values neither 1 nor the blocks', or no blocks (--dspark none): the load fails - and so does
@@ -7891,7 +7891,7 @@ struct Model::Impl {
             return false;
         };
         if (!pk.gguf) return off("it holds a GGUF's experts only");
-        if (ram_tier) return off("the RAM tier (MAYA_DS4_RAM_TIER) is on");
+        if (ram_tier) return off("the RAM tier (WAM_DS4_RAM_TIER) is on");
         std::vector<ExpertStore::Geo> geo((size_t) g.nl);   // (the trunk's layers: the drafter's stay in place)
         size_t lane = 0, all = 0;   // (the in-place CPU-lane experts; every routed expert of the layers)
         for (const Layer& l : L) {
@@ -8213,7 +8213,7 @@ struct Model::Impl {
                     }
                     // Both NUMA halves of all three matrices must be copied before releasing any source pages.
                     // Partial edge pages are retained, so adjacent experts/tensors are never discarded by this hint.
-                    // (#434's MAYA_DS4_LOAD_DROP_CACHE, on by default, and DS4_COPY_DROP_CACHE=1 both take this release:
+                    // (#434's WAM_DS4_LOAD_DROP_CACHE, on by default, and DS4_COPY_DROP_CACHE=1 both take this release:
                     // without it the pack's copies and their cache held twice reclaim in this thread)
                     if ((drop_copy_cache || drop_cache) && !bad.load()) {
                         uint64_t hinted = 0;
@@ -8390,7 +8390,7 @@ struct Model::Impl {
     bool zc_allowed() const {
         const char* v = std::getenv("DS4_STREAM_ZC");
         if ((v != nullptr && std::atoi(v) == 0) || lane_env_off() || !pk.gguf) return false;
-        // (off the one-GPU path: only when asked - DS4_STREAM_ZC=1, or MAYA_DS4_PIN_BY_NEED's own opt-in)
+        // (off the one-GPU path: only when asked - DS4_STREAM_ZC=1, or WAM_DS4_PIN_BY_NEED's own opt-in)
         if (!ln_one && v == nullptr && !pin_by_need()) return false;
         for (const LaneDev& D : ln_dev)   // (an integrated GPU's kernels may read the staging in place: theirs)
             if (D.integrated) return false;
@@ -8553,7 +8553,7 @@ struct Model::Impl {
                 if (mine[c] == 1) cudaHostUnregister(ram_chunks[c]);
             cudaGetLastError();
             std::fprintf(stderr, "ds4: pinning the copied experts (%.1f GB) would leave under %.1f GB the OS lets this "
-                                 "process lock (MAYA_DS4_PIN_ROOM_GB) - the prompt path stages them as before\n",
+                                 "process lock (WAM_DS4_PIN_ROOM_GB) - the prompt path stages them as before\n",
                          gb, pin_room_gb());
             return;
         }
@@ -8566,8 +8566,8 @@ struct Model::Impl {
     // #589: Windows (WDDM) caps the memory one process may lock, and with 160 GB of RAM pinning 131.8 GB of copied
     // experts succeeded and left too little for the prompt path's own pinned staging (cudaHostAlloc 385 MiB failed:
     // the start failed).  There (NVIDIA, Windows) the copies are pinned last - after every pinned buffer the load makes
-    // - and only while MAYA_DS4_PIN_ROOM_GB (1) more can still be locked for what the engine pins later; else they stay
-    // unpinned (the staging, as when the pin fails).  MAYA_DS4_PIN_LAST=1 / 0 forces the order on / off (tests).
+    // - and only while WAM_DS4_PIN_ROOM_GB (1) more can still be locked for what the engine pins later; else they stay
+    // unpinned (the staging, as when the pin fails).  WAM_DS4_PIN_LAST=1 / 0 forces the order on / off (tests).
     static bool cp_pin_last() {
         static const bool on = [] {
             const char* v = ds4_env("DS4_PIN_LAST");
@@ -8813,7 +8813,7 @@ struct Model::Impl {
                 if (L[(size_t) (g.nl + i)].dev == (int) di)
                     std::snprintf(dr + std::strlen(dr), sizeof dr - std::strlen(dr), "%s%d", *dr ? "," : " + blocks ", i);
             if (dense_req_n > 0 && d.id == devs[0].id)
-                std::fprintf(stderr, "ds4: MAYA_DS4_DENSE_REQ: %d dense matrices re-quantized (%d from the pack's cache), %.2f GB "
+                std::fprintf(stderr, "ds4: WAM_DS4_DENSE_REQ: %d dense matrices re-quantized (%d from the pack's cache), %.2f GB "
                                      "fewer, %.1f s\n",
                              dense_req_n, dense_req_cached, dense_req_saved / 1e9, dense_req_ms / 1000.0);
             char line[384];
@@ -8942,13 +8942,13 @@ struct Model::Impl {
         // kernels (and waits on the device) and whatever else the PC runs.  With every other core a worker spinning
         // between a token's layers - 19 on a 20-core Core Ultra 7 265K, Windows 11 - that thread waited for a core:
         // decode 28.3 tok/s, the device waiting 21.4 ms a token for the lane; 18 workers 47.2, 17 workers 55.5.
-        // MAYA_DS4_LANE_FREE (a config's env reaches the engine as STRATA_DS4_LANE_FREE; DS4_LANE_FREE for tests): the
+        // WAM_DS4_LANE_FREE (a config's env reaches the engine as STRATA_DS4_LANE_FREE; DS4_LANE_FREE for tests): the
         // cores left free (2 by default, 0: as before).  Only where the lane would take every logical CPU: with SMT the
         // lane runs a thread a core and the siblings are free already - there leaving cores out cost decode (#394: a
         // 16-core Threadripper, 16 threads 50.6 tok/s against 14 threads 45.9)
         static const int spare_cores = [] {
             const char* v = std::getenv("STRATA_DS4_LANE_FREE");
-            if (v == nullptr) v = std::getenv("MAYA_DS4_LANE_FREE");
+            if (v == nullptr) v = std::getenv("WAM_DS4_LANE_FREE");
             if (v == nullptr) v = std::getenv("DS4_LANE_FREE");
             return v != nullptr ? std::max(0, std::atoi(v)) : 2;
         }();
@@ -9101,7 +9101,7 @@ struct Model::Impl {
     bool alloc_seqs(std::string& err) {
         const int n = std::max(1, o.seqs);
         if (n == 1) return true;
-        if (const char* v = ds4_env("DS4_MULTI_ATTN")) {   // (MAYA_DS4_MULTI_ATTN)
+        if (const char* v = ds4_env("DS4_MULTI_ATTN")) {   // (WAM_DS4_MULTI_ATTN)
             if (std::strcmp(v, "1") != 0 && std::strcmp(v, "0") != 0) {
                 err = std::string("DS4_MULTI_ATTN=") + v + ": 1 or 0";
                 return false;
@@ -9280,7 +9280,7 @@ struct Model::Impl {
         }
     }
 
-    // the restore points a conversation keeps besides its three (MAYA_DS4_RESTORE_POINTS, 4; 0: a request's marks= and
+    // the restore points a conversation keeps besides its three (WAM_DS4_RESTORE_POINTS, 4; 0: a request's marks= and
     // shared= are not kept)
     static int marks_cap() {
         static const int n = [] {
@@ -9795,7 +9795,7 @@ struct Model::Impl {
             return ec ? 0ull : (unsigned long long) s;
         };
         std::ostringstream id;
-        id << "maya-ds4-session-2 engine=" << STRATA_VERSION << " mtp=" << g.n_mtp << " dim=" << g.dim << " hd=" << g.hd
+        id << "wam-ds4-session-2 engine=" << STRATA_VERSION << " mtp=" << g.n_mtp << " dim=" << g.dim << " hd=" << g.hd
            << " win=" << g.win << " ratios=";
         for (int r : g.ratios) id << r << ",";
         id << " kv=";
@@ -9830,7 +9830,7 @@ struct Model::Impl {
     // kVisChunk, zeroed again after), by its tail of expert slots (a device that lends those to the prompt path:
     // kVisTail, the experts under it read back after, as after a run of chunks), or taken from free memory (kVisFree).
     // A device with no prompt buffers to lend it (prompts in windows) keeps the room for the whole run (kVisResident,
-    // as before v1.1.31; MAYA_DS4_VISION_RESIDENT=1 asks for that too).
+    // as before v1.1.31; WAM_DS4_VISION_RESIDENT=1 asks for that too).
     enum { kVisNone = 0, kVisChunk, kVisTail, kVisFree, kVisResident };
     int vis_mode = kVisNone;             // where a picture's room comes from (load_vision, then place_experts)
     uint8_t* vis_res = nullptr;          // kVisResident: the room, held for the run
@@ -9869,7 +9869,7 @@ struct Model::Impl {
         img_tok = tok;
         // a picture's room: lent on demand (place_experts says by whom) where the prompt runs in chunks; prompts in
         // windows have no buffers to lend it, so the room is the tower's own then - taken here, before the split
-        // (the settings' MAYA_DS4_VISION_RESIDENT=1, or DS4_VISION_RESIDENT for tests: the room kept, as before)
+        // (the settings' WAM_DS4_VISION_RESIDENT=1, or DS4_VISION_RESIDENT for tests: the room kept, as before)
         const char* rv = std::getenv("DS4_VISION_RESIDENT");
         if (rv == nullptr) rv = std::getenv("STRATA_DS4_VISION_RESIDENT");
         const bool resident = rv != nullptr && std::atoi(rv) != 0;
@@ -13464,7 +13464,7 @@ struct Model::Impl {
     }
 
     // ---- the helper GPU (DS4_HELPER; the state's note by helper_id)
-    // a DS4_ setting as MAYA_DS4_* sets it (read as STRATA_DS4_*), else the DS4_* name itself
+    // a DS4_ setting as WAM_DS4_* sets it (read as STRATA_DS4_*), else the DS4_* name itself
     static const char* ds4_env(const char* name) {
         const char* v = std::getenv((std::string("STRATA_") + name).c_str());
         return v != nullptr ? v : std::getenv(name);
@@ -14719,7 +14719,7 @@ struct Model::Impl {
     }
 
     // ---- the decode path's PCIe lane (ds4_pcie.hpp).  A decoded token's routed experts that VRAM does not hold were all
-    // the CPU lane's; as GLM's maya does, some of them now go to the GPU instead: read into pinned memory (ln_host - from
+    // the CPU lane's; as GLM's wam does, some of them now go to the GPU instead: read into pinned memory (ln_host - from
     // the page cache, the disk or the RAM tier) by the reading threads, pulled over the link into a staging slot of
     // their layer's GPU by the GPU itself (pcie::stream_fetch, enqueued with the layer: the host only reads and writes
     // flags - a thread that enqueues layers can be blocked in the driver until the device moves on, so any GPU call from
@@ -14731,7 +14731,7 @@ struct Model::Impl {
     // group); each GPU streams its own layers' experts over its own link.  The device's sums take a streamed expert as
     // a VRAM one (the same kernels, the same order); the CPU lane's and the device's sums of one expert agree to their
     // order (both lanes round a low-bit expert's activations alike, ggml's Q8_K, unless DS4_IQ_Q8K=0 - DS4_LANE_CHECK).
-    // DS4_STREAM=0 (or the settings' MAYA_DS4_STREAM=0): off (the CPU lane alone, as before; 2: the slots kept but
+    // DS4_STREAM=0 (or the settings' WAM_DS4_STREAM=0): off (the CPU lane alone, as before; 2: the slots kept but
     // nothing streams - tests, the same experts'
     // placement as a streaming start); DS4_STREAM_THREADS=<n>: the reading threads (2);
     // DS4_STREAM_FORCE=<digits>: of n picks of a request the stream lane takes digit n (the first ones; tests - the
@@ -14831,7 +14831,7 @@ struct Model::Impl {
         double t0 = 0;              // the split's time
     };
 
-    // DS4_STREAM, or the settings' MAYA_DS4_STREAM (STRATA_DS4_STREAM): 0 off, 2 the slots kept and nothing streamed
+    // DS4_STREAM, or the settings' WAM_DS4_STREAM (STRATA_DS4_STREAM): 0 off, 2 the slots kept and nothing streamed
     static const char* lane_env() {
         const char* v = std::getenv("DS4_STREAM");
         return v != nullptr ? v : std::getenv("STRATA_DS4_STREAM");
@@ -14870,7 +14870,7 @@ struct Model::Impl {
     }
 
     // the staging slots on each GPU whose layers may stream, before place_experts - its VRAM experts take what they
-    // leave: a request's picks, k_exp slots of the largest blob (~64 MB for Maya's quant, ~113 MB for MXFP4: ~0.3% of a
+    // leave: a request's picks, k_exp slots of the largest blob (~64 MB for Wam's quant, ~113 MB for MXFP4: ~0.3% of a
     // 32 GB card's experts).  Not where every expert of its layers fits in VRAM (no CPU lane), nor where the times file
     // says this GPU's split never streams (its start costs no VRAM then).
     bool lane_alloc(std::string& err) {
@@ -17909,7 +17909,7 @@ struct Model::Impl {
             c.io_b0 = c.io->buffered_bytes();
             c.io_h0 = c.io->device_bytes();
             // (a short prompt's reads through the page cache, which keeps them for the decode after it - as the CPU
-            // lane's reads in windows did: one V100, Maya-S from an NVMe, decode after 17 tokens 12.7 tokens/s read
+            // lane's reads in windows did: one V100, Wam-S from an NVMe, decode after 17 tokens 12.7 tokens/s read
             // past the cache, 14.0 after windows; a long one's past it, more than the cache holds - DS4_FLOW_BUFFERED,
             // 1024 tokens on one GPU, 0 on more: the longest run read through it)
             static const int buf_max = std::getenv("DS4_FLOW_BUFFERED") ? std::atoi(std::getenv("DS4_FLOW_BUFFERED"))
@@ -19004,7 +19004,7 @@ struct Model::Impl {
     // page cache on a thread of their own while the first tokens decode, up to DS4_WARM_GB (half the RAM left, 32 at
     // most).  Windows used to leave them there (the CPU lane read every pick through the cache, the last ones last);
     // the flow reads past it, and the decode's first tokens read them a page fault at a time - one V100, 64 GB of RAM,
-    // Maya-S from an NVMe, after 4K tokens: 2.8 tokens/s the first 64, 8.0 the next.  Only the page cache sees it.
+    // Wam-S from an NVMe, after 4K tokens: 2.8 tokens/s the first 64, 8.0 the next.  Only the page cache sees it.
     void warm_after(int n) {
         static const int wmin = std::getenv("DS4_WARM_MIN") ? std::atoi(std::getenv("DS4_WARM_MIN")) : 512;
         if (!file_experts || n < wmin || L.empty() || L[0].lay.fmt != gg::kFmtMXFP4) return;
@@ -19067,7 +19067,7 @@ struct Model::Impl {
     // on one GPU, or on several (tensor parallel, groups) where no device streams its layers on the flow and no Engram
     // layer comes from it on (the cut then at a chunk's start: forward_chunks), or on a layer split whose earlier layers
     // are on other GPUs while the source and every layer after it share one GPU (the flow allowed: yoco_suffix_gpu).
-    // The settings' MAYA_DS4_PROMPT_SKIP (STRATA_DS4_PROMPT_SKIP; DS4_YOCO for tests):
+    // The settings' WAM_DS4_PROMPT_SKIP (STRATA_DS4_PROMPT_SKIP; DS4_YOCO for tests):
     // 1 (the default) the exact skip, 2 DeepSeek's own serving's (the last 128 rows only: faster, the answers shift a
     // little), 0 off
     static int yoco_mode() {
@@ -21541,7 +21541,7 @@ struct Model::Impl {
             std::snprintf(b, sizeof b,
                           "NOTE experts: %.0f GB stay off the GPU - Windows' page file is too small to hold them there; "
                           "a page file of %.0f GB keeps them on the GPU (System > About > Advanced system settings > "
-                          "Performance > Advanced > Virtual memory), then restart Maya", commit_kept / 1e9, pagefile_hint);
+                          "Performance > Advanced > Virtual memory), then restart Wam", commit_kept / 1e9, pagefile_hint);
             v.push_back(b);
             std::snprintf(b, sizeof b, "INFO gpu_commit_capped_gb=%.0f pagefile_hint_gb=%.0f", std::ceil(commit_kept / 1e9),
                           pagefile_hint);

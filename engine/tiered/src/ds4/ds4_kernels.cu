@@ -3696,7 +3696,7 @@ bool pdl_on() {
 #endif
 }
 
-// STRATA_DS4_RESIDENT_SKIP_W / STRATA_DS4_RESIDENT_TOPK (MAYA_ names alias them), read once; 0 = off
+// STRATA_DS4_RESIDENT_SKIP_W / STRATA_DS4_RESIDENT_TOPK (WAM_ names alias them), read once; 0 = off
 namespace {
 struct ResidentSkip {
     float w;

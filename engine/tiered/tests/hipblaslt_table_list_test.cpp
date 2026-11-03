@@ -28,8 +28,8 @@ int main() {
     expect("rel/x.txt:z.txt", false, {"rel/x.txt", "z.txt"});
     expect("", false, {});
 
-    // Windows: ';' (what maya.py writes), the drive prefix kept whole
-    expect("C:\\Maya\\tools\\hip\\x.txt", true, {"C:\\Maya\\tools\\hip\\x.txt"});
+    // Windows: ';' (what wam.py writes), the drive prefix kept whole
+    expect("C:\\Wam\\tools\\hip\\x.txt", true, {"C:\\Wam\\tools\\hip\\x.txt"});
     expect("C:\\a\\x.txt;D:\\b\\y.txt", true, {"C:\\a\\x.txt", "D:\\b\\y.txt"});
     expect("c:/a/x.txt;d:/b/y.txt;", true, {"c:/a/x.txt", "d:/b/y.txt"});
     expect("\\\\server\\share\\x.txt;C:\\y.txt", true, {"\\\\server\\share\\x.txt", "C:\\y.txt"});

@@ -173,7 +173,7 @@ bool Glm5Model::rows_alloc(std::string& err) {
     at = 0;
     carve();   // the pointers
     if (attn)
-        std::fprintf(stderr, "glm rows: CUDA%d the DSA attention of up to %d rows a launch (MAYA_GLM_ROWS_ATTN), %zu MB of "
+        std::fprintf(stderr, "glm rows: CUDA%d the DSA attention of up to %d rows a launch (WAM_GLM_ROWS_ATTN), %zu MB of "
                              "the rows' %zu MB\n", dev_, attn_tokens,
                      (size_t) ((2 * R * g.n_head * g.kv_lora * sizeof(float) + 2 * R * g.n_sel_max() * sizeof(int) +
                                 gf::mla_rows_part_floats(g.n_head, g.kv_lora) * attn_tokens * sizeof(float) +

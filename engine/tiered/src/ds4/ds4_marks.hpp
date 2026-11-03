@@ -1,4 +1,4 @@
-// src/ds4/ds4_marks.hpp - maya-ds4's restore points: which one a new prompt goes back to, which of the ones a request
+// src/ds4/ds4_marks.hpp - wam-ds4's restore points: which one a new prompt goes back to, which of the ones a request
 // asks for its read keeps, and which one gives way to a new one.  A restore point is the state at a position (the
 // window rings and the compressors' partial groups; the rest of the state is indexed by position).  Besides the three a
 // conversation always has (the end of its last prompt, the position before it, the anchor), the server may ask for more
@@ -16,7 +16,7 @@
 
 namespace strata::ds4 {
 
-// the restore points a conversation keeps besides its three, at most (MAYA_DS4_RESTORE_POINTS is clamped to it)
+// the restore points a conversation keeps besides its three, at most (WAM_DS4_RESTORE_POINTS is clamped to it)
 constexpr int kMarksMax = 16;
 
 // the latest of the points `at` (positions; -1: none) at or before `limit` - where the state's tokens still agree with
@@ -70,7 +70,7 @@ inline std::vector<MarkAt> mark_plan(const std::vector<int64_t>& asked, int64_t 
     return out;
 }
 
-// The tail point's cost on this PC (the server's tail=<pos>, MAYA_DS4_RESTORE_TAIL; #668).  The read stops there, so
+// The tail point's cost on this PC (the server's tail=<pos>, WAM_DS4_RESTORE_TAIL; #668).  The read stops there, so
 // the tokens after it are a run of their own: where most experts are not in VRAM, that short run costs nearly a whole
 // pass over them (each expert's weights read for a few rows - on the CPU lane, or lent to the GPU's prompt path one
 // run at a time; on a layer split whose experts stream, one more pass of them through every stage, one stage after

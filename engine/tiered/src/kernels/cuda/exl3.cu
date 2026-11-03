@@ -1949,7 +1949,7 @@ __global__ void __launch_bounds__(kThreads) set_mix_kernel(const KSetMix a, KMix
 // B 16 activations' slice from xb (col-major: an activation's inputs in a row), D stored col-major into out - the same
 // operands as gfx11's, the fragments loaded by the library instead of by hand (wt's pitch 12 words: wmma's ldm is a
 // multiple of 8 halves; the 8 rows a store takes stay on distinct banks).  wmma_now(): sm_7x unless
-// STRATA_EXL3_WMMA=0 (MAYA_EXL3_WMMA=0).
+// STRATA_EXL3_WMMA=0 (WAM_EXL3_WMMA=0).
 constexpr int kXS = kCols + 8;   // an activation's pitch in xb (halves: 2-way LDS reads)
 #if defined(STRATA_USE_HIP)
 constexpr int kWtP = 9;          // wt's pitch, words a decoded output row (8 + 1: banks)
@@ -2317,9 +2317,9 @@ __global__ void __launch_bounds__(kThreads) hip_rows_kernel(Mat m, const uint16_
     }
 }
 #if defined(STRATA_USE_HIP)
-static const char* hip_scalar_env(const char* internal, const char* maya, const char* native) {
+static const char* hip_scalar_env(const char* internal, const char* wam, const char* native) {
     const char* v = std::getenv(internal);
-    if (v == nullptr) v = std::getenv(maya);
+    if (v == nullptr) v = std::getenv(wam);
     return v != nullptr ? v : std::getenv(native);
 }
 // RDNA4 only for now. Each launch thread caches capability per visible device, not a workstation GPU ID.
@@ -2340,14 +2340,14 @@ static bool hip_scalar_set(const SetArgs& a, const float* x, int ldx, const int*
     // Only the tested integer 3/4-bit mul1 layouts. Mixed and other layouts retain their original path.
     if constexpr ((K2 == 6 || K2 == 8) && cb == 2) {
         const int mode = hip_scalar::mode(hip_scalar_env("STRATA_EXL3_HIP_SCALAR_ROWS",
-            "MAYA_EXL3_HIP_SCALAR_ROWS", "EXL3_HIP_SCALAR_ROWS"));
+            "WAM_EXL3_HIP_SCALAR_ROWS", "EXL3_HIP_SCALAR_ROWS"));
         if (mode == 8 || !hip_scalar_device()) return false;
         int gu_min = 48, down_min = 128;
         if (mode == -1) {
             gu_min = hip_scalar::cutoff(hip_scalar_env("STRATA_EXL3_HIP_SCALAR_GU_MIN_ROWS",
-                "MAYA_EXL3_HIP_SCALAR_GU_MIN_ROWS", "EXL3_HIP_SCALAR_GU_MIN_ROWS"), gu_min);
+                "WAM_EXL3_HIP_SCALAR_GU_MIN_ROWS", "EXL3_HIP_SCALAR_GU_MIN_ROWS"), gu_min);
             down_min = hip_scalar::cutoff(hip_scalar_env("STRATA_EXL3_HIP_SCALAR_DOWN_MIN_ROWS",
-                "MAYA_EXL3_HIP_SCALAR_DOWN_MIN_ROWS", "EXL3_HIP_SCALAR_DOWN_MIN_ROWS"), down_min);
+                "WAM_EXL3_HIP_SCALAR_DOWN_MIN_ROWS", "EXL3_HIP_SCALAR_DOWN_MIN_ROWS"), down_min);
         }
         const int nr = hip_scalar::rows(mode, GU, a.max_rows, gu_min, down_min);
         if (nr == 8) return false;

@@ -76,7 +76,7 @@ class _Reader:
                 except (OSError, ValueError) as e:
                     if self.proc is None:             # (it could not be started at all)
                         self.off = True
-                        print(f"[maya] the GPU readings are off: their NVML reader did not start ({e})", flush=True)
+                        print(f"[wam] the GPU readings are off: their NVML reader did not start ({e})", flush=True)
                         return None
                     rep, culprit, why = None, None, f"its pipe broke ({e})"
                 else:
@@ -159,13 +159,13 @@ class _Reader:
             self.skip.add(culprit)
         if self.crashes >= self.MAX_CRASHES:
             self.off = True
-            print(f"[maya] the GPU readings are off: their NVML reader crashed {self.crashes} times ({why}) - the "
+            print(f"[wam] the GPU readings are off: their NVML reader crashed {self.crashes} times ({why}) - the "
                   "server goes on without them", flush=True)
         elif culprit:
-            print(f"[maya] the GPU readings' NVML call {culprit} crashed their reader ({why}): that reading is left "
+            print(f"[wam] the GPU readings' NVML call {culprit} crashed their reader ({why}): that reading is left "
                   "out from now on - the server goes on", flush=True)
         else:
-            print(f"[maya] the GPU readings' NVML reader stopped ({why}); starting it again", flush=True)
+            print(f"[wam] the GPU readings' NVML reader stopped ({why}); starting it again", flush=True)
 
 
 _READER = None

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""tools/ds4/slot_keep_test.py - the kept conversations (MAYA_DS4_SLOT_KEEP): a prompt that does not continue the
+"""tools/ds4/slot_keep_test.py - the kept conversations (WAM_DS4_SLOT_KEEP): a prompt that does not continue the
 conversation in the model takes the kept one it does continue back, so A, B, A's next turn reads only the new tokens.
 
-    python tools/ds4/slot_keep_test.py --pack /mnt/data/models/.../maya-ds4 [--exe build/maya-ds4] [--gpus 0,2,1]
-                                       [--config maya-ds4.json]
+    python tools/ds4/slot_keep_test.py --pack /mnt/data/models/.../wam-ds4 [--exe build/wam-ds4] [--gpus 0,2,1]
+                                       [--config wam-ds4.json]
 
-The engine gets the environment this test inherits plus, with `--config <maya-ds4.json>`, that config's DeepSeek
-settings (`DS4_*` and the `MAYA_DS4_*` names, under the names the engine reads): on a unified-memory APU the pool it
+The engine gets the environment this test inherits plus, with `--config <wam-ds4.json>`, that config's DeepSeek
+settings (`DS4_*` and the `WAM_DS4_*` names, under the names the engine reads): on a unified-memory APU the pool it
 sizes from hipMemGetInfo is not the one a config pins (`DS4_POOL_GB`), and there a QUIT can hang for its 300 s.  The
 slot settings this test sets win over the config's - the test decides what it measures.
 
 Six runs of the engine's `--serve` protocol (greedy, spec=0 so the state's position is the answer's, exactly):
-  no-keep  A, B, A's next turn (MAYA_DS4_SLOT_KEEP=0)  the reference: reused 0, and its answer to A builds the turn
+  no-keep  A, B, A's next turn (WAM_DS4_SLOT_KEEP=0)  the reference: reused 0, and its answer to A builds the turn
                                                        every later run sends, so they all send the same prompt byte
                                                        for byte
   no-keep  the same again, a second process            two full reads of that one prompt: the engine's own run-to-run
@@ -19,7 +19,7 @@ Six runs of the engine's `--serve` protocol (greedy, spec=0 so the state's posit
                                                        across runs, so this is measured, not assumed)
   in-run   A, B, A's next turn, one process            the third request reports A's full prefix as reused
   kept     A, B, then QUIT                             the folder keeps both conversations (2 .bin + .meta, under a
-                                                       0.05 GB MAYA_DS4_SLOT_GB)
+                                                       0.05 GB WAM_DS4_SLOT_GB)
   restart  A's next turn alone, a new process          the same prefix reused, from the folder
   evict    A, B, C into a folder capped at A+B's bytes three conversations cannot fit: the least recently used (A) is
                                                        gone, B and C stay
@@ -55,7 +55,7 @@ from pathlib import Path
 from typing import Callable
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import maya_names  # noqa: E402  (tools/) a model config's settings under the names the engine reads
+import wam_names  # noqa: E402  (tools/) a model config's settings under the names the engine reads
 
 if os.name == "nt":      # PeekNamedPipe, below: select() takes only sockets on Windows (WinError 10093)
     import ctypes
@@ -84,7 +84,7 @@ def _readable(stream, timeout_s: float) -> bool:
 
 CORPUS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tokenizer_corpus.txt")
 META_MAGIC = 0x334154454d345344   # "DS4META3" (little endian): a slot's .meta, as src/ds4/ds4_main.cpp writes it
-DS4_ENV = ("DS4_", "STRATA_DS4_")   # (the engine's own names: it aliases MAYA_DS4_* to STRATA_DS4_* at start)
+DS4_ENV = ("DS4_", "STRATA_DS4_")   # (the engine's own names: it aliases WAM_DS4_* to STRATA_DS4_* at start)
 
 
 def text_tokens(tok, salt: str, n: int) -> list[int]:
@@ -123,7 +123,7 @@ def meta_tokens(path: str) -> list[int] | None:
 
 
 class Engine:
-    """One `maya-ds4 --serve` process: its INFO/READY lines, then `GEN` in, `T` / `DONE` out."""
+    """One `wam-ds4 --serve` process: its INFO/READY lines, then `GEN` in, `T` / `DONE` out."""
 
     def __init__(self, exe: str, args: list[str], env: dict):
         self.exe, self.args, self.env = exe, args, env
@@ -237,7 +237,7 @@ class Engine:
 def config_env(path: str) -> dict[str, str]:
     """A model config's DeepSeek settings, under the names the engine reads: a unified-memory APU's `DS4_POOL_GB` (its
     pool is otherwise sized from hipMemGetInfo), the streaming and the tiers it pins."""
-    cfg = maya_names.env_in(json.loads(Path(path).read_text(encoding="utf-8-sig")))   # (a BOM: Notepad)
+    cfg = wam_names.env_in(json.loads(Path(path).read_text(encoding="utf-8-sig")))   # (a BOM: Notepad)
     return {k: str(v) for k, v in (cfg.get("env") or {}).items() if k.startswith(DS4_ENV)}
 
 
@@ -245,9 +245,9 @@ def engine_env(settings: dict, keep: bool, slots: str, slot_gb: float | None) ->
     """The engine's environment: the config's settings first, this test's slot settings over them (the test decides
     what it measures)."""
     env = dict(settings)
-    env.update({"MAYA_DS4_SLOT_KEEP": "1" if keep else "0", "MAYA_DS4_SLOT_DIR": slots})
+    env.update({"WAM_DS4_SLOT_KEEP": "1" if keep else "0", "WAM_DS4_SLOT_DIR": slots})
     if slot_gb is not None:
-        env["MAYA_DS4_SLOT_GB"] = str(slot_gb)
+        env["WAM_DS4_SLOT_GB"] = str(slot_gb)
     return env
 
 
@@ -281,12 +281,12 @@ def run(exe: str, gpus: list[int], pack: str, ctx: int, slots: str, keep: bool, 
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="the kept conversations (MAYA_DS4_SLOT_KEEP): A, B, then A's next turn")
-    ap.add_argument("--pack", required=True, help="the model's pack dir (maya-ds4)")
+    ap = argparse.ArgumentParser(description="the kept conversations (WAM_DS4_SLOT_KEEP): A, B, then A's next turn")
+    ap.add_argument("--pack", required=True, help="the model's pack dir (wam-ds4)")
     ap.add_argument("--exe", default=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__)))), "build", "maya-ds4"), help="the engine (default: <repo>/build/maya-ds4)")
+        os.path.abspath(__file__)))), "build", "wam-ds4"), help="the engine (default: <repo>/build/wam-ds4)")
     ap.add_argument("--gpus", default="", help="the GPUs (default: every visible one, the engine's own split)")
-    ap.add_argument("--config", default="", help="a model config (maya-ds4.json): its DS4_/MAYA_DS4_ settings go to the "
+    ap.add_argument("--config", default="", help="a model config (wam-ds4.json): its DS4_/WAM_DS4_ settings go to the "
                                                 "engine - an APU's DS4_POOL_GB, else its pool is sized from hipMemGetInfo "
                                                 "and its QUIT can hang for 300 s; the slot settings here win over it")
     ap.add_argument("--ctx", type=int, default=32768, help="--max-context")
@@ -300,7 +300,7 @@ def main() -> int:
     settings = config_env(a_.config) if a_.config else {}
 
     if not os.path.exists(a_.exe):
-        print(f"{a_.exe}: no engine - build it first (cmake --build build --target maya-ds4)", flush=True)
+        print(f"{a_.exe}: no engine - build it first (cmake --build build --target wam-ds4)", flush=True)
         return 2
     try:
         from strata_tokenizer import Tokenizer   # (tools/strata_tokenizer.py's own: `regex`)
@@ -334,7 +334,7 @@ def main() -> int:
     dir_kept = os.path.join(tmp, "kept")
     dir_evict = os.path.join(tmp, "evict")
     try:
-        print("no-keep: A, B, A's next turn, one process (MAYA_DS4_SLOT_KEEP=0, the reference)", flush=True)
+        print("no-keep: A, B, A's next turn, one process (WAM_DS4_SLOT_KEEP=0, the reference)", flush=True)
         r0, _, _ = run(a_.exe, gpus, a_.pack, a_.ctx, os.path.join(tmp, "off-1"), False,
                        [("A", lambda _: a), ("B", lambda _: b),
                         ("A-turn", lambda ans: a + ans["A"]["tokens"] + turn)], max_new, settings=settings)
@@ -399,7 +399,7 @@ def main() -> int:
         check(f"kept: the folder holds A and B ({len(bins)} .bin, {len(metas)} .meta)",
               len(bins) == 2 and len(metas) == 2)
         size = sum(os.path.getsize(os.path.join(dir_kept, f)) for f in bins)
-        check(f"kept: the folder stays under MAYA_DS4_SLOT_GB=0.05 ({size / 2**20:.1f} MiB)", size <= 0.05 * 2**30)
+        check(f"kept: the folder stays under WAM_DS4_SLOT_GB=0.05 ({size / 2**20:.1f} MiB)", size <= 0.05 * 2**30)
 
         def folder_slots(path: str) -> dict[str, int]:
             """A folder's conversations by the prompt their tokens start with ({name: the .bin's bytes})."""

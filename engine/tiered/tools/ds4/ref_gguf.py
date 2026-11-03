@@ -1,10 +1,10 @@
 """tools/ds4/ref_gguf.py - tools/ds4/ref.py's oracle over a GGUF (tools/ds4/pack_gguf.py's pack): the same forward,
-each weight dequantised in torch from the GGUF's own blocks (BF16, Q8_0, MXFP4, MXFP8) - a check of maya-ds4's GGUF
+each weight dequantised in torch from the GGUF's own blocks (BF16, Q8_0, MXFP4, MXFP8) - a check of wam-ds4's GGUF
 path that shares none of its code.
 
-    python tools/ds4/ref_gguf.py --pack <model>/maya-ds4 --ids 0,671,6102 [--dump out.npz] [--gen 8]
+    python tools/ds4/ref_gguf.py --pack <model>/wam-ds4 --ids 0,671,6102 [--dump out.npz] [--gen 8]
 
-The token ids come from the server's tokenizer (maya-ds4 --serve, or the engine's own --ids runs); --dump writes
+The token ids come from the server's tokenizer (wam-ds4 --serve, or the engine's own --ids runs); --dump writes
 what tools/ds4/compare.py reads.
 """
 from __future__ import annotations
@@ -263,7 +263,7 @@ class RefGguf(R.Ref):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pack", required=True, help="pack_gguf.py's pack (<model>/maya-ds4)")
+    ap.add_argument("--pack", required=True, help="pack_gguf.py's pack (<model>/wam-ds4)")
     ap.add_argument("--ids", required=True, help="comma-separated token ids")
     ap.add_argument("--gen", type=int, default=0, help="greedy tokens to append (a whole forward each)")
     ap.add_argument("--dump", help="write the per-layer residual streams, the logits and the ids (.npz)")

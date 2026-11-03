@@ -51,7 +51,7 @@ def numbers_table(rows):
         f"| {i} | user{i * 7 % 13} | {(i * 37) % 100} | city{i % 5} |\n" for i in range(rows))
 
 
-LONG_BLOCK = " ".join(random.Random(11).choices(   # a plan of several hundred tokens (Maya-S thought one 4 times)
+LONG_BLOCK = " ".join(random.Random(11).choices(   # a plan of several hundred tokens (Wam-S thought one 4 times)
     "check the metric logs then the deploy diff and the gc pauses before the p99 of each host".split(), k=600)) + "\n"
 
 LEGIT = {
@@ -364,12 +364,12 @@ class ToolCalls(unittest.TestCase):
 class Settings(unittest.TestCase):
     def test_on_by_default_and_the_ways_to_turn_it_off(self):
         self.assertTrue(loop_guard_setting({}, {}))
-        self.assertFalse(loop_guard_setting({}, {"MAYA_LOOP_GUARD": "0"}))
+        self.assertFalse(loop_guard_setting({}, {"WAM_LOOP_GUARD": "0"}))
         self.assertFalse(loop_guard_setting({}, {"STRATA_LOOP_GUARD": "off"}))
         self.assertFalse(loop_guard_setting({"loop_guard": False}, {}))
         self.assertFalse(loop_guard_setting({"loop_guard": "false"}, {}))
         self.assertTrue(loop_guard_setting({"loop_guard": True}, {}))
-        self.assertTrue(loop_guard_setting({"loop_guard": False}, {"MAYA_LOOP_GUARD": "1"}))   # the environment wins
+        self.assertTrue(loop_guard_setting({"loop_guard": False}, {"WAM_LOOP_GUARD": "1"}))   # the environment wins
 
     def test_the_request_field(self):
         for value, want in ((True, True), (False, False), ("false", False), ("on", True), (0, False), (None, None)):
@@ -485,7 +485,7 @@ class Server(unittest.TestCase):
         self.assertTrue(m["loop_guard"]["on"])
         self.assertEqual(len(m["requests"][0]["loop_guard"]), 1)
         self.assertIn(f"a {period}-token block", m["requests"][0]["loop_guard"][0])
-        self.assertIn("maya:loop_guard_detected_total 1", svc.prometheus())
+        self.assertIn("wam:loop_guard_detected_total 1", svc.prometheus())
 
     def test_three_identical_tool_calls_in_one_reply_are_not_cut(self):
         call = "<tool_call>read_file<arg_key>path</arg_key><arg_value>/src/main.py</arg_value></tool_call>"
@@ -719,7 +719,7 @@ class ToolRepeat(unittest.TestCase):
         self.assertEqual(seen[-1][:-1], LG.collapse(msgs).messages)     # (the repeated rounds: left out, below)
         self.assertEqual(msgs[-1]["content"], NMCLI[1])                 # the request's own messages stay as sent
         self.assertEqual(svc.metrics()["loop_guard"]["tool_repeats"], 1)
-        self.assertIn("maya:loop_guard_tool_repeats_total 1", svc.prometheus())
+        self.assertIn("wam:loop_guard_tool_repeats_total 1", svc.prometheus())
         svc.prepare(msgs, tools, dict(kw), 100, guard=False)          # the request's "loop_guard": false
         self.assertEqual(seen[-1], msgs)
         svc.prepare(self.messages(agent(NMCLI, GREP)), tools, dict(kw), 100)
@@ -804,7 +804,7 @@ class ToolBlock(unittest.TestCase):
         self.assertIn(LG.block_note(LG.ToolRepeat("bash", 5)), said)    # ... and the note
         self.assertTrue(second[:len(first)] == first)                   # (the conversation's cache goes on)
         self.assertEqual((done["finish"], svc.metrics()["loop_guard"]["tool_blocked"]), ("stop", 1))
-        self.assertIn("maya:loop_guard_tool_blocked_total 1", svc.prometheus())
+        self.assertIn("wam:loop_guard_tool_blocked_total 1", svc.prometheus())
 
     def test_again_and_again_it_is_steered_never_stopped(self):
         other = "cat host/bellhost/bridge.py"
@@ -984,13 +984,13 @@ class Collapse(unittest.TestCase):
         msgs = self.turns(200)
         self.assertGreater(LG.conv_chars(msgs), LG.COLLAPSE_MAX_CHARS)
         self.assertIsNone(LG.collapse(msgs))
-        os.environ["MAYA_LOOP_GUARD_COLLAPSE_MAX"] = "1000000"          # (the behaviour before #702)
+        os.environ["WAM_LOOP_GUARD_COLLAPSE_MAX"] = "1000000"          # (the behaviour before #702)
         try:
             self.assertIsNotNone(LG.collapse(msgs))
-            os.environ["MAYA_LOOP_GUARD_COLLAPSE_MAX"] = "lots"              # (not a number: the default, no error)
+            os.environ["WAM_LOOP_GUARD_COLLAPSE_MAX"] = "lots"              # (not a number: the default, no error)
             self.assertIsNone(LG.collapse(msgs))
         finally:
-            os.environ.pop("MAYA_LOOP_GUARD_COLLAPSE_MAX", None)
+            os.environ.pop("WAM_LOOP_GUARD_COLLAPSE_MAX", None)
 
     def test_a_conversation_without_a_loop_is_untouched(self):
         msgs = [{"role": "user", "content": "x"}]

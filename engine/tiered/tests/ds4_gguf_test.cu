@@ -1,4 +1,4 @@
-// tests/ds4_gguf_test.cu - maya-ds4's GGUF kernels (src/ds4/ds4_gguf.cu, ds4_gguf_cpu.cpp) against a plain
+// tests/ds4_gguf_test.cu - wam-ds4's GGUF kernels (src/ds4/ds4_gguf.cu, ds4_gguf_cpu.cpp) against a plain
 // double-precision reference of random BF16 matrices and MXFP4 experts: the GEMVs (BF16 / MXFP4, 1..16 activations,
 // aligned or not), the token experts (gate / up / swiglu / down / combine, experts off the device, the CPU part, the
 // shared expert), a window's grouped experts (bit for bit the token path's), the prompt path's expert sets and the CPU
@@ -804,7 +804,7 @@ void test_mv_q(int type, cudaStream_t s) {
     }
 }
 
-// --parallel's multi step (maya-ds4 Model::step_multi): the rows of several conversations through one mv - each
+// --parallel's multi step (wam-ds4 Model::step_multi): the rows of several conversations through one mv - each
 // activation's outputs bit for bit its own mv alone, whatever its place among the others (every dense format, every
 // low-bit one; the decode's activation counts)
 void test_mv_rows(cudaStream_t s) {
@@ -2212,7 +2212,7 @@ void test_kv_pack(cudaStream_t s) {
             edges.nsel[t] = nsel[t];
         }
         for (int heads : {16, 32, 64}) wmma_case("partial tiles / empty rows", 16, heads, edges);
-        // Window-only and R=1/2 (this Maya-S pack), plus R=4/128: 256-row slabs at the causal start and
+        // Window-only and R=1/2 (this Wam-S pack), plus R=4/128: 256-row slabs at the causal start and
         // 8K/32K/64K/120K depth. Keep the original stress cohort's order/data for reproducibility.
         // A nonzero t0 also checks slabs taken from the middle of a chunk's extended window buffer.
         for (long long p0 : {0LL, 8192LL, 32768LL, 65536LL, 122880LL})
@@ -2740,7 +2740,7 @@ void test_hc_mix_split(cudaStream_t s) {
                 }
 }
 
-// A GGUF head's passes (maya-ds4 head_share: DS4_HEAD_COLS activations a pass, 8 by default, 4 before): 16 rows and 5
+// A GGUF head's passes (wam-ds4 head_share: DS4_HEAD_COLS activations a pass, 8 by default, 4 before): 16 rows and 5
 // (a drafter's block) of logits by 8 a pass the same bits as by 4 and by 1 - a Q8_0, a BF16 and a Q6_K head (a share of
 // the vocabulary's rows, the model's width)
 void test_head_cols(cudaStream_t s) {
@@ -2860,7 +2860,7 @@ void test_decode_trims(cudaStream_t s) {
 }
 
 // ---------------------------------------------------------------- a group of two's chunk all-reduce (ds4_kernels.cu)
-// Two GPUs, a thread and a stream each, the rows and flags host-mapped as maya-ds4's hmap leaves them (mapped,
+// Two GPUs, a thread and a stream each, the rows and flags host-mapped as wam-ds4's hmap leaves them (mapped,
 // portable, zeroed).  allreduce as before (xfer_put + ar_sum_kernel) and DS4_AR2 1 / 2 (ar2_kernel), interleaved on one
 // seq count, five rounds each (both slots, each written again), at up to 2048 rows x 5120, 37 rows and one (fewer
 // blocks, short pieces), a few values past FP16's range.  0 and 1 must give the host's p0 + p1 bit for bit on both

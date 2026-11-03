@@ -73,7 +73,7 @@ class Rendering(_CleanToolOrders):
         return result
 
     def render_with_setting(self, setting, messages, **options):
-        """A render with MAYA_DS4_KEEP_THINKING as a shell or the config's env sets it (`None`: unset)."""
+        """A render with WAM_DS4_KEEP_THINKING as a shell or the config's env sets it (`None`: unset)."""
         saved = os.environ.pop("STRATA_DS4_KEEP_THINKING", None)
         try:
             if setting is not None:

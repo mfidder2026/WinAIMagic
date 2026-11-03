@@ -126,7 +126,7 @@ def msa_attend(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, kept: torch.Te
 
 # ------------------------------------------------------------------ the engine's roundings (--emulate)
 class Emu:
-    """An EXL3 matrix computed as maya-mm3's kernels do: y = H(FP16(H(x * suh)) W') * svh, W' the decoded FP16 values,
+    """An EXL3 matrix computed as wam-mm3's kernels do: y = H(FP16(H(x * suh)) W') * svh, W' the decoded FP16 values,
     F32 sums; x16 first: x itself rounded to FP16 before (the dense matrices' FP16 input rows)."""
 
     def __init__(self, inner: torch.Tensor, suh: torch.Tensor, svh: torch.Tensor, x16: bool):
@@ -501,7 +501,7 @@ def main() -> int:
     ap.add_argument("--T", type=int, default=2600, help="positions for --selftest / --check-hf (> 2048 is sparse)")
     ap.add_argument("--dev", default="cuda:0")
     ap.add_argument("--layers", type=int, help="run only the first N layers (for --dump-blocks / the streams)")
-    ap.add_argument("--emulate", action="store_true", help="maya-mm3's roundings: FP16 inputs to the EXL3 products, "
+    ap.add_argument("--emulate", action="store_true", help="wam-mm3's roundings: FP16 inputs to the EXL3 products, "
                     "BF16 KV and index caches, FP16 expert activations")
     ap.add_argument("--check-dev", help="the device --check-hf runs both forwards on (default --dev; cpu for MoE)")
     a = ap.parse_args()

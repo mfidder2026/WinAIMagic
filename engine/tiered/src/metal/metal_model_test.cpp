@@ -1,4 +1,4 @@
-// src/metal/metal_model_test.cpp - maya-metal against the GLM oracles, with the gates the CUDA engine's tests hold
+// src/metal/metal_model_test.cpp - wam-metal against the GLM oracles, with the gates the CUDA engine's tests hold
 // (src/core/glm_model_test.cpp, src/core/glm_model_big_test.cpp):
 //
 //   metal_model_test small [GGUF] [DUMPS] [DUMPS12]   6-layer fixture vs ref/glm.py: batched logits within 2e-3,
@@ -16,8 +16,8 @@
 //       windows of 1-8 rows whose drafts are partly wrong must equal plain decoding token for token, every
 //       accepted row's logits within 1e-5 of the plain step's
 //
-// Settings (environment): MAYA_METAL_CPU=1 runs on ggml-cpu, MAYA_METAL_POOL_SLOTS=N shrinks the expert pool (the
-// eviction path), MAYA_METAL_UBATCH / MAYA_METAL_ATTN_CHUNK change the slicing, MAYA_METAL_KV_F16=1 / MAYA_METAL_KV_F32=1 the latent cache.
+// Settings (environment): WAM_METAL_CPU=1 runs on ggml-cpu, WAM_METAL_POOL_SLOTS=N shrinks the expert pool (the
+// eviction path), WAM_METAL_UBATCH / WAM_METAL_ATTN_CHUNK change the slicing, WAM_METAL_KV_F16=1 / WAM_METAL_KV_F32=1 the latent cache.
 #include "glm_metal.hpp"
 #include "spec.hpp"
 
@@ -30,7 +30,7 @@
 
 namespace {
 
-using maya::metal::GlmMetal;
+using wam::metal::GlmMetal;
 
 void require(bool ok, const std::string& what) {
     if (!ok) {
@@ -46,18 +46,18 @@ int env(const char* k) {
 
 void load(GlmMetal& m, const std::string& gguf, int64_t ctx, int max_window = 0, bool mtp = false,
           const std::string& dflash = "", bool dsa_matvec = false) {
-    maya::metal::GlmOptions o;
+    wam::metal::GlmOptions o;
     o.max_window = max_window;
     o.mtp = mtp;
     o.dflash = dflash;
-    o.use_gpu = env("MAYA_METAL_CPU") == 0;
-    o.pool_slots = env("MAYA_METAL_POOL_SLOTS");
-    if (env("MAYA_METAL_UBATCH") > 0) o.n_ubatch = env("MAYA_METAL_UBATCH");
-    if (env("MAYA_METAL_ATTN_CHUNK") > 0) o.attn_chunk = env("MAYA_METAL_ATTN_CHUNK");
-    o.kv_f16 = env("MAYA_METAL_KV_F16") != 0;
-    o.kv_f32 = env("MAYA_METAL_KV_F32") != 0;
-    if (const char* v = std::getenv("MAYA_METAL_DSA_MM"); v && *v) o.dsa_mm = std::atoi(v) != 0;
-    if (const char* v = std::getenv("MAYA_METAL_DSA_KERNEL"); v && *v) o.dsa_kernel = std::atoi(v) != 0;
+    o.use_gpu = env("WAM_METAL_CPU") == 0;
+    o.pool_slots = env("WAM_METAL_POOL_SLOTS");
+    if (env("WAM_METAL_UBATCH") > 0) o.n_ubatch = env("WAM_METAL_UBATCH");
+    if (env("WAM_METAL_ATTN_CHUNK") > 0) o.attn_chunk = env("WAM_METAL_ATTN_CHUNK");
+    o.kv_f16 = env("WAM_METAL_KV_F16") != 0;
+    o.kv_f32 = env("WAM_METAL_KV_F32") != 0;
+    if (const char* v = std::getenv("WAM_METAL_DSA_MM"); v && *v) o.dsa_mm = std::atoi(v) != 0;
+    if (const char* v = std::getenv("WAM_METAL_DSA_KERNEL"); v && *v) o.dsa_kernel = std::atoi(v) != 0;
     if (dsa_matvec) o.dsa_mm = false;
     m.set_options(o);
     std::string err;
@@ -207,7 +207,7 @@ int big(const std::string& gguf, const std::string& expect) {
     load(m, gguf, 1024);
     require(m.geometry().n_layers == 45, "the big fixture has 45 layers");
     // (MTP turns on mid-session once a streaming pool grows to hold every expert)
-    require(m.pool_holds_all() == (env("MAYA_METAL_POOL_SLOTS") == 0), "pool_holds_all() disagrees with the pool");
+    require(m.pool_holds_all() == (env("WAM_METAL_POOL_SLOTS") == 0), "pool_holds_all() disagrees with the pool");
     const size_t V = (size_t) m.geometry().n_vocab;
     std::vector<int32_t> tokens;
     for (size_t i = 0; i < T; ++i) tokens.push_back((int32_t) ((i % 511) + 1));
@@ -274,7 +274,7 @@ int mtp(const std::string& gguf, int n_gen) {
         m.reset();
         lg = fwd(m, prompt);
         std::vector<int32_t> got;
-        maya::metal::DecodeHooks h;
+        wam::metal::DecodeHooks h;
         h.pick = [&](const float* l) { return (int32_t) argmax(l, V); };
         h.emit = [&](int32_t t) {
             got.push_back(t);
@@ -283,9 +283,9 @@ int mtp(const std::string& gguf, int n_gen) {
         h.left = [&] { return (int64_t) (n_gen - (int) got.size()); };
         const int32_t y = (int32_t) argmax(lg.data(), V);
         if (!h.emit(y)) continue;
-        setenv("MAYA_GLM_MTP_FIXED", std::to_string(fixed).c_str(), 1);
-        maya::metal::DraftLength len(4);
-        require(maya::metal::decode_mtp(m, y, len, h, err), "decode_mtp: " + err);
+        setenv("WAM_GLM_MTP_FIXED", std::to_string(fixed).c_str(), 1);
+        wam::metal::DraftLength len(4);
+        require(wam::metal::decode_mtp(m, y, len, h, err), "decode_mtp: " + err);
         for (size_t i = 0; i < got.size() && i < ref.size(); ++i)
             if (got[i] != ref[i]) {
                 std::fprintf(stderr, "draft length %d: first difference at token %zu: %d vs %d\n", fixed, i, got[i],
@@ -294,7 +294,7 @@ int mtp(const std::string& gguf, int n_gen) {
             }
         require(got == ref, "MTP decoding differs from plain decoding");
     }
-    unsetenv("MAYA_GLM_MTP_FIXED");
+    unsetenv("WAM_GLM_MTP_FIXED");
     std::printf("metal_model_test mtp: PASS (%d tokens, draft lengths 1, 2, 4)\n", n_gen);
     return 0;
 }
@@ -322,7 +322,7 @@ int dflash(const std::string& gguf, const std::string& drafter, int n_gen) {
         m.reset();
         std::vector<float> lg = fwd(m, prompt);
         std::vector<int32_t> got;
-        maya::metal::DecodeHooks h;
+        wam::metal::DecodeHooks h;
         h.pick = [&](const float* l) { return (int32_t) argmax(l, V); };
         h.emit = [&](int32_t t) {
             got.push_back(t);
@@ -331,10 +331,10 @@ int dflash(const std::string& gguf, const std::string& drafter, int n_gen) {
         h.left = [&] { return (int64_t) (n_gen - (int) got.size()); };
         const int32_t y = (int32_t) argmax(lg.data(), V);
         require(h.emit(y), "n_gen < 2");
-        const maya::metal::Drafter df = [&](int32_t tok, int64_t, int n, std::vector<int32_t>& d, std::string& e) {
+        const wam::metal::Drafter df = [&](int32_t tok, int64_t, int n, std::vector<int32_t>& d, std::string& e) {
             return m.dflash_draft(tok, n, p_min, 0, 0.0f, d, e);
         };
-        require(maya::metal::decode_spec(m, y, m.dflash_block() - 1, df, [&](int n, int acc, double) {
+        require(wam::metal::decode_spec(m, y, m.dflash_block() - 1, df, [&](int n, int acc, double) {
                     drafted += n;
                     accepted += acc;
                 }, h, err),

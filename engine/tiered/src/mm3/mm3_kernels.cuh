@@ -1,4 +1,4 @@
-// src/mm3/mm3_kernels.cuh - maya-mm3's own kernels around the EXL3 matrices (mm3_exl3.hpp): MiniMax-M3.1-Flash's
+// src/mm3/mm3_kernels.cuh - wam-mm3's own kernels around the EXL3 matrices (mm3_exl3.hpp): MiniMax-M3.1-Flash's
 // norms, rotary, MiniMax Sparse Attention (the indexer's block selection and the attention over the kept blocks), the
 // sigmoid router and swigluoai.  The arithmetic follows transformers' modeling_minimax_m3_vl.py, in F32; the KV cache
 // and the indexer's keys are BF16 (vLLM's and transformers' model dtype).
@@ -131,7 +131,7 @@ bool plan_dev(const int* top, const float* w, int T, int K, const unsigned long 
               unsigned long long* plan_ptr, float* plan_w, unsigned* counts, unsigned long long* grp_ptr, int* grp_start,
               int* grp_ent, int* n_groups, cudaStream_t s);
 /// Windows + AMD submit queued GPU work only when the host waits: the stream's queued work started now, without a wait
-/// (cudaStreamQuery).  Elsewhere nothing.  MAYA_MM3_WIN_SUBMIT=0: off.
+/// (cudaStreamQuery).  Elsewhere nothing.  WAM_MM3_WIN_SUBMIT=0: off.
 void submit(cudaStream_t s);
 
 /// h = swigluoai(g, u) = min(g, L) * sigmoid(alpha min(g, L)) * (clamp(u, -L, L) + 1), elementwise over n values; F32

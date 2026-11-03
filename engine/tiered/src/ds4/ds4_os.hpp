@@ -1,4 +1,4 @@
-// src/ds4/ds4_os.hpp - the few OS services maya-ds4 needs, on Linux and on Windows: files read at an offset and
+// src/ds4/ds4_os.hpp - the few OS services wam-ds4 needs, on Linux and on Windows: files read at an offset and
 // mapped read-only (the experts read in place), page-cache hints, anonymous host memory on a NUMA node, thread pinning,
 // each NUMA node's physical cores, the RAM this process can still get.  (On Windows as src/core/expert_source.cpp
 // does it for GLM: no FILE_FLAG_RANDOM_ACCESS - the page cache must keep what it read.)

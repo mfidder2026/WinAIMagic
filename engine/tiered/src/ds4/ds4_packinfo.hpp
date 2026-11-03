@@ -1,4 +1,4 @@
-// src/ds4/ds4_packinfo.hpp - `maya-ds4 --pack-info --pack <dir>`: a pack described from its ds4.txt and tensors.txt
+// src/ds4/ds4_packinfo.hpp - `wam-ds4 --pack-info --pack <dir>`: a pack described from its ds4.txt and tensors.txt
 // alone - no GPU, no weights read, the model's files only looked at (there, and long enough).  Host code only: the
 // kernels' types come in through KernelTypes (ds4_main asks ds4_iq and the EXL3 kernels; tests pass their own).
 #pragma once

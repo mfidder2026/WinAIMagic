@@ -82,17 +82,17 @@ class Sampler(threading.Thread):
 def glm_command(a, log_dir: Path):
     m = Path(a.models) / "glm-5.3-flash-compact-24"
     pack, profile = m / "pack", m / "expert-profile.bin"
-    cfg = {"exe": str(ROOT / "build/tiered-cuda/maya.exe"),
+    cfg = {"exe": str(ROOT / "build/tiered-cuda/wam.exe"),
            "args": ["--glm-pack", str(pack), "--max-context", str(a.context), "--expert-cache", "auto", "--prefill", "auto",
                     "--kv-streaming", "on", "--expert-profile-save", str(profile),
                     *(["--expert-profile", str(profile)] if profile.exists() else []),
                     "--vram-reserve-mib", str(a.reserve)],
            "cwd": str(ROOT / "engine/tiered"), "tokenizer": str(pack / "tokenizer"), "model_name": "glm-5.3-flash-compact-24",
            "gpu": [0], "sampling": {"temperature": 1.0, "top_p": 0.95}, "reasoning_effort": "low", "lib_dirs": [],
-           "port": PORT, "log": str(log_dir / "maya-engine.log"), "env": dict(e.split("=", 1) for e in a.env)}
+           "port": PORT, "log": str(log_dir / "tiered-engine.log"), "env": dict(e.split("=", 1) for e in a.env)}
     path = log_dir / "glm.json"
     path.write_text(json.dumps(cfg, indent=1), encoding="utf-8")
-    return [sys.executable, "-m", "serve.server", "--engine", "maya", "--config", str(path), "--port", str(PORT)], \
+    return [sys.executable, "-m", "serve.server", "--engine", "wam", "--config", str(path), "--port", str(PORT)], \
         ROOT / "engine/tiered"
 
 

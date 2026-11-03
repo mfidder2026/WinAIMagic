@@ -109,7 +109,7 @@ RowsFn pick_rows(int type) {
     if (!on) return nullptr;
     init_once();
     // AVX-512 where cpu_avx512_ok() (VNNI and VBMI: Ice Lake / Zen 4 and later, which run 512-bit integer code at
-    // full clock); on a Skylake-SP Xeon 6152 the AVX-2 rows were 7-13% faster (glm_cpu_bench, Maya-L, 2-16 tokens)
+    // full clock); on a Skylake-SP Xeon 6152 the AVX-2 rows were 7-13% faster (glm_cpu_bench, Wam-L, 2-16 tokens)
     const bool avx512 = cpu_avx512_ok() && std::getenv("STRATA_NO_IQ512") == nullptr;
     const bool avx2 = cpu_avx2_ok() && std::getenv("STRATA_NO_IQ256") == nullptr;
     RowsFn fn = nullptr;
@@ -147,7 +147,7 @@ RowsFn exact_rows(int type) {
 // memory.  iq256_rows1 is ggml's dot with two changes - IQ3_XXS's signs built in registers, IQ3_S's
 // indices in scalar registers - so it is bit-identical to ggml's dot (checked here once, 306 results).  On every AVX-2
 // CPU, like ggml-cpu's own dot (it has no AVX-512 form for these). IQ1_M and IQ2_XS use the same exact AVX2 row backend
-// in both modes, their grid / scale / delta decode kept off the shuffle port (ggml's is bound by it on Broadwell). IQ2_XXS (Maya-S's gate/up) first tries the
+// in both modes, their grid / scale / delta decode kept off the shuffle port (ggml's is bound by it on Broadwell). IQ2_XXS (Wam-S's gate/up) first tries the
 // AVX-512 rows of iq_avx512_one.cpp (VBMI + BMI2: the grid as 2-bit codes in registers, the signs by pdep), checked
 // the same way.  STRATA_GLM_CPU_1T=0 keeps ggml's dot, STRATA_NO_IQ512 the AVX-2 rows.
 RowsFn pick_rows1(int type) {

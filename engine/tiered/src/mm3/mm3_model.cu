@@ -1,4 +1,4 @@
-// src/mm3/mm3_model.cu - maya-mm3's model (mm3_model.hpp): loading, placement over the GPUs, and the forward.
+// src/mm3/mm3_model.cu - wam-mm3's model (mm3_model.hpp): loading, placement over the GPUs, and the forward.
 //
 // A layer's forward, as transformers' MiniMaxM3VLDecoderLayer:
 //   x = rms(h) (1 + w);  q, k, v = x Wq, x Wk, x Wv (EXL3);  per-head RMSNorm, RoPE on 64 of 128 dims;  K, V -> cache
@@ -367,7 +367,7 @@ struct Model::Impl {
     int head_dev = 0;
     // a token's and a verify window's attention: each query's kept blocks in this many runs on blocks of their own,
     // combined in run order (k::sparse_attn's splits - one block a KV group walking all of them left the GPU idle: a
-    // query's sums depend on the splits alone, so a window's rows keep the token path's bits).  MAYA_MM3_ATTN_SPLIT=1:
+    // query's sums depend on the splits alone, so a window's rows keep the token path's bits).  WAM_MM3_ATTN_SPLIT=1:
     // one run (the decode as before)
     int attn_splits = 16;
     std::vector<float> inv_freq;
@@ -417,13 +417,13 @@ struct Model::Impl {
     float* taps = nullptr;           // its context's input: [taps][chunk][dim] F32 (the head's GPU)
     std::vector<int> tap_of;         // layer -> its tap (-1: none)
 
-    // ---- MAYA_MM3_PROF=1 (one GPU): each forward's GPU time by part, from events on the stream - the time between two
+    // ---- WAM_MM3_PROF=1 (one GPU): each forward's GPU time by part, from events on the stream - the time between two
     // marks goes to the second's part (a host wait before it included); printed at the end by kind of forward
     enum { kPAttnIn, kPIxProj, kPIndex, kPIxSel, kPAttn, kPOGemm, kPOut, kPDense, kPRouter, kPRoute, kPSync, kPExperts,
            kPHead, kPDraft, kPN };
     struct Prof {
         bool on = false;
-        bool sync = false;        // (MAYA_MM3_PROF=2: the host waits at each mark and times it - AMD's events may be
+        bool sync = false;        // (WAM_MM3_PROF=2: the host waits at each mark and times it - AMD's events may be
                                   //  stamped as their packet is dispatched, ahead of the kernels before them)
         std::vector<double> ht;
         std::vector<cudaEvent_t> ev;
@@ -592,7 +592,7 @@ struct Model::Impl {
         if (o.cpu_threads >= 0 && !gg_fmt(l.lay.gg_type[0], l.lay.gg_type[1], l.lay.gg_type[2], g.dim, g.ff, l.gf, err)) {
             // (a build without ggml-cpu, or a type it has no dot for: the experts outside VRAM are staged instead)
             info.push_back("NOTE: no CPU lane - layer " + std::to_string(li) + "'s experts: " + err);
-            std::fprintf(stderr, "maya-mm3: %s\n", info.back().c_str());
+            std::fprintf(stderr, "wam-mm3: %s\n", info.back().c_str());
             err.clear();
             o.cpu_threads = -1;
         }
@@ -671,7 +671,7 @@ struct Model::Impl {
             if (s.n[i] > 0) os::drop_mapped(s.p[i], s.n[i]);
     }
 
-    // ---- the CPU lane or a staging copy, by their measured costs (as maya-ds4's PCIe lane): a token's experts that are
+    // ---- the CPU lane or a staging copy, by their measured costs (as wam-ds4's PCIe lane): a token's experts that are
     // neither in VRAM nor in a staging slot are computed on the CPU lane, or - those in the pinned pool - copied into a
     // staging slot and computed by the GPU (the copies run on the GPU's copy engine while the CPU lane computes the
     // others, and the slot keeps the expert for the next tokens).  calibrate_lane times both on this PC at the load:
@@ -685,7 +685,7 @@ struct Model::Impl {
     void lane_retime(int n, double ms) {
         const double c1 = lane_cpu1, add = lane_cpu_add;
         if (!lane_rt.note(n, ms, lane_cpu1, lane_cpu_add)) return;
-        std::fprintf(stderr, "maya-mm3: the CPU lane timed again in decode: an expert %.2f ms (+%.2f ms each more), "
+        std::fprintf(stderr, "wam-mm3: the CPU lane timed again in decode: an expert %.2f ms (+%.2f ms each more), "
                              "planned with %.2f (+%.2f); %.2f ms to copy - 4 such experts: %d staged\n",
                      lane_cpu1, lane_cpu_add, c1, add, lane_copy, lane_split(4));
     }
@@ -1059,7 +1059,7 @@ struct Model::Impl {
         // the layers over the GPUs by what each needs against each GPU's free memory: a layer's dense weights, its routed
         // experts and its caches, the last GPU's room less the output head (and the DSpark draft) - so every GPU keeps
         // about the same share of its memory over (the dense layers hold no experts: by layer count the first GPU kept
-        // GBs free while the others' experts went to the CPU lane).  MAYA_MM3_SPLIT_OLD=1: by layer count and free memory
+        // GBs free while the others' experts went to the CPU lane).  WAM_MM3_SPLIT_OLD=1: by layer count and free memory
         {
             const bool old = ::mm3::env("MM3_SPLIT_OLD") != nullptr;
             std::vector<double> w((size_t) g.n_layers, 1.0), cap(D.size());
@@ -1349,7 +1349,7 @@ struct Model::Impl {
                 if (o.vision_must) return false;
                 info.push_back("NOTE: vision off: the tower did not load on CUDA" +
                                std::to_string(D[(size_t) o.vision_gpu].id) + " (" + err + ") - text only");
-                std::fprintf(stderr, "maya-mm3: %s\n", info.back().c_str());
+                std::fprintf(stderr, "wam-mm3: %s\n", info.back().c_str());
                 err.clear();
                 cudaGetLastError();
                 vis.reset();
@@ -1398,7 +1398,7 @@ struct Model::Impl {
             // only a prompt's and a picture's fallback (nothing is staged: every MoE layer host-free) - a few kept
             // (kMinSlots), the rest of their memory to the experts; and (the reserve not asked for) the GPU keeps
             // half a GB free instead of one - what the load has not taken by now is small (the BLAS's workspace, the
-            // graphs) - or a picture's room more on the vision tower's GPU.  MAYA_MM3_SLOTS_FIT=0: as before
+            // graphs) - or a picture's room more on the vision tower's GPU.  WAM_MM3_SLOTS_FIT=0: as before
             if (d.n_slots > kMinSlots && o.resident_cap < 0) {
                 const char* sv = ::mm3::env("MM3_SLOTS_FIT");
                 size_t all = 0;
@@ -1615,7 +1615,7 @@ struct Model::Impl {
         }
         // host-free layers: a MoE layer with every routed expert in VRAM makes its decode plan on the device (the routing
         // read, the experts' addresses looked up and a window's experts grouped there) - a token or a verify window is
-        // enqueued whole, with no wait for the host between its layers.  MAYA_MM3_HOST_FREE=0: every layer through the
+        // enqueued whole, with no wait for the host between its layers.  WAM_MM3_HOST_FREE=0: every layer through the
         // host as before (the same plan values, so the same tokens either way)
         {
             const char* hv = ::mm3::env("MM3_HOST_FREE");
@@ -2634,7 +2634,7 @@ struct Model::Impl {
     // Only where nothing in the forward needs the host: one GPU, every MoE layer host-free, the token kernels.  A
     // graph is keyed by its tokens, its head rows, the indexer's block count (the one argument that moves with the
     // position: every 128 tokens - a new capture then) and the residual stream's buffer (a prompt's MoE layers swap h
-    // and out: a graph captured before a prompt would read the other one after it).  MAYA_MM3_GRAPH=0: no graphs
+    // and out: a graph captured before a prompt would read the other one after it).  WAM_MM3_GRAPH=0: no graphs
     // (--parallel: the key also holds the bound sequence - its caches are the graph's - and a forward_rows step's
     //  rows' sequences and block counts; graphs are dropped least recently used first, kGraphKeep kept)
     struct GraphEntry {
@@ -2700,7 +2700,7 @@ struct Model::Impl {
                 graph_on = false;
                 info.push_back("NOTE: graphs off: a forward did not capture (" + (err.empty() ? std::string("CUDA") : err) +
                                ") - the kernels launched one by one");
-                std::fprintf(stderr, "maya-mm3: %s\n", info.back().c_str());
+                std::fprintf(stderr, "wam-mm3: %s\n", info.back().c_str());
                 err.clear();
                 return body(false);
             }
@@ -2714,7 +2714,7 @@ struct Model::Impl {
 
     // a forward's residual rows from GPU a's stream to b's (dst on b): b's stream waits on a's work there through an
     // event, the host goes on enqueueing (CUDA; HIP - whose queued work Windows submits only at a host wait - and
-    // MAYA_MM3_HOP_EVENTS=0: the host waits for a's stream first, as before)
+    // WAM_MM3_HOP_EVENTS=0: the host waits for a's stream first, as before)
     bool hop_events = [] {
 #if defined(STRATA_USE_HIP)
         return false;
@@ -2971,7 +2971,7 @@ struct Model::Impl {
         int cur = L[0].dev;
         CK(cudaSetDevice(D[(size_t) cur].id));
         CK(cudaMemcpyAsync(D[(size_t) cur].h, h, (size_t) T * g.dim * 4, cudaMemcpyHostToDevice, D[(size_t) cur].s));
-        pmark(D[(size_t) cur], kPAttnIn);   // (MAYA_MM3_PROF: the forward's start)
+        pmark(D[(size_t) cur], kPAttnIn);   // (WAM_MM3_PROF: the forward's start)
         // a token's or a verify window's rows through the head's GEMV (the same bits for each row), else the prompt's
         // head below
         const bool fast_head = want > 0 && want <= kWin && o.fast_decode;
@@ -3114,10 +3114,10 @@ bool Model::load(const Options& o_in, std::string& err) {
             return false;
         }
         for (const auto& s : skipped)
-            std::fprintf(stderr, "maya-mm3: NOTE: %s left out - compute capability below 7.0 (--gpus to choose)\n",
+            std::fprintf(stderr, "wam-mm3: NOTE: %s left out - compute capability below 7.0 (--gpus to choose)\n",
                          s.c_str());
     }
-    // the prefill calibration of this PC (maya-mm3 --calibrate-prefill, the setup's calibration step): its chunk and
+    // the prefill calibration of this PC (wam-mm3 --calibrate-prefill, the setup's calibration step): its chunk and
     // GEMM backend, where --chunk / --prefill-gemm do not choose; none: the engine's defaults, with a NOTE
     p->tkey = tune_key_of(o.gpus);
     p->tfile = o.prefill_tune.empty() ? o.pack + "/prefill-tune.txt" : o.prefill_tune;
@@ -3172,8 +3172,8 @@ bool Model::load(const Options& o_in, std::string& err) {
     }
 #if defined(_WIN32)
     // Windows: the tensor-parallel path's host waits on the GPUs' counters depend on its launches being submitted as
-    // they are enqueued, which the WDDM driver batches - the layer split there (MAYA_MM3_TP_WINDOWS=1: try it anyway)
-    if (o.tp > 0 && !(std::getenv("MAYA_MM3_TP_WINDOWS") && std::atoi(std::getenv("MAYA_MM3_TP_WINDOWS")) != 0)) {
+    // they are enqueued, which the WDDM driver batches - the layer split there (WAM_MM3_TP_WINDOWS=1: try it anyway)
+    if (o.tp > 0 && !(std::getenv("WAM_MM3_TP_WINDOWS") && std::atoi(std::getenv("WAM_MM3_TP_WINDOWS")) != 0)) {
         Options o2 = o;
         o2.tp = 0;
         const bool ok = p->load(o2, err);
@@ -3192,7 +3192,7 @@ bool Model::load(const Options& o_in, std::string& err) {
         Options o2 = o;
         o2.tp = 0;
         err.clear();
-        std::fprintf(stderr, "maya-mm3: --tp %d did not load (%s): the layer split instead\n", o.tp, why.c_str());
+        std::fprintf(stderr, "wam-mm3: --tp %d did not load (%s): the layer split instead\n", o.tp, why.c_str());
         if (!p->load(o2, err)) {
             err = "--tp " + std::to_string(o.tp) + ": " + why + "; the layer split: " + err;
             return false;
@@ -3206,7 +3206,7 @@ bool Model::load(const Options& o_in, std::string& err) {
         p->info.push_back("prefill: this PC's calibration (" + p->tfile + "): chunk " + std::to_string(p->o.chunk) +
                           (p->gguf ? std::string(", ") + (gg::gemm_backend() == 1 ? "hipBLASLt" : "BLAS") + " GEMMs" : ""));
     else if (o.tune && o.tp <= 0)
-        p->info.push_back("NOTE: prefill not calibrated on this PC (./maya.sh --calibrate measures it): chunk " +
+        p->info.push_back("NOTE: prefill not calibrated on this PC (./wam.sh --calibrate measures it): chunk " +
                           std::to_string(p->o.chunk) +
                           (other_calibration ? std::string("; ") + p->tfile + " holds a calibration of other GPUs, "
                                                "another GPU list or another runtime / driver: run it again for this setup"

@@ -1,4 +1,4 @@
-// src/mm3/mm3_model.hpp - maya-mm3: MiniMax-M3.1-Flash (EXL3) on the GPUs.
+// src/mm3/mm3_model.hpp - wam-mm3: MiniMax-M3.1-Flash (EXL3) on the GPUs.
 //
 // The layers split over the GPUs by their memory, each GPU holding its layers' dense matrices, KV cache (BF16
 // [ctx][4][128] K and V) and index-key cache (BF16 [ctx][128]), then as many of its layers' routed experts as fit
@@ -159,7 +159,7 @@ public:
     std::vector<std::string> info_lines() const;
     /// The Monitor's map of each GPU (serve/gpu_map.py's VRAM lines): what each part holds there, measured at the load.
     std::vector<std::string> vram_lines() const;
-    /// The prefill calibration (maya-mm3 --calibrate-prefill): the prompt chunk a forward takes (at most the chunk the
+    /// The prefill calibration (wam-mm3 --calibrate-prefill): the prompt chunk a forward takes (at most the chunk the
     /// load sized its buffers for: chunk_max) and the prompt path's GEMM backend, changed between forwards.
     int chunk() const;
     int chunk_max() const;

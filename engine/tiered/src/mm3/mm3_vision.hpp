@@ -1,4 +1,4 @@
-// maya-mm3: MiniMax-M3.1-Flash's vision tower - a picture's pixels -> the rows its image tokens carry
+// wam-mm3: MiniMax-M3.1-Flash's vision tower - a picture's pixels -> the rows its image tokens carry
 //
 // The CLIP-style tower (a Conv3d patch embedding over 2 x 14 x 14 patches, pre-LayerNorm, 32 pre-LN encoder layers
 // of 1280 with 16 heads of 80 and 3D RoPE over 78 of their dims, exact-GELU MLPs of 5120) and the projector (per

@@ -1,5 +1,5 @@
 // The devices of a GLM layer split beside an expert helper (glm_split_devices): the helper's device left out of the
-// default list, a named list (MAYA_GLM_DEVS) refused when it names the helper or repeats a device, pinned boundaries
+// default list, a named list (WAM_GLM_DEVS) refused when it names the helper or repeats a device, pinned boundaries
 // taking the first n + 1 devices beside the helper, `auto` taking up to the part limit - and no helper: the lists as
 // before.  Host only, no GPU.
 #include "strata/core/glm_split_devices.hpp"

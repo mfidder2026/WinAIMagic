@@ -2,7 +2,7 @@
 
     python tools/ds4/pack.py --model ~/models/DSV4
 
-writes <model>/maya-ds4/:
+writes <model>/wam-ds4/:
   ds4.txt       the geometry, `key value` lines (lists comma-separated), from config.json's text_config (and its
                 vision_config as vision.<key>, image_token_id)
   tensors.txt   every tensor of the directory's safetensors (the index's 43 shards and the base repo's Engram shards
@@ -162,17 +162,17 @@ def check_k_map(model: pathlib.Path, st: SafeTensors) -> int | None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True)
-    ap.add_argument("--out", help="default: <model>/maya-ds4")
+    ap.add_argument("--out", help="default: <model>/wam-ds4")
     a = ap.parse_args()
     model = pathlib.Path(a.model).expanduser().resolve()
-    out = pathlib.Path(a.out).expanduser() if a.out else model / "maya-ds4"
+    out = pathlib.Path(a.out).expanduser() if a.out else model / "wam-ds4"
     cfg = json.loads((model / "config.json").read_text())
     t = cfg["text_config"]
     q = cfg.get("quantization_config", {})
     if q.get("quant_method") != "exl3":
         raise SystemExit("%s: not an EXL3 model (quant_method %r)" % (model, q.get("quant_method")))
     st = SafeTensors(model)
-    dense = model / "maya-dense-bf16.safetensors"   # (fp8_dense.py: the FP8 dense weights as BF16, in their place)
+    dense = model / "wam-dense-bf16.safetensors"   # (fp8_dense.py: the FP8 dense weights as BF16, in their place)
     if dense.is_file():
         with dense.open("rb") as f:
             n = struct.unpack("<Q", f.read(8))[0]

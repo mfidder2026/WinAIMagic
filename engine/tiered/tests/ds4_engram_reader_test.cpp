@@ -1,4 +1,4 @@
-// maya-ds4's Engram reader (src/ds4/ds4_engram_io.hpp): a batch read ahead (submit low) waits behind the others - a
+// wam-ds4's Engram reader (src/ds4/ds4_engram_io.hpp): a batch read ahead (submit low) waits behind the others - a
 // prompt's next part's rows behind the decode's - and every read gives the file's bytes either way.  A file in the
 // temp folder, the reader's own threads; no model, no GPU.
 #ifdef NDEBUG
@@ -45,7 +45,7 @@ bool same(const EgBatch& b) {
 }  // namespace
 
 int main() {
-    char name[] = "/tmp/maya-engram-reader-XXXXXX";
+    char name[] = "/tmp/wam-engram-reader-XXXXXX";
     const int fd = mkstemp(name);
     assert(fd >= 0);
     close(fd);

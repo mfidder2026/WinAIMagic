@@ -1,23 +1,23 @@
-"""Tune maya-mm3 for this PC: --tp (the layer split, or tensor parallel in groups of 1, 2 or 4 equal GPUs) and the CPU
+"""Tune wam-mm3 for this PC: --tp (the layer split, or tensor parallel in groups of 1, 2 or 4 equal GPUs) and the CPU
 lane's --cpu-threads, measured with whole engine starts - tools/calibrate_ds4_tp.py's sweep (its prompts, warm-up,
-long-prompt floor, MIN_GAIN and confirmation start) on a maya-mm3.json config.
+long-prompt floor, MIN_GAIN and confirmation start) on a wam-mm3.json config.
 
 What differs from DeepSeek's:
-  - maya-mm3's own default is the layer split (--tp 0: no flag), so that is the baseline every other setting must beat;
+  - wam-mm3's own default is the layer split (--tp 0: no flag), so that is the baseline every other setting must beat;
   - the tensor-parallel groups split MiniMax-M3.1's 4 KV heads, so --tp 1, 2 or 4 (and only up to the longest run of
     equal GPUs); one GPU: nothing to choose there;
   - on Windows the tensor-parallel path is not tried (the engine refuses it there: its host waits and the WDDM
     driver's batched submission).
 
 --dspark: whether the DSpark drafter pays on this PC (tools/calibrate_ds4.py's measure: the config without the drafter
-- --dspark none - and with it, the same questions; kept only when it wins by more than its MIN_GAIN); maya-mm3 takes
---dspark none / off / on and --expert-profile as maya-ds4 does, so the measure is DeepSeek's as it is.
+- --dspark none - and with it, the same questions; kept only when it wins by more than its MIN_GAIN); wam-mm3 takes
+--dspark none / off / on and --expert-profile as wam-ds4 does, so the measure is DeepSeek's as it is.
 
-The result goes into the config's args (the caller - ./maya.sh --calibrate - writes it); the engine's own choice is
+The result goes into the config's args (the caller - ./wam.sh --calibrate - writes it); the engine's own choice is
 left as no flag.
 
-    python tools/mm3/calibrate.py maya-mm3.json            # --tp and --cpu-threads: measure and print
-    python tools/mm3/calibrate.py --dspark maya-mm3.json   # the DSpark drafter or none
+    python tools/mm3/calibrate.py wam-mm3.json            # --tp and --cpu-threads: measure and print
+    python tools/mm3/calibrate.py --dspark wam-mm3.json   # the DSpark drafter or none
 """
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def tp_candidates(vram: list[float]) -> list[int]:
 
 
 def run(cfg: dict, vram: list[float], say=print, start_engine=None) -> dict:
-    """calibrate_ds4_tp.run with maya-mm3's candidates and baseline; {"args": {flag: value or None}, "report": ...}."""
+    """calibrate_ds4_tp.run with wam-mm3's candidates and baseline; {"args": {flag: value or None}, "report": ...}."""
     args = list(cfg.get("args") or [])
     if C.arg(args, "--tp") is None:
         args += ["--tp", "0"]           # (the engine's default spelled out: the sweep's baseline)
@@ -68,7 +68,7 @@ def run(cfg: dict, vram: list[float], say=print, start_engine=None) -> dict:
 
 
 def dspark(cfg: dict, say=print, start_engine=None) -> dict:
-    """calibrate_ds4.run on a maya-mm3 config: {"none": ..., "dspark": ..., "keep": "dspark" or "none", "gain": ...}."""
+    """calibrate_ds4.run on a wam-mm3 config: {"none": ..., "dspark": ..., "keep": "dspark" or "none", "gain": ...}."""
     import calibrate_ds4 as CDS
     return CDS.run(cfg, say=say, start_engine=start_engine)
 
@@ -78,7 +78,7 @@ if __name__ == "__main__":
         print(json.dumps(dspark(json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))), indent=1))
         sys.exit(0)
     if len(sys.argv) != 2:
-        sys.exit("usage: tools/mm3/calibrate.py [--dspark] <maya-mm3.json>")
+        sys.exit("usage: tools/mm3/calibrate.py [--dspark] <wam-mm3.json>")
     import setup as S
     c = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     found = {g["index"]: g for g in S.gpus() or []}

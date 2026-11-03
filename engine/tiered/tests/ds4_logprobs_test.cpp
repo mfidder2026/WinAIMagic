@@ -1,4 +1,4 @@
-// maya-ds4 --serve's log-probabilities (src/ds4/ds4_logprobs.hpp): the host reference against a plain log-softmax in
+// wam-ds4 --serve's log-probabilities (src/ds4/ds4_logprobs.hpp): the host reference against a plain log-softmax in
 // double, the penalties as the sampler applies them, the order of the top list (ties: the lower id), the rows a draw
 // can never pick left out; the kernel's own pieces (LpStride, lse_merge) run as its threads run them, against the
 // reference; and the protocol's LP line.  No GPU, no model: rows are made up here.

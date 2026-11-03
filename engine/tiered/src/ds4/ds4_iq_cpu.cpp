@@ -1,6 +1,6 @@
 // src/ds4/ds4_iq_cpu.cpp - a GGUF's low-bit experts on the CPU lane (see ds4_gguf_cpu.hpp): the GLM CPU lane's native
-// experts (src/kernels/cpu/native_expert.cpp), whose arithmetic is ggml-cpu's - and for IQ3_XXS / IQ3_S (Maya-S's
-// down, Maya-M's gate / up / down) rows of our own, the same numbers bit for bit, faster.
+// experts (src/kernels/cpu/native_expert.cpp), whose arithmetic is ggml-cpu's - and for IQ3_XXS / IQ3_S (Wam-S's
+// down, Wam-M's gate / up / down) rows of our own, the same numbers bit for bit, faster.
 #include "ds4_gguf_cpu.hpp"
 #include "ds4_cpu_prepare_rows.hpp"
 
@@ -403,7 +403,7 @@ inline float mul_exact(float a, float b) {   // a * b rounded on its own (never 
     return p;
 }
 
-// IQ1_S (Maya-XS's experts) rows [r0, r1) of NT tokens: ggml_vec_dot_iq1_s_q8_K's AVX2 branch with each block's grid,
+// IQ1_S (Wam-XS's experts) rows [r0, r1) of NT tokens: ggml_vec_dot_iq1_s_q8_K's AVX2 branch with each block's grid,
 // scales and delta signs decoded once for all the tokens (ggml decodes them again for every token).  The int32 sums
 // are the same; the float steps are ggml's: d = y.d * x.d, the 8 lanes by FMA, then g_iq1_fma's two
 #if defined(IQ_X86) && (defined(__GNUC__) || defined(__clang__))

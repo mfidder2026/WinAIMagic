@@ -4,7 +4,7 @@
 // mtmd library and the model's mmproj file (vision encoder + projector).  The engine does the rest: it places the
 // rows at the image's pad tokens and gives them their 2-D M-RoPE positions (see --serve GENI in generate.cpp).
 //
-//   maya-vision --mmproj <mmproj.gguf> --model <text model .gguf, first split> [--gpu] [--threads N]
+//   wam-vision --mmproj <mmproj.gguf> --model <text model .gguf, first split> [--gpu] [--threads N]
 //                 [--max-tokens N] [--no-flash-attn] [--no-warmup] [--measure]
 //
 // --measure: load, warm up at the largest picture, print "MEM <bytes> <base> <total>" and end - the GPU memory this
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
         else { std::fprintf(stderr, "unknown argument %s\n", a.c_str()); return 2; }
     }
     if (mmproj.empty() || model.empty()) {
-        std::fprintf(stderr, "usage: maya-vision --mmproj <mmproj.gguf> --model <model.gguf> [--gpu] [--threads N] "
+        std::fprintf(stderr, "usage: wam-vision --mmproj <mmproj.gguf> --model <model.gguf> [--gpu] [--threads N] "
                              "[--max-tokens N]\n");
         return 2;
     }
@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
                     warm_tokens = (int) mtmd_input_chunk_get_n_tokens(ch);
             }
         }
-        std::fprintf(stderr, "maya-vision: warmed up at %d image tokens\n", warm_tokens);
+        std::fprintf(stderr, "wam-vision: warmed up at %d image tokens\n", warm_tokens);
         mtmd_input_chunks_free(chunks);
         if (bm) mtmd_bitmap_free(bm);
         // --measure without the picture's work buffers would report the weights alone, and the engine would lend

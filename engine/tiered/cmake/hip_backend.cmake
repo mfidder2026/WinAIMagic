@@ -2,9 +2,9 @@
 # workgroup, a signed dot4 instruction). CMake/compiler discovery stays machine-independent; pass CMAKE_HIP_COMPILER when it
 # is not on PATH.
 if(NOT DEFINED CMAKE_HIP_ARCHITECTURES OR CMAKE_HIP_ARCHITECTURES STREQUAL "")
-  set(CMAKE_HIP_ARCHITECTURES gfx1100 CACHE STRING "Maya HIP target architecture(s), e.g. gfx1100 or gfx1100;gfx1201")
+  set(CMAKE_HIP_ARCHITECTURES gfx1100 CACHE STRING "Wam HIP target architecture(s), e.g. gfx1100 or gfx1100;gfx1201")
 endif()
-# The following architecture classifications describe upstream Strata, not Maya model validation.
+# The following architecture classifications describe upstream Strata, not Wam model validation.
 # Validated on real cards: gfx1100 (RX 7900 XT / XTX) and gfx1201 (RX 9070 / 9070 XT, Radeon AI PRO R9700) by the
 # maintainers; gfx1101 (RX 7800 XT, #254) and gfx1200 (RX 9060 XT, #256) by their owners. gfx1102 (RX 7600) has the
 # same LDS limit and dot4 instruction and passed ctest (#192), but no model run has been reported yet. RDNA2 gfx1030 (RX 6800 / 6900) has the
@@ -33,14 +33,14 @@ foreach(_arch IN LISTS _strata_hip_norm)
   string(REGEX REPLACE ":.*$" "" _base "${_arch}")      # gfx1100:xnack- -> gfx1100
   if(_base IN_LIST _strata_hip_validated)
   elseif(_base IN_LIST _strata_hip_community)
-    message(STATUS "Maya HIP: ${_base} was validated by community reports (docs/AMD_MAYA.md)")
+    message(STATUS "Wam HIP: ${_base} was validated by community reports (docs/AMD_WAM.md)")
   elseif(_base IN_LIST _strata_hip_unvalidated)
-    message(WARNING "Maya HIP: ${_base} builds, but it is not validated on a real card yet; please report results")
+    message(WARNING "Wam HIP: ${_base} builds, but it is not validated on a real card yet; please report results")
   elseif(_base IN_LIST _strata_hip_wave64)
-    message(STATUS "Maya HIP: ${_base} is a wave64 CDNA card running through the half-wavefront compat layer (experimental)")
+    message(STATUS "Wam HIP: ${_base} is a wave64 CDNA card running through the half-wavefront compat layer (experimental)")
   else()
     message(FATAL_ERROR
-      "Maya's HIP build supports wave32 gfx1100, gfx1101, gfx1151, gfx1200 and gfx1201 (unvalidated: ${_strata_hip_unvalidated}; "
+      "Wam's HIP build supports wave32 gfx1100, gfx1101, gfx1151, gfx1200 and gfx1201 (unvalidated: ${_strata_hip_unvalidated}; "
       "wave64: ${_strata_hip_wave64}); "
       "CMAKE_HIP_ARCHITECTURES is '${CMAKE_HIP_ARCHITECTURES}'")
   endif()
@@ -56,7 +56,7 @@ foreach(_a IN LISTS STRATA_HIP_ARCH_LIST)
   endif()
 endforeach()
 if(NOT STRATA_HIP_ARCH_LIST)
-  message(FATAL_ERROR "Maya HIP: CMAKE_HIP_ARCHITECTURES is empty")
+  message(FATAL_ERROR "Wam HIP: CMAKE_HIP_ARCHITECTURES is empty")
 endif()
 # gfx942 and gfx950 have packed FP32 instructions (v_pk_fma_f32, v_pk_mul_f32): with clang's default -ffp-contract=fast the SLP
 # vectorizer pairs a multi-activation GEMV's columns and fuses their multiply-adds differently from the one-activation
@@ -69,7 +69,7 @@ foreach(_a IN LISTS STRATA_HIP_ARCH_LIST)
   endif()
 endforeach()
 # Normalize the actual compiler list as well as the validation list.
-set(CMAKE_HIP_ARCHITECTURES "${_strata_hip_norm}" CACHE STRING "Maya HIP target architecture(s)" FORCE)
+set(CMAKE_HIP_ARCHITECTURES "${_strata_hip_norm}" CACHE STRING "Wam HIP target architecture(s)" FORCE)
 # The compiled architectures reach the runtime device check (src/core/device.cu) as "gfx1100,gfx1201": a binary
 # carried to a card it has no code for stops at startup with a clear message instead of "invalid device function".
 string(REPLACE ";" "," STRATA_HIP_ARCHS "${STRATA_HIP_ARCH_LIST}")
@@ -95,7 +95,7 @@ enable_language(HIP)
 string(STRIP "${CMAKE_HIP_FLAGS_RELEASE}" _strata_hip_rel)
 if(_strata_hip_rel STREQUAL "")
   set(CMAKE_HIP_FLAGS_RELEASE "-O3 -DNDEBUG")
-  message(STATUS "Maya: CMAKE_HIP_FLAGS_RELEASE was empty; using -O3 -DNDEBUG")
+  message(STATUS "Wam: CMAKE_HIP_FLAGS_RELEASE was empty; using -O3 -DNDEBUG")
 endif()
 find_package(hip CONFIG REQUIRED)
 find_package(hipblas CONFIG REQUIRED)
@@ -111,7 +111,7 @@ if(TARGET roc::hipblaslt)
   set(STRATA_HIPBLASLT_AVAILABLE ON)
 else()
   set(STRATA_HIPBLASLT_AVAILABLE OFF)
-  message(STATUS "Maya: hipBLASLt not found; solution-table dispatch is unavailable")
+  message(STATUS "Wam: hipBLASLt not found; solution-table dispatch is unavailable")
 endif()
 
 # HIP's link step produces a PIE; make Strata and ggml objects PIC for the ROCm linker.

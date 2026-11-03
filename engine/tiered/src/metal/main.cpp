@@ -1,7 +1,7 @@
-// src/metal/main.cpp - maya-metal: GLM-5.3-Flash on Apple Silicon.
+// src/metal/main.cpp - wam-metal: GLM-5.3-Flash on Apple Silicon.
 //
-//   maya-metal --gguf MODEL.gguf --serve [--max-context N] ...   the engine `maya.py` / serve/server.py drive
-//   maya-metal --gguf MODEL.gguf --ids 1,2,3 [--n 64]            greedy continuation of token ids, with timings
+//   wam-metal --gguf MODEL.gguf --serve [--max-context N] ...   the engine `wam.py` / serve/server.py drive
+//   wam-metal --gguf MODEL.gguf --ids 1,2,3 [--n 64]            greedy continuation of token ids, with timings
 #include "glm_metal.hpp"
 #include "spec.hpp"
 
@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace maya::metal {
+namespace wam::metal {
 int serve(GlmMetal& model, const std::vector<std::string>& args);
 int mtp_draft_cap();
 }
@@ -21,7 +21,7 @@ namespace {
 
 void usage() {
     std::fprintf(stderr,
-                 "usage: maya-metal --gguf MODEL.gguf [--serve | --ids 1,2,3 [--n N]]\n"
+                 "usage: wam-metal --gguf MODEL.gguf [--serve | --ids 1,2,3 [--n N]]\n"
                  "  --max-context N      tokens the KV cache holds (default 32768)\n"
                  "  --ubatch N           prompt tokens per slice (default 2048)\n"
                  "  --expert-gb X        unified memory for the routed-expert pool (default: what the GPU's\n"
@@ -31,7 +31,7 @@ void usage() {
                  "  --expert-profile-save F  this Mac's learned profile: read instead when it exists, rewritten after\n"
                  "                       each request\n"
                  "  --kv-f16             MLA latent cache in F16 (half the bytes; default F32, F16 on the GPU)\n"
-                 "  --kv-f32             keep the MLA latent cache F32 on the GPU too (MAYA_METAL_KV_F32=1)\n"
+                 "  --kv-f32             keep the MLA latent cache F32 on the GPU too (WAM_METAL_KV_F32=1)\n"
                  "  --no-mtp             no MTP drafting (the NextN block is not loaded)\n"
                  "  --dflash F           draft with this DFlash2 drafter GGUF instead of the NextN block\n"
                  "  --cpu                run on ggml-cpu instead of the GPU (reference runs)\n");
@@ -56,17 +56,17 @@ int main(int argc, char** argv) {
     bool serve = false;
     std::vector<int32_t> ids;
     int n_gen = 32;
-    maya::metal::GlmOptions o;
-    o.mtp = std::getenv("MAYA_GLM_NO_MTP") == nullptr && std::getenv("MAYA_GLM_NO_SPEC") == nullptr;
-    if (const char* v = std::getenv("MAYA_METAL_DSA_MM"); v && *v) o.dsa_mm = std::atoi(v) != 0;
-    if (const char* v = std::getenv("MAYA_METAL_DSA_KERNEL"); v && *v) o.dsa_kernel = std::atoi(v) != 0;
-    if (const char* v = std::getenv("MAYA_METAL_KV_F32"); v && *v) o.kv_f32 = std::atoi(v) != 0;
+    wam::metal::GlmOptions o;
+    o.mtp = std::getenv("WAM_GLM_NO_MTP") == nullptr && std::getenv("WAM_GLM_NO_SPEC") == nullptr;
+    if (const char* v = std::getenv("WAM_METAL_DSA_MM"); v && *v) o.dsa_mm = std::atoi(v) != 0;
+    if (const char* v = std::getenv("WAM_METAL_DSA_KERNEL"); v && *v) o.dsa_kernel = std::atoi(v) != 0;
+    if (const char* v = std::getenv("WAM_METAL_KV_F32"); v && *v) o.kv_f32 = std::atoi(v) != 0;
     std::vector<std::string> rest;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
         auto next = [&]() -> const char* {
             if (i + 1 >= argc) {
-                std::fprintf(stderr, "maya-metal: %s needs a value\n", a.c_str());
+                std::fprintf(stderr, "wam-metal: %s needs a value\n", a.c_str());
                 std::exit(2);
             }
             return argv[++i];
@@ -102,25 +102,25 @@ int main(int argc, char** argv) {
         return 2;
     }
     if (!o.dflash.empty()) o.mtp = false;   // as the CUDA engine: a DFlash2 drafter replaces the NextN block
-    if (o.mtp) o.max_window = std::max(o.max_window, maya::metal::mtp_draft_cap() + 1);
+    if (o.mtp) o.max_window = std::max(o.max_window, wam::metal::mtp_draft_cap() + 1);
     if (!o.dflash.empty()) o.max_window = std::max(o.max_window, 16);
-    maya::metal::GlmMetal model;
+    wam::metal::GlmMetal model;
     model.set_options(o);
     std::string err;
     const auto t0 = std::chrono::steady_clock::now();
     if (!model.load(gguf, max_ctx, err)) {
-        std::fprintf(stderr, "maya-metal: %s\n", err.c_str());
+        std::fprintf(stderr, "wam-metal: %s\n", err.c_str());
         return 1;
     }
     const double load_s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    std::fprintf(stderr, "maya-metal: loaded in %.1f s: %s\n", load_s, model.describe().c_str());
-    if (serve) return maya::metal::serve(model, rest);
+    std::fprintf(stderr, "wam-metal: loaded in %.1f s: %s\n", load_s, model.describe().c_str());
+    if (serve) return wam::metal::serve(model, rest);
 
     if (ids.empty()) ids = {1};
     std::vector<float> logits;
     auto t1 = std::chrono::steady_clock::now();
     if (!model.forward(ids, logits, err)) {
-        std::fprintf(stderr, "maya-metal: %s\n", err.c_str());
+        std::fprintf(stderr, "wam-metal: %s\n", err.c_str());
         return 1;
     }
     const double pp = std::chrono::duration<double>(std::chrono::steady_clock::now() - t1).count();
@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
             if (l[v] > l[(size_t) best]) best = (int32_t) v;
         return best;
     };
-    maya::metal::DecodeHooks hk;   // greedy, n_gen tokens
+    wam::metal::DecodeHooks hk;   // greedy, n_gen tokens
     hk.pick = argmax;
     hk.emit = [&](int32_t t) {
         out.push_back(t);
@@ -152,14 +152,14 @@ int main(int argc, char** argv) {
     const int32_t y = argmax(logits.data());
     if (hk.emit(y)) {
         if (model.has_dflash()) {
-            const maya::metal::Drafter df = [&](int32_t tok, int64_t, int n, std::vector<int32_t>& d, std::string& e) {
+            const wam::metal::Drafter df = [&](int32_t tok, int64_t, int n, std::vector<int32_t>& d, std::string& e) {
                 return model.dflash_draft(tok, n, 0.95f, 0, 0.0f, d, e);
             };
-            ok = maya::metal::decode_spec(model, y, model.dflash_block() - 1, df, tally, hk, err);
+            ok = wam::metal::decode_spec(model, y, model.dflash_block() - 1, df, tally, hk, err);
         } else if (model.has_mtp()) {
-            maya::metal::DraftLength len(maya::metal::mtp_draft_cap());
+            wam::metal::DraftLength len(wam::metal::mtp_draft_cap());
             int chosen = 0;
-            const maya::metal::Drafter mtp = [&](int32_t tok, int64_t p0, int n, std::vector<int32_t>& d, std::string& e) {
+            const wam::metal::Drafter mtp = [&](int32_t tok, int64_t p0, int n, std::vector<int32_t>& d, std::string& e) {
                 chosen = model.mtp_hidden_pos() == p0 - 1 ? std::min(len.choose(), n) : 0;
                 for (int i = 0; i < chosen; ++i) {
                     int32_t x = 0;
@@ -168,7 +168,7 @@ int main(int argc, char** argv) {
                 }
                 return true;
             };
-            ok = maya::metal::decode_spec(model, y, 15, mtp, [&](int n, int acc, double ms) {
+            ok = wam::metal::decode_spec(model, y, 15, mtp, [&](int n, int acc, double ms) {
                 tally(n, acc, ms);
                 len.record(chosen, std::min(acc, n), ms);
             }, hk, err);
@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
         }
     }
     if (!ok) {
-        std::fprintf(stderr, "maya-metal: %s\n", err.c_str());
+        std::fprintf(stderr, "wam-metal: %s\n", err.c_str());
         return 1;
     }
     const double tg = std::chrono::duration<double>(std::chrono::steady_clock::now() - t1).count();

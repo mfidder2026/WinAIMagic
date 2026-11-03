@@ -35,7 +35,7 @@ static void check_ram_plan() {
     assert(slots[0] == 267);
     assert(!ram_class_plan(266 * 16, {16}, {288 - main}, {300}, slots));
 
-    // Geometry from the Windows Maya-L experiment; this tests the planner, not
+    // Geometry from the Windows Wam-L experiment; this tests the planner, not
     // a claim that these budgets are available on every Windows system.
     const std::vector<size_t> stride{12976128, 11665408};
     const uint64_t measured_budget = 135674292224ull;

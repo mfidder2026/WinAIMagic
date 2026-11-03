@@ -15,7 +15,7 @@ from gguf import quants
 gdir, hpath, outpath, idspath = sys.argv[1:5]
 NPOS = int(sys.argv[5]) if len(sys.argv) > 5 else 300
 ORDER = sys.argv[6] if len(sys.argv) > 6 else "eh"      # concat order: "eh" = [enorm(emb), hnorm(h)], "he" = swapped
-CACHE = os.path.expanduser("~/maya/mtp_cache")
+CACHE = os.path.expanduser("~/wam/mtp_cache")
 os.makedirs(CACHE, exist_ok=True)
 
 readers = [gguf.GGUFReader(p) for p in sorted(glob.glob(os.path.join(gdir, "*.gguf")))]

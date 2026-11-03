@@ -220,7 +220,7 @@ void dsa_select_all(int n_vis, int kpool, int n_sel, int pos, int* cells, cudaSt
 /// Absorbed MLA for one token, per head: q_abs = wk_b_h . q_h, scores over the selected latents,
 /// softmax, ctx, out_h = wv_b_h . ctx; writes the q8_1 of the n_head * v_head output.
 /// lat_q8: the cache holds INT8 latent records (see lat8_rec_bytes), else FP16 rows of kv_lora.
-/// marks (the stage profiler, MAYA_GLM_PROF): called after each step it launched with that step's name -
+/// marks (the stage profiler, WAM_GLM_PROF): called after each step it launched with that step's name -
 /// "mla_q_abs", "mla_attend", "mla_out", or "mla" for the one-kernel form; nullptr: none.  Launches unchanged.
 struct MlaMarks {
     void (*fn)(void* ctx, const char* name);

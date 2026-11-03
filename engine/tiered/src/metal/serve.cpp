@@ -1,5 +1,5 @@
-// src/metal/serve.cpp - maya-metal --serve: the GLM engine's stdin/stdout protocol (src/program/generate.cpp's serve
-// loop, one conversation at a time), so serve/server.py drives maya-metal exactly as it drives maya.
+// src/metal/serve.cpp - wam-metal --serve: the GLM engine's stdin/stdout protocol (src/program/generate.cpp's serve
+// loop, one conversation at a time), so serve/server.py drives wam-metal exactly as it drives wam.
 //
 //   in:  GEN <max_new> [key=value ...] <id,id,...>   STOP   PAUSE [keep]   WRAP   QUIT
 //   out: INFO ... / READY <ctx> stop, then per request PP ..., T <id> ..., DONE ... (or ERR ...)
@@ -31,7 +31,7 @@
 #include <utility>
 #include <vector>
 
-namespace maya::metal {
+namespace wam::metal {
 
 int mtp_draft_cap();
 
@@ -39,7 +39,7 @@ namespace {
 
 constexpr int32_t kEos[] = {154820, 154827, 154829};
 constexpr int32_t kArgValue = 154849, kArgValueEnd = 154850, kUser = 154827;
-constexpr int32_t kImageToken = 154854;   // <|image|>: one per image row maya-vision encoded
+constexpr int32_t kImageToken = 154854;   // <|image|>: one per image row wam-vision encoded
 
 int env_int(const char* k, int def) {
     const char* v = std::getenv(k);
@@ -109,11 +109,11 @@ struct Server {
     Input in;
     std::vector<int32_t> cached;      // the previous prompt less its last token: what the snapshot holds
     uint64_t cached_img = 0;          // the images inside it (positions and rows, hashed)
-    const int loop_w_think = env_int("MAYA_GLM_LOOP_THINK", 256);
-    const int loop_w_answer = env_int("MAYA_GLM_LOOP_ANSWER", 1024);
+    const int loop_w_think = env_int("WAM_GLM_LOOP_THINK", 256);
+    const int loop_w_answer = env_int("WAM_GLM_LOOP_ANSWER", 1024);
     int chunk = 512;                            // prompt tokens a forward() takes: the engine's slice (serve())
-    bool mtp = false;                           // the NextN block drafts (has_mtp(), not MAYA_GLM_NO_MTP)
-    bool mtp_auto = false;                      // mtp follows the pool (no MAYA_GLM_MTP_DECODE, MTP allowed)
+    bool mtp = false;                           // the NextN block drafts (has_mtp(), not WAM_GLM_NO_MTP)
+    bool mtp_auto = false;                      // mtp follows the pool (no WAM_GLM_MTP_DECODE, MTP allowed)
     std::unique_ptr<DraftLength> mtp_len;       // kept across requests: what drafts were worth on this machine
 
     // the request's images, for the prefix check (generate.cpp's img_hash): FNV-1a over the rows and positions
@@ -231,7 +231,7 @@ struct Server {
             }
         }
         if (!ok || prompt.empty()) return err("malformed GEN line");
-        // GENI: maya-vision's rows ("SVE1" records, n_embd floats each) take the <|image|> tokens' places
+        // GENI: wam-vision's rows ("SVE1" records, n_embd floats each) take the <|image|> tokens' places
         std::vector<int64_t> img_pos;
         std::vector<float> img_rows;
         if (cmd == "GENI") {
@@ -244,7 +244,7 @@ struct Server {
                 if (got == 0 && std::feof(f)) break;
                 if (got != sizeof hdr || hdr[0] != 0x31455653 || hdr[1] <= 0 || hdr[4] != E ||
                     (size_t) hdr[1] > prompt.size() - img_rows.size() / (size_t) E) {
-                    ge = "not a maya-vision record for this model";
+                    ge = "not a wam-vision record for this model";
                     break;
                 }
                 const size_t at = img_rows.size();
@@ -500,22 +500,22 @@ struct Server {
                     std::chrono::duration<double, std::milli>(t2 - t1).count(), finish, reuse);
         std::fflush(stdout);
         if (const size_t grown = model.grow_pool()) {   // memory freed since the start: more experts stay resident
-            std::fprintf(stderr, "maya-metal: the expert pool grew by %.1f GB to %.1f GB\n", grown / 1e9,
+            std::fprintf(stderr, "wam-metal: the expert pool grew by %.1f GB to %.1f GB\n", grown / 1e9,
                          model.stats().pool_bytes / 1e9);
             // started short (a restart before the old engine's memory came back): MTP's default turns on once the
             // pool holds every expert, as it would have at a start with that memory
             if (mtp_auto && !mtp && model.pool_holds_all()) {
                 mtp = true;
                 mtp_len = std::make_unique<DraftLength>(mtp_draft_cap());
-                std::fprintf(stderr, "maya-metal: every expert has a slot now: MTP drafting is on\n");
+                std::fprintf(stderr, "wam-metal: every expert has a slot now: MTP drafting is on\n");
             }
         }
         std::string pe;   // this machine's expert usage, for the next start (after DONE: nobody waits on it)
-        if (!model.save_profile(pe)) std::fprintf(stderr, "maya-metal: %s\n", pe.c_str());
+        if (!model.save_profile(pe)) std::fprintf(stderr, "wam-metal: %s\n", pe.c_str());
         if (produced > 0) {
             const auto& st = model.stats();
             const double s = std::chrono::duration<double>(t2 - t1).count();
-            std::fprintf(stderr, "maya-metal: %lld tokens, %.2f tok/s; experts %llu hits / %llu misses so far\n",
+            std::fprintf(stderr, "wam-metal: %lld tokens, %.2f tok/s; experts %llu hits / %llu misses so far\n",
                          (long long) produced, produced / std::max(1e-9, s), (unsigned long long) st.expert_hits,
                          (unsigned long long) st.expert_misses);
         }
@@ -524,8 +524,8 @@ struct Server {
 
 }  // namespace
 
-int mtp_draft_cap() {   // MAYA_GLM_MTP_DRAFT (default 3), at most 8 drafts a round
-    const char* v = std::getenv("MAYA_GLM_MTP_DRAFT");
+int mtp_draft_cap() {   // WAM_GLM_MTP_DRAFT (default 3), at most 8 drafts a round
+    const char* v = std::getenv("WAM_GLM_MTP_DRAFT");
     return std::min(8, std::max(0, v && *v ? std::atoi(v) : 3));
 }
 
@@ -536,24 +536,24 @@ int serve(GlmMetal& model, const std::vector<std::string>& args) {
     // a prompt goes to forward() a slice at a time (STOP and the PP lines land between them): one --ubatch slice, or
     // 512-token pieces cut every --ubatch 2048 slice to 512 and its experts' tiles ran a quarter full
     s.chunk = model.ubatch();
-    if (const char* c = std::getenv("MAYA_METAL_PP_CHUNK")) s.chunk = std::max(1, std::atoi(c));
+    if (const char* c = std::getenv("WAM_METAL_PP_CHUNK")) s.chunk = std::max(1, std::atoi(c));
     // MTP drafts by default only when every expert is resident: then a token is GPU work and a verify window writes
     // several for about the price of one.  With experts streamed from the SSD a window needs more of them than one
-    // token (measured on Maya-S, 64 GB M4 Max: plain 7.3 tok/s, MTP 6.9 - the same tokens) - as the CUDA engine, whose
-    // MTP decode is on by default only where memory is unified and large.  MAYA_GLM_MTP_DECODE=0/1 decides instead.
-    const char* md = std::getenv("MAYA_GLM_MTP_DECODE");
+    // token (measured on Wam-S, 64 GB M4 Max: plain 7.3 tok/s, MTP 6.9 - the same tokens) - as the CUDA engine, whose
+    // MTP decode is on by default only where memory is unified and large.  WAM_GLM_MTP_DECODE=0/1 decides instead.
+    const char* md = std::getenv("WAM_GLM_MTP_DECODE");
     const bool mtp_wanted = md && *md ? std::atoi(md) != 0 : model.stats().experts_all_resident;
-    s.mtp = mtp_wanted && model.has_mtp() && std::getenv("MAYA_GLM_NO_MTP") == nullptr &&
-            std::getenv("MAYA_GLM_NO_SPEC") == nullptr;
-    s.mtp_auto = !(md && *md) && model.has_mtp() && std::getenv("MAYA_GLM_NO_MTP") == nullptr &&
-                 std::getenv("MAYA_GLM_NO_SPEC") == nullptr;
+    s.mtp = mtp_wanted && model.has_mtp() && std::getenv("WAM_GLM_NO_MTP") == nullptr &&
+            std::getenv("WAM_GLM_NO_SPEC") == nullptr;
+    s.mtp_auto = !(md && *md) && model.has_mtp() && std::getenv("WAM_GLM_NO_MTP") == nullptr &&
+                 std::getenv("WAM_GLM_NO_SPEC") == nullptr;
     if (model.has_mtp() && !s.mtp)
-        std::printf("NOTE MTP drafting is off (the experts stream from the SSD); MAYA_GLM_NO_MTP=1 frees the NextN "
+        std::printf("NOTE MTP drafting is off (the experts stream from the SSD); WAM_GLM_NO_MTP=1 frees the NextN "
                     "block's memory for the expert pool\n");
     if (s.mtp) s.mtp_len = std::make_unique<DraftLength>(mtp_draft_cap());
     const auto& st = model.stats();
     std::printf("INFO engine=%s context=%lld logit_bias=1 kv_ctx=%lld kv_gb=%.3f vram_gb=%.1f vram_slots=%zu\n",
-                MAYA_VERSION, (long long) model.max_context(), (long long) model.max_context(), st.state_bytes / 1e9,
+                WAM_VERSION, (long long) model.max_context(), (long long) model.max_context(), st.state_bytes / 1e9,
                 (st.dense_bytes + st.pool_bytes + st.state_bytes) / 1e9, st.pool_slots);
     std::printf("NOTE %s\n", model.describe().c_str());
     std::printf("READY %lld stop pause\n", (long long) model.max_context());
@@ -573,7 +573,7 @@ int serve(GlmMetal& model, const std::vector<std::string>& args) {
         const std::string head = line.substr(0, line.find(' '));
         if (head == "GEN" || head == "GENI") s.gen(line);
         else if (head == "VLEND" || head == "VRECLAIM" || head == "LOGP")
-            s.err("unsupported command '" + head + "' (maya-metal serves text only)");
+            s.err("unsupported command '" + head + "' (wam-metal serves text only)");
         else
             s.err("unsupported command '" + head + "'");
     }
@@ -581,4 +581,4 @@ int serve(GlmMetal& model, const std::vector<std::string>& args) {
     return 0;
 }
 
-}  // namespace maya::metal
+}  // namespace wam::metal

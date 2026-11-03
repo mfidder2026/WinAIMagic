@@ -1,16 +1,16 @@
-# tools/vision - maya-vision, the image encoder for Strata's multimodal path (optional; setup.py builds it when
+# tools/vision - wam-vision, the image encoder for Strata's multimodal path (optional; setup.py builds it when
 # the vision encoder is chosen).  Uses llama.cpp's mtmd library at the same pinned commit as the engine's ggml.
 #
 #   cmake -S tools/vision -B build-vision -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_DIR=third_party/llama.cpp
 #         [-DSTRATA_VISION_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=native]
-#   cmake --build build-vision --target maya-vision
+#   cmake --build build-vision --target wam-vision
 cmake_minimum_required(VERSION 3.21)
 project(strata_vision C CXX)
 
-# Maya's build options by the names its docs give them: -DMAYA_X=... sets STRATA_X, the name this file reads
-get_cmake_property(_maya_cache CACHE_VARIABLES)
-foreach(_v IN LISTS _maya_cache)
-  if(_v MATCHES "^MAYA_(.+)$")
+# Wam's build options by the names its docs give them: -DWAM_X=... sets STRATA_X, the name this file reads
+get_cmake_property(_wam_cache CACHE_VARIABLES)
+foreach(_v IN LISTS _wam_cache)
+  if(_v MATCHES "^WAM_(.+)$")
     set(STRATA_${CMAKE_MATCH_1} "${${_v}}")
   endif()
 endforeach()
@@ -61,15 +61,15 @@ if(STRATA_VISION_HIP)
 endif()
 
 add_subdirectory(${LLAMA_DIR} llama EXCLUDE_FROM_ALL)
-# float32 sums for the encoder's matmuls and attention on the GPU (ggml_vision_precision.py): on maya-vision's own
+# float32 sums for the encoder's matmuls and attention on the GPU (ggml_vision_precision.py): on wam-vision's own
 # ggml only - the engines compile the same ggml files without it
 foreach(_t ggml-cuda ggml-hip)
   if(TARGET ${_t})
-    target_compile_definitions(${_t} PRIVATE MAYA_VISION_F32_SUMS)
+    target_compile_definitions(${_t} PRIVATE WAM_VISION_F32_SUMS)
   endif()
 endforeach()
 
-add_executable(maya-vision strata_vision.cpp)
-target_link_libraries(maya-vision PRIVATE mtmd llama)
-target_compile_features(maya-vision PRIVATE cxx_std_17)
-set_target_properties(maya-vision PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+add_executable(wam-vision strata_vision.cpp)
+target_link_libraries(wam-vision PRIVATE mtmd llama)
+target_compile_features(wam-vision PRIVATE cxx_std_17)
+set_target_properties(wam-vision PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

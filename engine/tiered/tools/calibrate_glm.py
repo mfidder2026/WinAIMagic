@@ -1,4 +1,4 @@
-"""Tune the GLM engine's CPU lane for this PC (./maya.sh --calibrate) - Strata's tools/calibrate.py, for GLM-5.3-Flash.
+"""Tune the GLM engine's CPU lane for this PC (./wam.sh --calibrate) - Strata's tools/calibrate.py, for GLM-5.3-Flash.
 
 On one or two GPUs most of a token's experts are not in VRAM; the CPU LANE computes the ones in the RAM tier while the
 GPU runs the rest.  Two of its settings depend on the PC more than on the model:
@@ -25,7 +25,7 @@ tiers, and the engine works on a copy of this PC's expert usage file (usage_copy
 A setting is kept only when it beats the engine's own by more than MIN_GAIN in an interleaved re-measurement - the
 expert tiers follow the text and the OS adds noise, so single measurements differ by a few percent.
 
-    python tools/calibrate_glm.py maya-<model>.json      # measure and print; ./maya.sh --calibrate also saves it
+    python tools/calibrate_glm.py wam-<model>.json      # measure and print; ./wam.sh --calibrate also saves it
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ PCIE_SHARES = (0.0, 0.1, 0.25, 0.5, 0.75)
 STOP_BELOW = 0.7
 MAX_NEW = 128
 # A fresh group of three - code, an explanation, a list - for every measurement.  The expert tiers follow the text they
-# serve: three prompts answered over and over left them holding just those answers' experts (Maya-L on 9 GPUs: 99.2%
+# serve: three prompts answered over and over left them holding just those answers' experts (Wam-L on 9 GPUs: 99.2%
 # VRAM hits and 2.6 experts a token on the CPU, 31.8 tok/s, where a chat on that engine had 95-96%, 13-16 on the CPU
 # and 24-25 tok/s), so the CPU lane's settings were measured with next to nothing on it.  A run takes ~20 groups.
 CODE = ("merges two sorted lists into one sorted list", "checks whether a string is a palindrome",
@@ -290,7 +290,7 @@ def run(cfg: dict, say=print, start_engine=None) -> dict:
 
         def start_engine(c):
             return StrataEngine(c["exe"], engine_args(c), cwd=c.get("cwd"), log=c.get("log"), env=child_env(c))
-    with tempfile.TemporaryDirectory(prefix="maya-calibrate-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="wam-calibrate-") as tmp:
         base = {**cfg, "args": without_writes(list(cfg.get("args") or [])),
                 "env": {**apply(cfg.get("env") or {}, {}), **usage_copy(cfg, Path(tmp)), **lane_max_env(cfg)}}
         kept = {k: v for k, v in (cfg.get("env") or {}).items() if k in KEYS}
@@ -411,7 +411,7 @@ def measure(cfg: dict, ids_list, start_engine, say=print, extra_threads=(), kept
 
 def engine_error(log: str | None, since: int = 0) -> str | None:
     """The engine's own reason for a failed start: the last line of its log written after byte `since` that is its own
-    ("glm ...", "maya ..." or "ERR ..."), else the last line there; None without a log or a new line."""
+    ("glm ...", "wam ..." or "ERR ..."), else the last line there; None without a log or a new line."""
     if not log:
         return None
     try:
@@ -420,7 +420,7 @@ def engine_error(log: str | None, since: int = 0) -> str | None:
             lines = [x.strip() for x in f.read()[-16384:].decode("utf-8", "replace").splitlines() if x.strip()]
     except OSError:
         return None
-    return next((x for x in reversed(lines) if x.startswith(("glm", "maya", "ERR"))), lines[-1] if lines else None)
+    return next((x for x in reversed(lines) if x.startswith(("glm", "wam", "ERR"))), lines[-1] if lines else None)
 
 
 def close(eng):
@@ -461,7 +461,7 @@ def apply(env: dict, settings: dict) -> dict:
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        sys.exit("usage: calibrate_glm.py <maya-*.json>")
-    import maya_names
-    res = run(maya_names.env_in(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig"))))
+        sys.exit("usage: calibrate_glm.py <wam-*.json>")
+    import wam_names
+    res = run(wam_names.env_in(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig"))))
     print(json.dumps(res, indent=1))

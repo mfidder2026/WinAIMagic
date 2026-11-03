@@ -1,4 +1,4 @@
-// src/ds4/ds4_packinfo.cpp - `maya-ds4 --pack-info` (ds4_packinfo.hpp): the pack as its description says it is,
+// src/ds4/ds4_packinfo.cpp - `wam-ds4 --pack-info` (ds4_packinfo.hpp): the pack as its description says it is,
 // before anything is loaded.  A pack is pointers - ds4.txt (the geometry and model_dir), tensors.txt (every tensor's
 // type, file, offset, bytes and shape: tools/ds4/pack.py, pack_gguf.py) and the model's files where model_dir says -
 // so a pack whose model_dir was cleaned up still reads perfectly and only fails at the load.  Here every file is
@@ -73,7 +73,7 @@ bool read_desc(const std::string& dir, Desc& d, std::FILE* out) {
     {
         std::ifstream f(dir + "/ds4.txt");
         if (!f) {
-            std::fprintf(out, "pack-info: %s/ds4.txt: not found (not a maya-ds4 pack: tools/ds4/pack.py or pack_gguf.py "
+            std::fprintf(out, "pack-info: %s/ds4.txt: not found (not a wam-ds4 pack: tools/ds4/pack.py or pack_gguf.py "
                               "writes one)\n", dir.c_str());
             return false;
         }

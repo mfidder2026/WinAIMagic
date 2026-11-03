@@ -1,8 +1,8 @@
-"""serve/test_minimax_frontend.py - MiniMax-M3.1-Flash in the frontend: Maya's chat template (tools/mm3/chat_template.jinja)
+"""serve/test_minimax_frontend.py - MiniMax-M3.1-Flash in the frontend: Wam's chat template (tools/mm3/chat_template.jinja)
 rendered as MiniMax's own template renders it, its thinking levels, and the model's output (reasoning, answer, tool
 calls) parsed from any split of the stream.
 
-    python -m unittest serve.test_minimax_frontend          (MAYA_MM3_TEMPLATE=<another chat_template.jinja to check>)
+    python -m unittest serve.test_minimax_frontend          (WAM_MM3_TEMPLATE=<another chat_template.jinja to check>)
 
 Offline: the official template is a copy in serve/fixtures/minimax_m31 (its sha256 checked); the test against
 transformers' own renderer runs where transformers is installed and skips elsewhere.
@@ -21,7 +21,7 @@ from serve.frontend import (AUTO, ChatTemplate, MINIMAX_NS, OutputParser, effort
 
 ROOT = Path(__file__).resolve().parents[1]
 NS = MINIMAX_NS
-TEMPLATE = Path(os.environ.get("MAYA_MM3_TEMPLATE", ROOT / "tools" / "mm3" / "chat_template.jinja"))
+TEMPLATE = Path(os.environ.get("WAM_MM3_TEMPLATE", ROOT / "tools" / "mm3" / "chat_template.jinja"))
 OFFICIAL = ROOT / "serve" / "fixtures" / "minimax_m31" / "chat_template.jinja"
 OFFICIAL_SHA256 = "961e3f96b2c08d26555efdfeb3b384d5e81181bf0cfc04edbadc31c6e507b431"   # (54e4e69's, unchanged)
 LEVELS = ("low", "medium", "high", "xhigh", "max")

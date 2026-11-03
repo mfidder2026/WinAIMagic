@@ -3,8 +3,8 @@
 with a picture in its history is set aside and taken back - for a prompt whose picture sits at the same place with the
 same pixels, and for no other.
 
-    python tools/ds4/slot_image_test.py --pack /mnt/data/models/.../maya-ds4 [--exe build/maya-ds4] [--gpus 0,1]
-                                        [--config maya-ds4.json]
+    python tools/ds4/slot_image_test.py --pack /mnt/data/models/.../wam-ds4 [--exe build/wam-ds4] [--gpus 0,1]
+                                        [--config wam-ds4.json]
 
 Two runs of the engine's `--serve` protocol (greedy, spec=0: the state's position is the answer's, exactly):
   no-keep   A (a picture), B, A's next turn         the reference: every turn starts over (reused 0), and its answers
@@ -152,7 +152,7 @@ def run(exe: str, gpus: list[int], pack: str, ctx: int, slots: str, keep: bool,
 def main() -> int:
     ap = argparse.ArgumentParser(description="pictures in the kept conversations")
     ap.add_argument("--pack", required=True)
-    ap.add_argument("--exe", default=str(Path(__file__).resolve().parents[2] / "build" / "maya-ds4"))
+    ap.add_argument("--exe", default=str(Path(__file__).resolve().parents[2] / "build" / "wam-ds4"))
     ap.add_argument("--gpus", default="")
     ap.add_argument("--config", default="")
     ap.add_argument("--ctx", type=int, default=32768)

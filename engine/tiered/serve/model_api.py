@@ -1,4 +1,4 @@
-"""Maya's model API (phase 1): the names, keep_alive, the request/answer translation between the native
+"""Wam's model API (phase 1): the names, keep_alive, the request/answer translation between the native
 chat API (/api/chat, /api/generate) and the OpenAI path the server already runs, and the model listings (/api/tags,
 /api/ps, /api/show).  Pure functions: serve/server.py does the I/O, serve/model_pull.py the downloads."""
 from __future__ import annotations
@@ -36,20 +36,20 @@ def parse_keep_alive(v):
 
 
 def public_name(path: Path) -> str:
-    """A config's name as the API shows it: its file name without .json (maya-glm-maya-s)."""
+    """A config's name as the API shows it: its file name without .json (wam-glm-wam-s)."""
     return Path(path).name.removesuffix(".json")
 
 
 def find_config(root: Path, name) -> Path | None:
     """The installed model's config a request names: its API name, with or without ":latest", .json, or the leading
-    "maya-"; None when nothing matches."""
+    "wam-"; None when nothing matches."""
     n = str(name or "").strip()
     n = n.removesuffix(":latest").removesuffix(".json")
     if not n or "/" in n or "\\" in n or n.startswith("."):
         return None
     for p in models.config_paths(root):
         stem = p.name.removesuffix(".json")
-        if n in (stem, stem.removeprefix("maya-")):
+        if n in (stem, stem.removeprefix("wam-")):
             return p
     return None
 
@@ -68,7 +68,7 @@ def tags_entry(d: dict) -> dict:
     name = public_name(Path(d["file"]))
     return {"name": name + ":latest", "model": name + ":latest", "modified_at": _iso(d.get("used")),
             "size": int(d.get("size") or 0), "digest": "", "details": _details(d),
-            "maya": {"title": d.get("model") or "", "ok": bool(d.get("ok")), "missing": d.get("missing"),
+            "wam": {"title": d.get("model") or "", "ok": bool(d.get("ok")), "missing": d.get("missing"),
                      "running": bool(d.get("running"))}}
 
 
@@ -89,10 +89,10 @@ def show_entry(d: dict, plan: dict | None = None) -> dict:
                                                     if k in ("context", "temperature", "top_p", "top_k")),
            "template": "", "details": _details(d), "model_info": info,
            "capabilities": ["completion", "tools"], "modified_at": _iso(d.get("used")),
-           "maya": {"file": d.get("file"), "folder": d.get("folder"), "command": d.get("command"), "settings": s,
+           "wam": {"file": d.get("file"), "folder": d.get("folder"), "command": d.get("command"), "settings": s,
                     "backend": d.get("backend"), "ok": bool(d.get("ok")), "missing": d.get("missing")}}
     if plan is not None:
-        out["maya"]["delete_plan"] = plan
+        out["wam"]["delete_plan"] = plan
     return out
 
 

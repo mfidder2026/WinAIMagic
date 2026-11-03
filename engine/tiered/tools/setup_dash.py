@@ -1,4 +1,4 @@
-"""The dashboard on Maya's screen once it runs (setup_tui.py): the web Monitor's numbers (serve/web/app.js, render) from
+"""The dashboard on Wam's screen once it runs (setup_tui.py): the web Monitor's numbers (serve/web/app.js, render) from
 the server's GET /metrics, read once a second - the throughput, where the experts live, the GPUs, the hardware and the
 recent requests - in binsider's boxes and the dashboard's colours (setup_look.py).  While the model loads, a box of its
 own instead: how far the start is (the engine log's warm-up of each GPU's experts), which GPU, how long."""
@@ -32,11 +32,11 @@ DIGITS = {"0": (0x3E, 0x63, 0x73, 0x7B, 0x6F, 0x67, 0x3E, 0x00), "1": (0x0C, 0x0
 BLOCKS = "▁▂▃▄▅▆▇█"
 TIERS = (("ram_fetch", "From RAM", INFO_TEXT, "/tok"), ("disk", "From SSD", WARN, "/tok"),
          ("promo", "Promoted", ACCENT, "/tok"))   # per token
-# DeepSeek's (maya-ds4): experts the CPU lane computed, MB the storage read (Linux), the cache's moves, the n-gram
+# DeepSeek's (wam-ds4): experts the CPU lane computed, MB the storage read (Linux), the cache's moves, the n-gram
 # memory's (Engram) read time - each a token
 TIERS_DS4 = (("cpu", "On the CPU", INFO_TEXT, "/tok"), ("disk_mb", "Disk reads", WARN, " MB/tok"),
              ("promo", "Promoted", ACCENT, "/tok"), ("engram_ms", "N-gram memory", ACCENT, " ms/tok"))
-# MiniMax's (maya-mm3): GLM's keys, but the experts VRAM does not hold are computed on the CPU from pinned RAM
+# MiniMax's (wam-mm3): GLM's keys, but the experts VRAM does not hold are computed on the CPU from pinned RAM
 TIERS_MM3 = (("ram_fetch", "On the CPU", INFO_TEXT, "/tok"), ("disk", "From SSD", WARN, "/tok"),
              ("promo", "Promoted", ACCENT, "/tok"))
 TIPS = {   # the Monitor's advice under the tiers, said shorter as the box narrows (one line: the longest that fits)
@@ -402,15 +402,15 @@ class Dashboard(VerticalScroll):
 
     SCOPED_CSS = False                                  # (.narrow is the screen's: the top boxes stack on 80 columns)
     DEFAULT_CSS = """
-    Dashboard { height: 1fr; scrollbar-size-vertical: 1; scrollbar-color: $maya-edge;
+    Dashboard { height: 1fr; scrollbar-size-vertical: 1; scrollbar-color: $wam-edge;
                 scrollbar-background: $background; }
     Dashboard Static { height: auto; }
     #dash-banner { margin-bottom: 1; }
-    #dash-load { width: 90; max-width: 100%; border: solid $maya-line; padding: 1 2; margin-bottom: 1;
+    #dash-load { width: 90; max-width: 100%; border: solid $wam-line; padding: 1 2; margin-bottom: 1;
                  border-title-align: center; }
-    #dash-card { width: 76; max-width: 100%; height: auto; border: solid $maya-line; padding: 0 1; margin-bottom: 1; }
+    #dash-card { width: 76; max-width: 100%; height: auto; border: solid $wam-line; padding: 0 1; margin-bottom: 1; }
     #dash-row { height: auto; }
-    #dash-speed, #dash-tiers, #dash-gpus, #dash-hw, #dash-reqs { border: solid $maya-line; padding: 0 1;
+    #dash-speed, #dash-tiers, #dash-gpus, #dash-hw, #dash-reqs { border: solid $wam-line; padding: 0 1;
                  margin-bottom: 1; border-title-align: center; border-subtitle-align: right; }
     #dash-speed, #dash-tiers { width: 1fr; }
     #dash-speed { margin-right: 1; }

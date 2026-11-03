@@ -1,4 +1,4 @@
-"""dumpcmp.py - two maya-ds4 runs' debug dumps side by side (the prompt path's numerics: where two runs part).
+"""dumpcmp.py - two wam-ds4 runs' debug dumps side by side (the prompt path's numerics: where two runs part).
 
   layers A B [--pos P]       DS4_DUMP_L files: each layer record's relative error between the runs - the median over
                              the positions, the worst position, and position P's

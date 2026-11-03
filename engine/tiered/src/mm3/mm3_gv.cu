@@ -1,4 +1,4 @@
-// src/mm3/mm3_gv.cu - maya-mm3's dense GEMVs (mm3_gv.cuh).  The block layouts are ggml's (ggml-common.h, MIT,
+// src/mm3/mm3_gv.cu - wam-mm3's dense GEMVs (mm3_gv.cuh).  The block layouts are ggml's (ggml-common.h, MIT,
 // third_party/ggml/LICENSE); each sub-block's codes and scales are exactly ds4_iq.cu's decode (the same integers and
 // floats), its sum exactly ds4_iq.cu's sub_dot, so a row's sums are ds4_iq's mv's to the bit.
 #include "mm3_gv.cuh"

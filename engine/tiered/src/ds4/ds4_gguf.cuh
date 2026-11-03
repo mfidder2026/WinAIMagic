@@ -1,4 +1,4 @@
-// src/ds4/ds4_gguf.cuh - a GGUF's weights on the device for maya-ds4 (unsloth's DeepSeek-V4.1-Flash-1017 GGUFs,
+// src/ds4/ds4_gguf.cuh - a GGUF's weights on the device for wam-ds4 (unsloth's DeepSeek-V4.1-Flash-1017 GGUFs,
 // tools/ds4/pack_gguf.py): the dense matrices in BF16 and the routed experts in MXFP4.  They stand in for
 // strata::kernels::exl3's matrices and experts (an x3::Mat with fmt kFmtBF16, an x3::ExpertLayout with fmt kFmtMXFP4)
 // with the same arguments and the same results' layout, so the engine's paths (decode, verify windows, chunked prompts,

@@ -431,7 +431,7 @@ bool ExpertCache::open(int64_t n_slots, int64_t n_layers, int64_t n_expert, int6
     // lendable (the on-demand vision encoder): mapped in pieces, else (no virtual memory API) the one cudaMalloc
     if (want_lend_) {
         if (arena_.open(want, vmm_err_)) base_ = arena_.data();
-        else std::fprintf(stderr, "maya: the expert cache cannot be mapped in pieces on this GPU (%s) - only VRAM "
+        else std::fprintf(stderr, "wam: the expert cache cannot be mapped in pieces on this GPU (%s) - only VRAM "
                                   "that is free can go to the vision encoder\n", vmm_err_.c_str());
     }
     if (base_ == nullptr && cudaMalloc((void**) &base_, (size_t) want) != cudaSuccess) {

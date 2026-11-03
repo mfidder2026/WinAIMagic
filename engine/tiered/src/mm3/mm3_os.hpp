@@ -1,5 +1,5 @@
-// src/mm3/mm3_os.hpp - the few OS services maya-mm3 needs, on Linux and on Windows: the model's files mapped read-only
-// (maya-ds4's helpers, src/ds4/ds4_os.hpp, used as they are), the RAM this process can still get and the RAM in all,
+// src/mm3/mm3_os.hpp - the few OS services wam-mm3 needs, on Linux and on Windows: the model's files mapped read-only
+// (wam-ds4's helpers, src/ds4/ds4_os.hpp, used as they are), the RAM this process can still get and the RAM in all,
 // stdin read as it arrives, and thread pinning.
 #pragma once
 

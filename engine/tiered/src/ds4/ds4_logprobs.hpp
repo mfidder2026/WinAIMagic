@@ -1,4 +1,4 @@
-// src/ds4/ds4_logprobs.hpp - maya-ds4 --serve's log-probabilities (GEN logprobs=<n>, the server's OpenAI `logprobs` /
+// src/ds4/ds4_logprobs.hpp - wam-ds4 --serve's log-probabilities (GEN logprobs=<n>, the server's OpenAI `logprobs` /
 // `top_logprobs`): for each token a request writes, the log-probability of that token and the n most likely tokens of
 // the row it came from.  The distribution is the model's softmax over its logits after the request's penalties
 // (llama.cpp's repeat / frequency / presence, as the sampler counts them), at temperature 1 and before top_k, top_p and

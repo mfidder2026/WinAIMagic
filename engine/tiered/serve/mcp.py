@@ -1,7 +1,7 @@
 """serve/mcp.py - tools from MCP (Model Context Protocol) servers for the web app's chats.
 
 The user lists servers in the run config (`"mcp_servers"`, or Claude Desktop's `"mcpServers"` block pasted as is) or
-in a separate file (`--mcp-config`).  Each one is either a program Maya starts (`command`, `args`, `env`, `cwd`:
+in a separate file (`--mcp-config`).  Each one is either a program Wam starts (`command`, `args`, `env`, `cwd`:
 the stdio transport, newline-delimited JSON-RPC 2.0 on its stdin/stdout) or an address (`url`, `headers`: the
 Streamable HTTP transport, JSON-RPC POSTed, answered as JSON or as an event stream).  Both are implemented here with
 the standard library only; no MCP SDK is needed.
@@ -263,7 +263,7 @@ class HttpTransport:
 
     def _headers(self) -> dict:
         h = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream",
-             "User-Agent": "maya", **self.headers}
+             "User-Agent": "wam", **self.headers}
         if self.session:
             h["Mcp-Session-Id"] = self.session
         if self.protocol:
@@ -398,7 +398,7 @@ class McpServer:
         try:
             t.start()
             res = t.request("initialize", {"protocolVersion": PROTOCOL, "capabilities": {},
-                                           "clientInfo": {"name": "maya", "title": "Maya", "version": "1"}},
+                                           "clientInfo": {"name": "wam", "title": "Wam", "version": "1"}},
                             timeout)
             t.protocol = str(res.get("protocolVersion") or PROTOCOL)
             self.info = {k: v for k, v in (res.get("serverInfo") or {}).items() if k in ("name", "title", "version")}
@@ -418,13 +418,13 @@ class McpServer:
                     break
             self.tools, self.status = tools, "ready"
             names = ", ".join(x["name"] for x in tools[:8]) + (", ..." if len(tools) > 8 else "")
-            print(f"[maya] MCP server {self.name!r}: {len(tools)} tool{'s' * (len(tools) != 1)}"
+            print(f"[wam] MCP server {self.name!r}: {len(tools)} tool{'s' * (len(tools) != 1)}"
                   f"{' (' + names + ')' if tools else ''}", flush=True)
             return True
         except McpError as e:
             self.status, self.error, self.tools = "failed", str(e), []
             t.close()
-            print(f"[maya] MCP server {self.name!r} did not start: {e}. Its tools are left out; the chat works "
+            print(f"[wam] MCP server {self.name!r} did not start: {e}. Its tools are left out; the chat works "
                   "without them.", flush=True)
             return False
 
@@ -435,7 +435,7 @@ class McpServer:
                 # start is tried again at most every 10 s, so a broken command does not run on every call
                 if self.status == "failed" and time.monotonic() - self.last_start < 10:
                     raise McpError(f"the server is not running ({self.error or 'it stopped'})")
-                print(f"[maya] MCP server {self.name!r} had stopped; starting it again", flush=True)
+                print(f"[wam] MCP server {self.name!r} had stopped; starting it again", flush=True)
                 if not self._start():
                     raise McpError(f"the server could not be started again: {self.error}")
             t = self.transport
@@ -593,20 +593,20 @@ class McpHub:
 # ------------------------------------------------------------------------------------------------ config
 def _check_server(name, cfg, where) -> dict:
     if not isinstance(cfg, dict):
-        raise SystemExit(f"[maya] {where}: MCP server {name!r} must be an object with \"command\" or \"url\"")
+        raise SystemExit(f"[wam] {where}: MCP server {name!r} must be an object with \"command\" or \"url\"")
     if cfg.get("url"):
         if cfg.get("type") == "sse":
-            raise SystemExit(f"[maya] {where}: MCP server {name!r} uses the old SSE transport (\"type\": \"sse\"); "
+            raise SystemExit(f"[wam] {where}: MCP server {name!r} uses the old SSE transport (\"type\": \"sse\"); "
                              "Strata speaks Streamable HTTP - most servers offer it at /mcp")
         if not isinstance(cfg.get("headers") or {}, dict):
-            raise SystemExit(f"[maya] {where}: MCP server {name!r}: \"headers\" must be an object")
+            raise SystemExit(f"[wam] {where}: MCP server {name!r}: \"headers\" must be an object")
         return cfg
     if not isinstance(cfg.get("command"), str) or not cfg["command"].strip():
-        raise SystemExit(f"[maya] {where}: MCP server {name!r} needs \"command\" (a program to start) or \"url\"")
+        raise SystemExit(f"[wam] {where}: MCP server {name!r} needs \"command\" (a program to start) or \"url\"")
     if not isinstance(cfg.get("args") or [], list):
-        raise SystemExit(f"[maya] {where}: MCP server {name!r}: \"args\" must be a list")
+        raise SystemExit(f"[wam] {where}: MCP server {name!r}: \"args\" must be a list")
     if not isinstance(cfg.get("env") or {}, dict):
-        raise SystemExit(f"[maya] {where}: MCP server {name!r}: \"env\" must be an object")
+        raise SystemExit(f"[wam] {where}: MCP server {name!r}: \"env\" must be an object")
     return cfg
 
 
@@ -615,7 +615,7 @@ def servers_from(block, where: str) -> dict[str, dict]:
     if block is None:
         return {}
     if not isinstance(block, dict):
-        raise SystemExit(f"[maya] {where}: the MCP servers must be an object {{\"name\": {{...}}}}")
+        raise SystemExit(f"[wam] {where}: the MCP servers must be an object {{\"name\": {{...}}}}")
     return {str(n): _check_server(n, c, where) for n, c in block.items()
             if not (isinstance(c, dict) and c.get("disabled") is True)}
 
@@ -627,14 +627,14 @@ def settings_from(cfg: dict) -> dict:
         number = isinstance(value, (int, float)) and not isinstance(value, bool)
         if key in ("timeout_s", "start_timeout_s"):
             if not number or value <= 0:
-                raise SystemExit(f"[maya] config mcp.{key}={value!r}: expected a number of seconds > 0")
+                raise SystemExit(f"[wam] config mcp.{key}={value!r}: expected a number of seconds > 0")
             out[key] = float(value)
         elif key in ("max_result_chars", "max_rounds"):
             if not number or value != int(value) or value < 1:
-                raise SystemExit(f"[maya] config mcp.{key}={value!r}: expected a positive integer")
+                raise SystemExit(f"[wam] config mcp.{key}={value!r}: expected a positive integer")
             out[key] = int(value)
         else:
-            print(f"[maya] config mcp.{key}={value!r}: unknown key, ignored", flush=True)
+            print(f"[wam] config mcp.{key}={value!r}: unknown key, ignored", flush=True)
     return out
 
 
@@ -649,10 +649,10 @@ def hub_from_config(cfg: dict, mcp_config_path: str | None = None) -> McpHub | N
             with open(mcp_config_path, encoding="utf-8-sig") as f:
                 data = json.load(f)
         except (OSError, ValueError) as e:
-            raise SystemExit(f"[maya] --mcp-config {mcp_config_path}: {e}") from None
+            raise SystemExit(f"[wam] --mcp-config {mcp_config_path}: {e}") from None
         block = data.get("mcpServers", data.get("mcp_servers")) if isinstance(data, dict) else None
         if block is None:
-            raise SystemExit(f"[maya] --mcp-config {mcp_config_path}: expected {{\"mcpServers\": {{...}}}}")
+            raise SystemExit(f"[wam] --mcp-config {mcp_config_path}: expected {{\"mcpServers\": {{...}}}}")
         servers.update(servers_from(block, f"--mcp-config {mcp_config_path}"))
     if not servers:
         return None

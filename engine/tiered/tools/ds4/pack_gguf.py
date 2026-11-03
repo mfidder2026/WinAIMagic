@@ -4,7 +4,7 @@ and the like: dense BF16, routed experts MXFP4, Engram tables MXFP8, Q6_K, Q5_K 
 
     python tools/ds4/pack_gguf.py --model ~/models/DeepSeek-V4.1-Flash-1017-GGUF/UD-Q8_K_XL
 
-writes <model>/maya-ds4/ in pack.py's format, so the engine reads both:
+writes <model>/wam-ds4/ in pack.py's format, so the engine reads both:
   ds4.txt       the geometry under config.json's names (the GGUF's deepseek41.* keys translated), model_dir, format gguf
   tensors.txt   every tensor under the checkpoint's names: `file <i> <name>` lines, then
                 `t <name> <dtype> <file> <offset> <bytes> <dims...>` - dims outermost first (torch order: a matrix is
@@ -18,7 +18,7 @@ from there when it is present.  Nor a vision tower: vision_pack.py makes it from
 (--vision: another folder), and the pack takes it and its geometry (vision.<key>, image_token_id) from there when it is
 present; without it the engine reads text only.
 
-A quant that leaves the two Engram tables out (v1.1.16's Maya-S; Maya's quants hold them since) takes them from a set
+A quant that leaves the two Engram tables out (v1.1.16's Wam-S; Wam's quants hold them since) takes them from a set
 of GGUF files that holds them, beside it: --engram, else ../Engram/ (unsloth's MXFP8 shard of them, where setups before
 v1.1.17 put it) when it is whole.
 """
@@ -35,13 +35,13 @@ import sys
 TYPES = {0: ("F32", 1, 4), 1: ("F16", 1, 2), 8: ("Q8_0", 32, 34), 30: ("BF16", 1, 2), 39: ("MXFP4", 32, 17),
          67: ("MXFP8", 32, 33),          # ggml type -> (name, values a block, bytes a block); 67: unsloth's fork
          43: ("MXFP8", 32, 33),          # unsloth's GGUFs from 2026-10-19 on (upstream's 43 is F8_E4M3: Gguf._type43)
-         # the low-bit expert types (the Maya quants' experts; the engine's ds4_iq kernels)
+         # the low-bit expert types (the Wam quants' experts; the engine's ds4_iq kernels)
          10: ("Q2_K", 256, 84), 11: ("Q3_K", 256, 110), 12: ("Q4_K", 256, 144), 13: ("Q5_K", 256, 176),
          14: ("Q6_K", 256, 210), 16: ("IQ2_XXS", 256, 66), 17: ("IQ2_XS", 256, 74), 18: ("IQ3_XXS", 256, 98),
          19: ("IQ1_S", 256, 50), 20: ("IQ4_NL", 32, 18), 21: ("IQ3_S", 256, 110), 22: ("IQ2_S", 256, 82),
          23: ("IQ4_XS", 256, 136), 29: ("IQ1_M", 256, 56)}
 # the Engram set a quant without the tables takes them from by default, beside it (or inside its folder): unsloth's
-# MXFP8 shard of them, where setups before v1.1.17 put it for Maya-S (--engram: any other)
+# MXFP8 shard of them, where setups before v1.1.17 put it for Wam-S (--engram: any other)
 ENGRAM_SETS = ("Engram",)
 
 
@@ -424,7 +424,7 @@ def write_tokenizer(out: pathlib.Path, kv: dict, template: str | None):
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True, help="the directory of the GGUF's shards")
-    ap.add_argument("--out", help="default: <model>/maya-ds4")
+    ap.add_argument("--out", help="default: <model>/wam-ds4")
     ap.add_argument("--vision", help="vision_pack.py's folder (default: <model>/../vision; taken when it is there)")
     ap.add_argument("--drafter", help="the DSpark drafter's .json (drafter_pack.py's; default <model>/../dspark/dspark.json)")
     ap.add_argument("--engram", help="the folder of the Engram tables' GGUF set, for a quant that leaves them out "
@@ -433,12 +433,12 @@ def main() -> int:
                                                 "model's; the setup names them: a folder may hold an earlier layout)")
     ap.add_argument("--without", nargs="+", default=[],
                     help="shards of the split left out on purpose: they hold only its Engram tables, which --engram's "
-                         "set gives instead (orcarouter's shard 2: the setup takes Maya's Q6_K tables for it)")
+                         "set gives instead (orcarouter's shard 2: the setup takes Wam's Q6_K tables for it)")
     a = ap.parse_args()
     if a.without and not a.engram:
         raise SystemExit("--without: the Engram tables then come from --engram's set - name it")
     model = pathlib.Path(a.model).expanduser().resolve()
-    out = pathlib.Path(a.out).expanduser() if a.out else model / "maya-ds4"
+    out = pathlib.Path(a.out).expanduser() if a.out else model / "wam-ds4"
     shards = [model / n for n in a.shards] if a.shards else sorted(model.glob("*.gguf"))
     if not shards or not all(p.is_file() for p in shards):
         raise SystemExit("%s: no .gguf files" % model if not shards else
@@ -464,7 +464,7 @@ def main() -> int:
     for g in gs:
         split_ple(g, kv)
     # the Engram tables may come from a shared set of GGUF files beside the quant (the same tensor names: engram_set) -
-    # its engram tensors fill in the ones the quant's shards leave out, its engram metadata too.  v1.1.16's Maya-S:
+    # its engram tensors fill in the ones the quant's shards leave out, its engram metadata too.  v1.1.16's Wam-S:
     # unsloth's UD-Q8_K_XL shard that holds only the tables, as it is (00008 of 9; before 2026-10-19 shards 00008 and
     # 00009 of 10, a table each), so no shard count is checked - every Engram layer's tables must be found, below.
     # Looked for only when the quant's shards leave some out.
@@ -488,7 +488,7 @@ def main() -> int:
             for k, v in g.kv.items():
                 if ".engram." in k or ".ple." in k or k.endswith(".embedding_length_per_layer_input"):
                     # (the tables' own hash parameters: a quant's that differ would read other rows - the set's win,
-                    #  e.g. Maya's Q6_K tables under another quant)
+                    #  e.g. Wam's Q6_K tables under another quant)
                     if k in kv and kv[k] != v and ".engram." in k:
                         print("Engram %s: the tables' own (%s) over the quant's" % (k.split(".engram.", 1)[1],
                                                                                 str(v)[:60]))

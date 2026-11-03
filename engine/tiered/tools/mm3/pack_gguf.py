@@ -1,22 +1,22 @@
-"""tools/mm3/pack_gguf.py - the engine's pack for a MiniMax-M3.1-Flash GGUF set (Project Maya's MiniMax-M3.1-Flash-Maya-XS /
+"""tools/mm3/pack_gguf.py - the engine's pack for a MiniMax-M3.1-Flash GGUF set (Project Wam's MiniMax-M3.1-Flash-Maya-XS /
 -S: llama.cpp's `minimax-m3` layout, dense matrices in Q4_K..Q8_0, routed experts in IQ1_S..IQ3_XXS), beside the model's
 files (no weights copied).
 
     python tools/mm3/pack_gguf.py --model ~/models/MiniMax-M3.1-Flash-Maya-XS
 
-writes <model>/maya-mm3/ in pack.py's format, so maya-mm3 reads both:
+writes <model>/wam-mm3/ in pack.py's format, so wam-mm3 reads both:
   mm3.txt       the geometry under config.json's text_config names (from the GGUF's minimax-m3.* keys; swiglu_alpha /
                 swiglu_limit MiniMax-M3's 1.702 / 7, as llama.cpp's graph holds them), format gguf, quant_name, model_dir
   tensors.txt   every tensor under the checkpoint's names (language_model.model.layers.N.self_attn.q_proj.weight ...):
                 `file <i> <name>` lines, then `t <name> <dtype> <file> <offset> <bytes> <dims...>` - dims outermost first
                 (a matrix [out][in]), dtype ggml's type name (Q6_K, IQ1_S, F32 ...); the routed experts an entry each
                 (layers.N.block_sparse_moe.experts.E.w1.weight: expert E's slice of the GGUF's stacked tensor)
-  tokenizer/    the server's tokenizer from the GGUF's vocabulary and merges (pre "minimax"), and Maya's chat template
+  tokenizer/    the server's tokenizer from the GGUF's vocabulary and merges (pre "minimax"), and Wam's chat template
                 (this directory's chat_template.jinja - the same for every MiniMax pack)
 
 MiniMax-M3.1 runs its sparse attention's indexer in all 60 layers; stock llama.cpp's `minimax-m3` (M3) creates indexers
-only from the first MoE layer on, so the Maya sets keep layers 0-2's (12 tensors) in a side file beside the shards,
-<name>-maya-indexers.bin (a GGUF; .gguf before v1.1.31 - the Hub took a lone .gguf for the model): this pack takes
+only from the first MoE layer on, so the Wam sets keep layers 0-2's (12 tensors) in a side file beside the shards,
+<name>-wam-indexers.bin (a GGUF; .gguf before v1.1.31 - the Hub took a lone .gguf for the model): this pack takes
 it (--indexers names another).  Without it the pack stops: the engine runs
 the model as MiniMax defines it, never those layers on full attention in silence.
 
@@ -46,13 +46,13 @@ TEMPLATE = HERE / "chat_template.jinja"
 _spec = importlib.util.spec_from_file_location("ds4_pack_gguf", HERE.parent / "ds4" / "pack_gguf.py")
 _ds4 = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_ds4)
-Gguf, TYPES = _ds4.Gguf, _ds4.TYPES   # (maya-ds4's GGUF reader: the shards' metadata and tensor infos)
+Gguf, TYPES = _ds4.Gguf, _ds4.TYPES   # (wam-ds4's GGUF reader: the shards' metadata and tensor infos)
 sys.path.insert(0, str(HERE))
 import pack as exl3_pack  # noqa: E402  (tools/mm3/pack.py: its mm3.txt writer for the vision / DSpark keys)
 from st import SafeTensors  # noqa: E402
 
 COMPANIONS = "MiniMax-M3.1-Flash-companions"   # (the setup's folder of the EXL3 repo's vision tower and DSpark draft)
-EXL3_DIR = "MiniMax-M3.1-Flash-EXL3-3.5bpw"    # (a whole EXL3 download: maya.py's MM3_DIR)
+EXL3_DIR = "MiniMax-M3.1-Flash-EXL3-3.5bpw"    # (a whole EXL3 download: wam.py's MM3_DIR)
 
 
 def st_tensors(path: pathlib.Path) -> list:
@@ -186,7 +186,7 @@ def geometry(kv: dict, vocab: int, shared_ff: int) -> dict:
 
 def write_tokenizer(out: pathlib.Path, kv: dict) -> dict:
     """pack.py's layout from the GGUF's vocabulary: vocab.json (id order), merges.txt, token_type.json,
-    tokenizer.json {pre minimax, special_ids}, and Maya's chat template."""
+    tokenizer.json {pre minimax, special_ids}, and Wam's chat template."""
     tokens = kv["tokenizer.ggml.tokens"]
     types = kv.get("tokenizer.ggml.token_type") or [1] * len(tokens)
     merges = kv.get("tokenizer.ggml.merges") or []
@@ -205,13 +205,13 @@ def write_tokenizer(out: pathlib.Path, kv: dict) -> dict:
     return special
 
 
-SIDE_BIN = "-maya-indexers.bin"                     # (a GGUF; the Hub reads a lone .gguf as the model)
-SIDE_NAMES = (SIDE_BIN, "-maya-indexers.gguf")       # (.gguf: its name up to v1.1.30)
+SIDE_BIN = "-wam-indexers.bin"                     # (a GGUF; the Hub reads a lone .gguf as the model)
+SIDE_NAMES = (SIDE_BIN, "-wam-indexers.gguf")       # (.gguf: its name up to v1.1.30)
 
 
 def find_shards(model: pathlib.Path, names: list[str] | None, indexers: str | None):
     """(the main set's shards, the indexers' side file or None) - every .gguf in the folder (and the indexers'
-    -maya-indexers.bin) unless named."""
+    -wam-indexers.bin) unless named."""
     paths = [model / n for n in names] if names else sorted(model.glob("*.gguf")) + sorted(model.glob("*" + SIDE_BIN))
     missing = [p for p in paths if not p.is_file()]
     if not paths or missing:
@@ -230,16 +230,16 @@ def find_shards(model: pathlib.Path, names: list[str] | None, indexers: str | No
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True, help="the directory of the GGUF's shards")
-    ap.add_argument("--out", help="default: <model>/maya-mm3")
+    ap.add_argument("--out", help="default: <model>/wam-mm3")
     ap.add_argument("--shards", nargs="+", help="the set's files in --model (default: every .gguf there)")
     ap.add_argument("--indexers", help="the dense layers' indexers side file (default: the folder's "
-                                       "*-maya-indexers.bin, or .gguf)")
+                                       "*-wam-indexers.bin, or .gguf)")
     ap.add_argument("--companions", help="the EXL3 repo's vision tower / DSpark draft files (default: <model>/../"
                                          "%s, or a whole EXL3 download beside the model)" % COMPANIONS)
     ap.add_argument("--text-only", action="store_true", help="leave the companions' vision tower and draft out")
     a = ap.parse_args()
     model = pathlib.Path(a.model).expanduser().resolve()
-    out = pathlib.Path(a.out).expanduser() if a.out else model / "maya-mm3"
+    out = pathlib.Path(a.out).expanduser() if a.out else model / "wam-mm3"
     paths, side = find_shards(model, a.shards, a.indexers)
     gs = [Gguf(p) for p in paths]
     kv = next((g.kv for g in gs if "general.architecture" in g.kv), None)
@@ -259,7 +259,7 @@ def main() -> int:
         sg = Gguf(side)
         if sg.kv.get("general.architecture") != ARCH or _ds4.short(sg):
             raise SystemExit("%s: not a whole MiniMax-M3 indexers file" % side)
-        for_, name = sg.kv.get("maya.indexers.for"), str(kv.get("general.name", "")).replace(" ", "-")
+        for_, name = sg.kv.get("wam.indexers.for"), str(kv.get("general.name", "")).replace(" ", "-")
         if for_ and name and for_ != name:
             print("note: %s says it is for %s (the set: %s)" % (side.name, for_, name))
     rel = lambda p: os.path.relpath(p, model).replace(os.sep, "/")  # noqa: E731
@@ -306,7 +306,7 @@ def main() -> int:
     if lacking:
         raise SystemExit(
             "the sparse-attention indexer of layer%s %s is not in the set%s: MiniMax-M3.1 runs it in every layer. The "
-            "Maya sets keep layers 0-2's in <name>-maya-indexers.bin beside the shards - download it into %s (or name "
+            "Wam sets keep layers 0-2's in <name>-wam-indexers.bin beside the shards - download it into %s (or name "
             "it with --indexers)" % ("s" if len(lacking) > 1 else "", ", ".join(map(str, lacking[:8])),
                                       "" if sg is None else " nor in " + side.name, model))
     # the EXL3 repo's vision tower and DSpark draft beside the GGUF's weights (the same files, any quant)
@@ -334,7 +334,7 @@ def main() -> int:
             exp_types[t[1]] = exp_types.get(t[1], 0) + 1
     recipe = {}
     try:
-        recipe = json.loads(kv.get("maya.recipe", "{}"))
+        recipe = json.loads(kv.get("wam.recipe", "{}"))
     except ValueError:
         pass
     with (out / "mm3.txt").open("w", newline="\n") as f:
@@ -351,7 +351,7 @@ def main() -> int:
         f.write("format gguf\n")
         f.write("quant_name %s\n" % str(kv.get("general.name", model.name)).replace(" ", "-"))
         if recipe.get("tier"):
-            f.write("maya.tier %s\n" % recipe["tier"])
+            f.write("wam.tier %s\n" % recipe["tier"])
         f.write("gguf.dense %s\n" % ",".join(dense))
         f.write("gguf.experts %s\n" % ",".join("%sx%d" % (k, v) for k, v in sorted(exp_types.items())))
         f.write("gguf.indexers %s\n" % (rel(side) if sg else "-"))

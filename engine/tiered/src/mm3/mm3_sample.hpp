@@ -1,4 +1,4 @@
-// src/mm3/mm3_sample.hpp - maya-mm3's sampler (mm3_main.cpp's serve loop): a request's sampling settings, the next
+// src/mm3/mm3_sample.hpp - wam-mm3's sampler (mm3_main.cpp's serve loop): a request's sampling settings, the next
 // token's distribution from a row of logits or from its candidates (Model::forward_cands), draws, and the residual of
 // speculative sampling.  Header-only, so tests/mm3_sampler_test.cpp checks it against itself.
 #pragma once

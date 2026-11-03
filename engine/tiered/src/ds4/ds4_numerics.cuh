@@ -1,4 +1,4 @@
-// src/ds4/ds4_numerics.cuh - the BF16 and FP8 (E4M3) conversions of maya-ds4's kernels, on CUDA through its
+// src/ds4/ds4_numerics.cuh - the BF16 and FP8 (E4M3) conversions of wam-ds4's kernels, on CUDA through its
 // intrinsics (cuda_bf16.h / cuda_fp8.h) and on HIP in plain arithmetic that gives the same bits: BF16 round to
 // nearest even; E4M3 (OCP "fn": no infinities, max 448) decoded exactly, rounded to nearest even and saturated.
 #pragma once

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """tools/gguf_fix_arch.py - a GLM-5.3-Flash GGUF's architecture as llama.cpp names it.
 
-Maya's quants copied "glm5next" (unsloth's early spelling) from the GGUF they were made from; llama.cpp calls the
+Wam's quants copied "glm5next" (unsloth's early spelling) from the GGUF they were made from; llama.cpp calls the
 architecture "glm5-next" and does not load the other spelling.  This renames it - `general.architecture` and every
 "glm5next." key - and keeps the header the SAME SIZE: the data section starts at the same byte, so every tensor stays
-where it was, and so do the absolute offsets a Maya pack (pack/native_experts.txt) reads.  The bytes the longer name
-adds come out of the alignment padding before the data and the `maya.recipe` JSON's spaces (and, when those are one
+where it was, and so do the absolute offsets a Wam pack (pack/native_experts.txt) reads.  The bytes the longer name
+adds come out of the alignment padding before the data and the `wam.recipe` JSON's spaces (and, when those are one
 or two short, the recipe note's "; " written ";").  Nothing after the header is touched.  Only the first shard of a split model has these keys; the others need nothing.
 
     python tools/gguf_fix_arch.py <the first .gguf> --check           what it would change (nothing is written)
@@ -124,7 +124,7 @@ def _str_of(raw: bytes) -> str:
 
 def note_tight(note: str) -> str:
     """The recipe note's "; " as ";" - the only text the rename may change, and only when the recipe's JSON spaces were
-    not enough (Maya-S and Maya-M: one byte short)."""
+    not enough (Wam-S and Wam-M: one byte short)."""
     return note.replace("; ", ";")
 
 
@@ -163,10 +163,10 @@ def renamed(h: Header) -> bytes | None:
         kvs.append((k, t, raw))
     target = h.data_start
     body = _build(h, kvs)
-    i = next((n for n, (k, t, _) in enumerate(kvs) if k == "maya.recipe" and t == STRING), None)
+    i = next((n for n, (k, t, _) in enumerate(kvs) if k == "wam.recipe" and t == STRING), None)
     if len(body) > target:                               # take the bytes from the recipe's JSON whitespace
         if i is None:
-            raise ValueError(f"the renamed header is {len(body) - target} bytes too long and has no maya.recipe")
+            raise ValueError(f"the renamed header is {len(body) - target} bytes too long and has no wam.recipe")
         recipe = json.loads(_str_of(kvs[i][2]))
         for step in (0, 1):
             if step == 1 and isinstance(recipe.get("note"), str):
@@ -197,8 +197,8 @@ def verify(path: Path, old: Header) -> None:
     assert _str_of(new.get("general.architecture")[1]) == NEW, "the architecture is not renamed"
     for (k0, t0, r0), (k1, t1, r1) in zip(old.kvs, new.kvs):
         assert k1 == (NEW + k0[len(OLD):] if k0.startswith(OLD + ".") else k0) and t0 == t1, f"{k0}: renamed wrong"
-        if k0 == "maya.recipe":
-            assert _same_recipe(_str_of(r0), _str_of(r1)), "maya.recipe changed"
+        if k0 == "wam.recipe":
+            assert _same_recipe(_str_of(r0), _str_of(r1)), "wam.recipe changed"
         elif k0 != "general.architecture":
             assert r0 == r1, f"{k0}: its value changed"
 

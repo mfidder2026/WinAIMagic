@@ -1,4 +1,4 @@
-// src/metal/spec.hpp - speculative decoding on maya-metal: the MTP drafter (the model's NextN block), as the CUDA
+// src/metal/spec.hpp - speculative decoding on wam-metal: the MTP drafter (the model's NextN block), as the CUDA
 // engine runs it (src/core/glm_mtp.cu decode_mtp): a round drafts n tokens with chained greedy NextN steps, one
 // verify window checks them, and every row is picked exactly as plain decoding picks it - so the tokens are plain
 // decoding's, only more of them per pass over the weights.
@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace maya::metal {
+namespace wam::metal {
 
 // what the caller does with a token, the same calls plain decoding makes
 struct DecodeHooks {
@@ -53,4 +53,4 @@ bool decode_spec(GlmMetal& model, int32_t y, int n_max, const Drafter& draft,
 // MTP: the NextN block's chained greedy steps, the draft length chosen by `len`
 bool decode_mtp(GlmMetal& model, int32_t y, DraftLength& len, const DecodeHooks& hooks, std::string& err);
 
-}  // namespace maya::metal
+}  // namespace wam::metal

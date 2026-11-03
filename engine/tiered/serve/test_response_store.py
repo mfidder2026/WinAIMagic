@@ -6,7 +6,7 @@ from unittest.mock import patch
 from serve.response_config import limits_from_env
 from serve.response_store import ResponseStore, StoreBusy
 from serve.server import apply_server_env
-from tools import maya_names
+from tools import wam_names
 
 
 def item(index, content="x" * 2048):
@@ -89,19 +89,19 @@ class SharedHistory(unittest.TestCase):
             with patch.dict(os.environ, {"STRATA_GLM_RESPONSES_CACHE_BYTES": value}), self.assertRaises(ValueError):
                 limits_from_env()
 
-    def test_maya_environment_aliases_take_precedence_at_startup(self):
-        with patch.dict(os.environ, {"MAYA_GLM_RESPONSES_CACHE_ENTRIES": "7",
+    def test_wam_environment_aliases_take_precedence_at_startup(self):
+        with patch.dict(os.environ, {"WAM_GLM_RESPONSES_CACHE_ENTRIES": "7",
                                      "STRATA_GLM_RESPONSES_CACHE_ENTRIES": "3"}, clear=True):
-            maya_names.alias_env(os.environ)
-            apply_server_env(maya_names.env_in({}))
+            wam_names.alias_env(os.environ)
+            apply_server_env(wam_names.env_in({}))
             self.assertEqual(limits_from_env()["CACHE_ENTRIES"], 7)
 
-    def test_maya_config_aliases_and_config_over_environment_precedence(self):
-        for env in ({"MAYA_GLM_RESPONSES_CACHE_ENTRIES": "11", "STRATA_GLM_RESPONSES_CACHE_ENTRIES": "5"},
+    def test_wam_config_aliases_and_config_over_environment_precedence(self):
+        for env in ({"WAM_GLM_RESPONSES_CACHE_ENTRIES": "11", "STRATA_GLM_RESPONSES_CACHE_ENTRIES": "5"},
                     {"STRATA_GLM_RESPONSES_CACHE_ENTRIES": "11"}):
-            with self.subTest(env=env), patch.dict(os.environ, {"MAYA_GLM_RESPONSES_CACHE_ENTRIES": "7"}, clear=True):
-                maya_names.alias_env(os.environ)
-                apply_server_env(maya_names.env_in({"env": env}))
+            with self.subTest(env=env), patch.dict(os.environ, {"WAM_GLM_RESPONSES_CACHE_ENTRIES": "7"}, clear=True):
+                wam_names.alias_env(os.environ)
+                apply_server_env(wam_names.env_in({"env": env}))
                 self.assertEqual(limits_from_env()["CACHE_ENTRIES"], 11)
 
 

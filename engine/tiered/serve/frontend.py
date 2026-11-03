@@ -101,7 +101,7 @@ class ChatTemplate:
             # MiniMax's card: "set reasoning_effort in the chat template: low, medium, high, xhigh or max" - its
             # template has one thinking mode, adaptive (the model decides whether to think), and writes the effort
             # beside it; none named (Auto) is the template's default.  Off is thinking_mode "disabled" (MiniMax-M3's
-            # words, the turn opened with </mm:think>) - the one place Maya's prompt differs from MiniMax's template.
+            # words, the turn opened with </mm:think>) - the one place Wam's prompt differs from MiniMax's template.
             off = kwargs.pop("enable_thinking", None) is False
             level = kwargs.pop("reasoning_effort", None)
             level = name or level
@@ -221,9 +221,9 @@ def config_budget(value):
 
 
 def deepseek_keep_thinking() -> bool:
-    """MAYA_DS4_KEEP_THINKING=1: an earlier turn's reasoning stays in the prompt for the turns after it, where
+    """WAM_DS4_KEEP_THINKING=1: an earlier turn's reasoning stays in the prompt for the turns after it, where
     DeepSeek's own serving drops it at the next user turn - so a tool-less chat's next turn starts with the prompt the
-    model already holds (with MAYA_DS4_SLOT_KEEP, with its state), instead of one that differs at every assistant turn."""
+    model already holds (with WAM_DS4_SLOT_KEEP, with its state), instead of one that differs at every assistant turn."""
     return os.environ.get("STRATA_DS4_KEEP_THINKING", "0") not in ("", "0")
 
 

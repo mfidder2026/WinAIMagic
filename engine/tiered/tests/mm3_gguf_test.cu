@@ -1,4 +1,4 @@
-// tests/mm3_gguf_test.cu - maya-mm3's GGUF weights (src/mm3/mm3_gguf.cu over maya-ds4's src/ds4/ds4_iq.cu, the CPU
+// tests/mm3_gguf_test.cu - wam-mm3's GGUF weights (src/mm3/mm3_gguf.cu over wam-ds4's src/ds4/ds4_iq.cu, the CPU
 // lane's mm3_cpu_gg.cpp) on random blocks, no model:
 //   * the dense types (Q4_K, Q5_K, Q6_K, Q8_0): the kernels' values, the FP16 rows and the host's rows equal to ggml's
 //     dequantize_row_*; the GEMVs (1, 3, 16 activations) against a double reference on the int8 activations; the
@@ -612,7 +612,7 @@ void test_experts(int tg, int tu, int td, cudaStream_t s) {
     cudaFree(dpart), cudaFree(dwo);
 }
 
-// gate / up / down types: MiniMax-M3.1's Maya-XS and Maya-S layers (one type, and gate / up of two), and the i-quants
+// gate / up / down types: MiniMax-M3.1's Wam-XS and Wam-S layers (one type, and gate / up of two), and the i-quants
 const int kTriples[][3] = {
     {iq::kIQ1_S, iq::kIQ1_S, iq::kIQ1_S},       {iq::kIQ1_S, iq::kIQ1_S, iq::kIQ2_XXS},
     {iq::kIQ2_XXS, iq::kIQ1_S, iq::kIQ2_XXS},   {iq::kIQ2_XS, iq::kIQ2_XXS, iq::kIQ3_XXS},

@@ -1604,7 +1604,7 @@ bool Glm5Model::dflash_bind(std::string& err) {
     // one drafter at a time: the NextN block's decode and its states would run beside the DFlash windows
     // (load_pack_env sets STRATA_GLM_NO_MTP, so the block is never loaded with a DFlash drafter)
     if (has_mtp()) {
-        err = "glm dflash: the NextN (MTP) draft block is loaded too - DFlash replaces it (MAYA_GLM_NO_MTP=1)";
+        err = "glm dflash: the NextN (MTP) draft block is loaded too - DFlash replaces it (WAM_GLM_NO_MTP=1)";
         return false;
     }
     if (tail->dev_ != D->dev()) {
@@ -1775,7 +1775,7 @@ bool Glm5Model::decode_dflash(strata::kernels::SamplerParams& sp, int64_t max_ne
     // the pipelined window (its parts on consecutive tokens at once) or the batched one: dflash_pipelined
     const bool pipe = split_next_ != nullptr && dflash_pipelined(std::max(2, n_parts_));
     // the defaults (n_max / p_min < 0): on the pipelined window a draft after a wrong one costs little (its work is
-    // skipped) - Maya-L over 9 GPUs, 5 prompts: 0.3 / 0.5 / 0.7 / none within ~2% of each other, 0.5 the steadiest on
+    // skipped) - Wam-L over 9 GPUs, 5 prompts: 0.3 / 0.5 / 0.7 / none within ~2% of each other, 0.5 the steadiest on
     // a long context (53.8 against 43-52 tok/s at 0.3).  The batched window on two GPUs: a draft a round whatever its
     // confidence, then more while the product of the confidences stays at 0.9, up to kSplitDrafts - a window of two
     // costs 1.24 lone tokens there (81 against 65 ms), each more token ~28 ms; per-round stats with every window size

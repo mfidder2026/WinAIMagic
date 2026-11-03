@@ -1,8 +1,8 @@
 """tools/mm3/ref_gguf.py - tools/mm3/ref.py's oracle over a GGUF pack (tools/mm3/pack_gguf.py's): the same forward
 (ref.py's layer: transformers' MiniMax-M3.1 arithmetic in F32), each weight dequantised by llama.cpp's gguf-py from the
-GGUF's own blocks - a check of maya-mm3's GGUF path that shares none of its code.
+GGUF's own blocks - a check of wam-mm3's GGUF path that shares none of its code.
 
-    python tools/mm3/ref_gguf.py --pack <model>/maya-mm3 --ids 200019,1234,... [--dump ref.npz] [--layers N]
+    python tools/mm3/ref_gguf.py --pack <model>/wam-mm3 --ids 200019,1234,... [--dump ref.npz] [--layers N]
 
 gguf-py: GGUF_PY=<llama.cpp>/gguf-py (or an installed `gguf`).  The GGUF's norms hold 1 + w already (llama.cpp's
 converter): w is taken back from them for ref.py's Gemma norm.  --dump writes what tools/mm3/compare.py and

@@ -301,7 +301,7 @@ bool Verifier::init(const WeightTable& wt, const ModelGeometry& g, SessionState&
         }
         if (!ok2) { cudaGetLastError(); device_plan_ = false; }
     }
-    std::fprintf(stderr, "maya verify: window up to %d tokens, %.1f MiB of device buffers\n", max_t,
+    std::fprintf(stderr, "wam verify: window up to %d tokens, %.1f MiB of device buffers\n", max_t,
                  (double) count.used / 1048576.0);
     return true;
 }
@@ -881,7 +881,7 @@ bool Verifier::capture(int T, std::string& err) {
         std::vector<std::pair<int, std::string>> v;
         for (auto& [k2, c] : kinds) v.push_back({c, k2});
         std::sort(v.rbegin(), v.rend());
-        std::fprintf(stderr, "maya verify: the %d-token window graph has %zu nodes:", T, nn);
+        std::fprintf(stderr, "wam verify: the %d-token window graph has %zu nodes:", T, nn);
         for (size_t i = 0; i < v.size() && i < 40; ++i) std::fprintf(stderr, " %d x %.60s;", v[i].first, v[i].second.c_str());
         std::fprintf(stderr, "\n");
     }
@@ -894,7 +894,7 @@ bool Verifier::capture(int T, std::string& err) {
     }
     const cudaError_t ue = cudaGraphUpload(exec_[T], cs_);
     const cudaError_t us = cudaStreamSynchronize(cs_);
-    std::fprintf(stderr, "maya verify: captured the %d-token window (upload %s, sync %s)\n", T,
+    std::fprintf(stderr, "wam verify: captured the %d-token window (upload %s, sync %s)\n", T,
                  cudaGetErrorString(ue), cudaGetErrorString(us));
     return true;
 }
@@ -975,10 +975,10 @@ bool Verifier::run(int T, const int32_t* tokens, int64_t pos0, PoolMultiFn pool,
     if (pos0 + T > ss.qsa_states[0].max_cells) { err = "verify: the window runs past the context"; return false; }
     // (v1.1.32) Windows' HIP runtime submits queued GPU work only at a host wait (#133's lesson): a window that does
     // not continue the last committed one - the first after a prompt was read, a conversation taken back - waits for
-    // the device first, so it reads what the prompt path and the expert-cache refills wrote.  MAYA_QWEN_SYNC: 0 off,
+    // the device first, so it reads what the prompt path and the expert-cache refills wrote.  WAM_QWEN_SYNC: 0 off,
     // 1 that (the default on Windows + HIP), 2 before every window (a diagnosis arm)
     static const int sync_mode = [] {
-        if (const char* v = std::getenv("MAYA_QWEN_SYNC")) return std::atoi(v);
+        if (const char* v = std::getenv("WAM_QWEN_SYNC")) return std::atoi(v);
 #if defined(_WIN32) && defined(STRATA_USE_HIP)
         return 1;
 #else
@@ -1136,7 +1136,7 @@ bool Verifier::run(int T, const int32_t* tokens, int64_t pos0, PoolMultiFn pool,
                 for (int64_t v = 0; v < n_vocab_; ++v) bad += !std::isfinite(h[(size_t) t * n_vocab_ + v]);
                 if (bad) {
                     reported = true;
-                    std::fprintf(stderr, "maya dbg: verify window at position %lld, row %d: %lld of %lld logits non-finite "
+                    std::fprintf(stderr, "wam dbg: verify window at position %lld, row %d: %lld of %lld logits non-finite "
                                          "(token out %d)\n", (long long) pos0, t, (long long) bad, (long long) n_vocab_, out[t]);
                 }
             }

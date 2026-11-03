@@ -243,11 +243,11 @@ class Responses(ResponseCase):
             self.assertEqual(response.status, 503)
             self.assertEqual(response.headers["Retry-After"], "30")
 
-    def test_responses_capabilities_keep_maya_ds4_diagnostics(self):
+    def test_responses_capabilities_keep_wam_ds4_diagnostics(self):
         self.engine.info.update(vision="off", gpu_commit_capped_gb=12, pagefile_hint_gb=64)
         with self.request(path="/v1/status") as response:
             out = json.load(response)
-        self.assertEqual(out["service"], "maya")
+        self.assertEqual(out["service"], "wam")
         self.assertIn("/v1/responses", out["dialects"])
         self.assertIn("vision tower did not load", out["vision"]["error"])
         self.assertIn("12 GB", out["memory_note"])

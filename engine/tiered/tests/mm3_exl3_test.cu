@@ -1,4 +1,4 @@
-// tests/mm3_exl3_test.cu - maya-mm3's EXL3 device kernels (src/mm3/mm3_exl3.cu: MiniMax-M3.1's swigluoai in the
+// tests/mm3_exl3_test.cu - wam-mm3's EXL3 device kernels (src/mm3/mm3_exl3.cu: MiniMax-M3.1's swigluoai in the
 // routed experts; before sm_80 the tiles on Volta / Turing's tensor cores and the prompt path's busy matrices through
 // cuBLAS' FP16 GEMMs) against the scalar CPU reference - tests/exl3_test.cu's cases and tolerances for the shared
 // kernels, the same API (no model needed: any trellis bit pattern is a valid encoding, so the matrices are random

@@ -1,4 +1,4 @@
-// src/ds4/ds4_model.hpp - DeepSeek-V4.1-Flash on Maya: an EXL3 model (tools/ds4/pack.py's pack beside its files) over
+// src/ds4/ds4_model.hpp - DeepSeek-V4.1-Flash on Wam: an EXL3 model (tools/ds4/pack.py's pack beside its files) over
 // the machine's GPUs, layer-split, with the routed experts that do not fit in VRAM on the CPU lane.
 //
 // Windows of up to 16 tokens through every layer (a prompt in windows, a decode step a window of one): each query of a
@@ -25,7 +25,7 @@
 namespace strata::ds4 {
 
 struct Options {
-    std::string pack;                 // <model>/maya-ds4
+    std::string pack;                 // <model>/wam-ds4
     int64_t max_context = 32768;
     std::vector<int> gpus;            // empty: every visible GPU
     int64_t reserve_mib = 600;        // VRAM left free on each GPU
@@ -318,7 +318,7 @@ public:
     /// Keep the state at the current position as a restore point a request asked for (GEN marks= / shared=: the start
     /// of the last user message, a point near the prompt's tail, the end of a shared start - shared: given up last),
     /// besides the three above: restore() and a slot go back to these too.  At most marks_cap() a conversation
-    /// (MAYA_DS4_RESTORE_POINTS, 4; 0: none kept), the least recently used giving way; each check_bytes() of host RAM.
+    /// (WAM_DS4_RESTORE_POINTS, 4; 0: none kept), the least recently used giving way; each check_bytes() of host RAM.
     void mark(bool shared = false);
     int marks_cap() const;
     size_t check_bytes() const;

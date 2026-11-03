@@ -1,4 +1,4 @@
-"""serve/models.py - the web app's Models page: the run configs the setup wrote (maya-<model>.json beside maya.py), what
+"""serve/models.py - the web app's Models page: the run configs the setup wrote (wam-<model>.json beside wam.py), what
 each one runs with, the engine settings the page changes in them, and a model deleted (delete_plan, delete).
 
 A config's settings, as the page shows them (None: the engine's own default, or "auto"):
@@ -6,10 +6,10 @@ A config's settings, as the page shows them (None: the engine's own default, or 
   GLM:       parallel, draft ("mtp" | "dflash2"), expert_cache, prefill, kv_streaming, kv_resident
   DeepSeek:  parallel, draft ("dspark" | "none"), tp, mmap ("auto" | "on" | "off"), prefill_chunk, cpu_threads
   MiniMax:   parallel, draft ("dspark" | "none"), tp (0: the layers split, no groups), kv_cache, kv_streaming,
-             kv_resident, cpu_threads (maya-mm3 stops at a flag it does not know: only its own are written)
-  CYBER-FROST (the `maya` engine's Qwen path; its server always loads the MTP drafter - "none" is --mtp-max-t 1):
+             kv_resident, cpu_threads (wam-mm3 stops at a flag it does not know: only its own are written)
+  CYBER-FROST (the `wam` engine's Qwen path; its server always loads the MTP drafter - "none" is --mtp-max-t 1):
              draft ("mtp" | "none"), expert_cache, prefill, kv ("fp16" | "int8" |
-             "k8v4" | "q4_0"), ram_gb (the experts' RAM tier, MAYA_EXPERT_RAM_GB); no images (text only)
+             "k8v4" | "q4_0"), ram_gb (the experts' RAM tier, WAM_EXPERT_RAM_GB); no images (text only)
 apply() writes them back into the config's "args", "env", "gpu" and "vision" - its other keys as they are."""
 from __future__ import annotations
 
@@ -25,25 +25,25 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-import maya_names  # noqa: E402  (tools/) a setting under either of its names
-import maya_quants  # noqa: E402  (tools/) the quants' names users see, and each config's family
+import wam_names  # noqa: E402  (tools/) a setting under either of its names
+import wam_quants  # noqa: E402  (tools/) the quants' names users see, and each config's family
 
-SWITCH_FILE = ".maya-switch.json"           # the server's note to maya.py: start this config next (a switch)
-DELETE_FILE = ".maya-delete.json"           # ... and to the next server: delete this config (it was the one running)
+SWITCH_FILE = ".wam-switch.json"           # the server's note to wam.py: start this config next (a switch)
+DELETE_FILE = ".wam-delete.json"           # ... and to the next server: delete this config (it was the one running)
 CONTEXTS = [8192, 32768, 65536, 131072]       # the setup's choices (a config's own size is offered too)
-DS4_CONTEXTS = [32768, 65536, 131072, 262144, 524288, 1048576]   # ... for DeepSeek (maya.py's DS4_CONTEXTS)
-MM3_CONTEXTS = DS4_CONTEXTS                                       # ... and MiniMax (maya.py's MM3_CONTEXTS)
-QWEN_CONTEXTS = [32768, 65536, 131072, 262144]                    # ... and CYBER-FROST (maya.py's QWEN_CONTEXTS)
+DS4_CONTEXTS = [32768, 65536, 131072, 262144, 524288, 1048576]   # ... for DeepSeek (wam.py's DS4_CONTEXTS)
+MM3_CONTEXTS = DS4_CONTEXTS                                       # ... and MiniMax (wam.py's MM3_CONTEXTS)
+QWEN_CONTEXTS = [32768, 65536, 131072, 262144]                    # ... and CYBER-FROST (wam.py's QWEN_CONTEXTS)
 CONTEXT_MIN = 4096          # the dashboard's Context size: the smallest it offers ...
 CONTEXT_FALLBACK_MAX = 262144   # ... and the largest when the model file does not say what it was trained for
-# the largest context the dashboard offers without an "untested" warning, by engine: maya-ds4 its model's own 1M; the
-# GLM engine's 256K, and maya-mm3's 256K (MiniMax-M3.1 is offered up to its 1M; past 256K it has not been run end to
+# the largest context the dashboard offers without an "untested" warning, by engine: wam-ds4 its model's own 1M; the
+# GLM engine's 256K, and wam-mm3's 256K (MiniMax-M3.1 is offered up to its 1M; past 256K it has not been run end to
 # end yet)
 CONTEXT_TESTED = {"ds4": 1048576, "mm3": 262144}
 CONTEXT_TESTED_DEFAULT = 262144
 QWEN_KV =("fp16", "int8", "k8v4", "q4_0")                        # the Qwen path's --kv
-MM3_KV = ("bf16", "int8", "fp8", "fp4")                           # maya-mm3 --kv-cache (one format for K and V)
-# files the setup's quant list (tools/maya_quants.py) does not name, by their config's installer key
+MM3_KV = ("bf16", "int8", "fp8", "fp4")                           # wam-mm3 --kv-cache (one format for K and V)
+# files the setup's quant list (tools/wam_quants.py) does not name, by their config's installer key
 OTHER_QUANTS = {("deepseek", "abliterated"): "Mix-256G"}
 ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # variables that change which code the engine's process loads or runs (a library preloaded, the program search path):
@@ -104,8 +104,8 @@ def _float(v, default=None):
 
 
 def family(cfg: dict) -> str:
-    """"minimax", "deepseek", "qwen" or "glm" (maya_quants.family_of, as maya.py and the server read it)."""
-    return maya_quants.family_of(cfg)
+    """"minimax", "deepseek", "qwen" or "glm" (wam_quants.family_of, as wam.py and the server read it)."""
+    return wam_quants.family_of(cfg)
 
 
 def gpus_of(cfg: dict) -> list:
@@ -235,7 +235,7 @@ def qwen_mtp(cfg: dict) -> Path | None:
 
 def mm3_pack_has(cfg: dict, key: str) -> bool:
     """MiniMax's pack indexes `key` (mm3.txt: "dspark.num_hidden_layers" its drafter, "vision.hidden_size" its vision
-    tower - maya.py's checks)."""
+    tower - wam.py's checks)."""
     pack = pack_of(cfg)
     try:
         return any(line.startswith(key + " ")
@@ -252,7 +252,7 @@ def choices(cfg: dict) -> dict:
     if family(cfg) == "deepseek":
         return {"draft": ["dspark", "none"] if ds4_has_drafter(cfg) else ["none"],
                 "images": ds4_has_vision(cfg) or "--vision" not in (cfg.get("args") or [])}
-    if family(cfg) == "qwen":                          # (images: the setup's maya-vision entry, on or kept off)
+    if family(cfg) == "qwen":                          # (images: the setup's wam-vision entry, on or kept off)
         return {"draft": ["mtp", "none"] if qwen_mtp(cfg) is not None else ["none"],
                 "images": bool(cfg.get("vision") or cfg.get("vision_off"))}
     f = dflash_file(cfg)
@@ -265,7 +265,7 @@ def settings_of(cfg: dict) -> dict:
     args = cfg.get("args") or []
     env = {str(k): str(v) for k, v in (cfg.get("env") or {}).items()}
     out = {"context": _int(flag(args, "--max-context"), 32768), "gpus": gpus_of(cfg), "env": env}
-    if family(cfg) == "minimax":                       # (maya-mm3's own defaults where the config names none)
+    if family(cfg) == "minimax":                       # (wam-mm3's own defaults where the config names none)
         vision, kvs = flag(args, "--vision"), flag(args, "--kv-streaming")
         out.update(images=vision == "on" or (vision is None and mm3_pack_has(cfg, "vision.hidden_size")),
                    parallel=_int(flag(args, "--parallel"), 1),
@@ -278,7 +278,7 @@ def settings_of(cfg: dict) -> dict:
         return out
     if family(cfg) == "qwen":
         ec, pf = flag(args, "--expert-cache", "auto"), flag(args, "--prefill", "auto")
-        ram = maya_names.lookup(env, "MAYA_EXPERT_RAM_GB")
+        ram = wam_names.lookup(env, "WAM_EXPERT_RAM_GB")
         out.update(images=bool(cfg.get("vision")), reserve_mib=_int(flag(args, "--vram-reserve-mib")),
                    draft="mtp" if flag(args, "--mtp") and flag(args, "--mtp-max-t") != "1" else "none",
                    expert_cache=None if ec == "auto" else _int(ec), prefill=None if pf == "auto" else _int(pf),
@@ -313,7 +313,7 @@ def glm_streams(cfg: dict) -> bool:
     if kvs is not None:
         return kvs != "off"
     return (_int(flag(args, "--kv-resident"), 0) or 0) > 0 or \
-        (_int(maya_names.lookup(env, "MAYA_GLM_KV_RESIDENT"), 0) or 0) > 0
+        (_int(wam_names.lookup(env, "WAM_GLM_KV_RESIDENT"), 0) or 0) > 0
 
 
 def _num(s: dict, key: str, lo: int, hi: int, what: str, none_ok: bool = True):
@@ -396,7 +396,7 @@ def apply(cfg: dict, settings: dict) -> dict:
         if qwen_mtp(cfg) is not None:   # (loaded either way - the server needs it; "none" keeps its drafts off)
             args = set_flag(args, "--mtp", qwen_mtp(cfg))
         args = drop_flag(args, "--mtp-max-t") if s["draft"] == "mtp" else set_flag(args, "--mtp-max-t", 1)
-        # Images: the config's "vision" (maya-vision with the model's mmproj) and the engine's bare --vision flag (GENI
+        # Images: the config's "vision" (wam-vision with the model's mmproj) and the engine's bare --vision flag (GENI
         # requests); off keeps the entry as "vision_off", so Images can be switched on again
         if s.get("images") and not out.get("vision"):
             if not out.get("vision_off"):
@@ -418,18 +418,18 @@ def apply(cfg: dict, settings: dict) -> dict:
         ram = _num(s, "ram_gb", 0, 4096, "Experts in RAM (GB)")
         env2 = dict(out.get("env") or {})
         if ram is None:
-            for name in maya_names.both_names("MAYA_EXPERT_RAM_GB"):   # (set under either name)
+            for name in wam_names.both_names("WAM_EXPERT_RAM_GB"):   # (set under either name)
                 env2.pop(name, None)
         else:
-            for name in maya_names.both_names("MAYA_EXPERT_RAM_GB"):
+            for name in wam_names.both_names("WAM_EXPERT_RAM_GB"):
                 env2.pop(name, None)
-            env2["MAYA_EXPERT_RAM_GB"] = str(ram)
+            env2["WAM_EXPERT_RAM_GB"] = str(ram)
         if env2:
             out["env"] = env2
         else:
             out.pop("env", None)
     elif fam == "minimax":
-        # (maya-mm3 --parallel: n conversations at once - each its own KV cache in VRAM, so no KV streaming and no DSpark
+        # (wam-mm3 --parallel: n conversations at once - each its own KV cache in VRAM, so no KV streaming and no DSpark
         #  while it is above 1; those two settings stay as chosen for the day it is 1 again; written where it changes)
         par = _num(s, "parallel", 1, 8, "Answers at once", none_ok=False)
         args = set_flag(args, "--parallel", par) if par > 1 or "--parallel" in args else args
@@ -467,7 +467,7 @@ def apply(cfg: dict, settings: dict) -> dict:
         ch = _num(s, "prefill_chunk", 16, 65536, "Prompt chunk")
         args = set_flag(args, "--chunk", ch) if ch is not None else drop_flag(args, "--chunk")
     elif ds4:
-        # (maya-ds4 --parallel: n conversations at once - each its own context's caches in VRAM; written where it changes)
+        # (wam-ds4 --parallel: n conversations at once - each its own context's caches in VRAM; written where it changes)
         par = _num(s, "parallel", 1, 8, "Answers at once", none_ok=False)
         args = set_flag(args, "--parallel", par) if par > 1 or "--parallel" in args else args
         if s.get("draft") not in can["draft"]:
@@ -549,15 +549,15 @@ def shown_settings(cfg: dict) -> dict:
 
 def command(cfg: dict) -> dict:
     """What the config runs: the engine, its arguments and its environment (the page's preview, secrets masked)."""
-    return {"exe": Path(str(cfg.get("exe") or "maya")).name, "args": [str(a) for a in cfg.get("args") or []],
+    return {"exe": Path(str(cfg.get("exe") or "wam")).name, "args": [str(a) for a in cfg.get("args") or []],
             "env": shown_env(cfg.get("env"))}
 
 
 # ------------------------------------------------------------------ the list
 def config_paths(root: Path) -> list:
-    """The installed models' configs, the most recently used first (maya.py's configs())."""
+    """The installed models' configs, the most recently used first (wam.py's configs())."""
     try:
-        found = [p for p in Path(root).glob("maya-*.json") if not p.name.endswith(".shared-settings.json")]
+        found = [p for p in Path(root).glob("wam-*.json") if not p.name.endswith(".shared-settings.json")]
         return sorted(found, key=lambda p: p.stat().st_mtime, reverse=True)
     except OSError:
         return []
@@ -595,15 +595,15 @@ def folder_size(pack: Path | None) -> int | None:
 
 
 def quant_label(cfg: dict, path: Path) -> str:
-    """The files a config runs, as shown after the model's name ("Maya-XS", "UD-Q8_K_XL", "EXL3 3.5 bpw" - the setup's
-    names, maya_quants); else its installer key, or the config's own name for one the setup did not write."""
-    fam, key = family(cfg), maya_quants.config_key(cfg)
-    what = maya_quants.tier(fam, key) or maya_quants.OTHERS.get((fam, key)) or OTHER_QUANTS.get((fam, str(key).lower()))
-    return str(what or key or path.stem.removeprefix("maya-").removesuffix("-hip"))
+    """The files a config runs, as shown after the model's name ("Wam-XS", "UD-Q8_K_XL", "EXL3 3.5 bpw" - the setup's
+    names, wam_quants); else its installer key, or the config's own name for one the setup did not write."""
+    fam, key = family(cfg), wam_quants.config_key(cfg)
+    what = wam_quants.tier(fam, key) or wam_quants.OTHERS.get((fam, key)) or OTHER_QUANTS.get((fam, str(key).lower()))
+    return str(what or key or path.stem.removeprefix("wam-").removesuffix("-hip"))
 
 
 def missing(cfg: dict) -> str | None:
-    """What keeps a config from starting (maya.py stops at it - a switch to it would leave no model running): None when
+    """What keeps a config from starting (wam.py stops at it - a switch to it would leave no model running): None when
     its engine and pack are named and the pack is on this PC."""
     pack = pack_of(cfg)
     if not cfg.get("exe") or pack is None:
@@ -675,13 +675,13 @@ def listing(root: Path, running: str | None) -> dict:
 
 def own_defaults(path: Path) -> bool:
     """A switch to the config at `path` (the Models page): its model's own sampling and thinking level
-    (maya_quants.MODEL_DEFAULTS, as the setup writes them) written into it where they differ - a config from an older
+    (wam_quants.MODEL_DEFAULTS, as the setup writes them) written into it where they differ - a config from an older
     setup, or with another model's values - the one before kept beside it (<config>.prev).  True when it changed."""
     cfg = read(path)
     if not cfg:
         return False
-    sampling, effort = maya_quants.model_defaults(cfg)
-    budget = maya_quants.thinking_budget_for(cfg)      # (GLM's 8192 where none was set, or still the old 32768)
+    sampling, effort = wam_quants.model_defaults(cfg)
+    budget = wam_quants.thinking_budget_for(cfg)      # (GLM's 8192 where none was set, or still the old 32768)
     if cfg.get("sampling") == sampling and cfg.get("reasoning_effort") == effort and budget is None:
         return False
     p = Path(path)
@@ -717,44 +717,44 @@ def save(path: Path, settings: dict) -> dict:
     first time the page changes it, what the setup wrote: installer.as_set_up, the page's Reset)."""
     cfg = read(path)
     if not cfg:
-        raise ValueError(f"{Path(path).name}: not a config Maya can read")
+        raise ValueError(f"{Path(path).name}: not a config Wam can read")
     return _commit(path, cfg, apply(cfg, settings))
 
 
 # ------------------------------------------------------------------ Turbo (the page's Turbo button)
 # The fastest settings the engine has, for people who play with speed and run benchmarks.  What the engine needs a start
-# for is written into the config (the same "settings saved, Maya starts again" flow); the config keeps a "turbo" note:
+# for is written into the config (the same "settings saved, Wam starts again" flow); the config keeps a "turbo" note:
 # what it was before, so that switching Turbo off puts every one of these back.  The request-level half (greedy
 # decoding, the fastest thinking level, coding prompts) lives in the page (serve/web/turbo-core.js).
 TURBO_CONTEXT = 32768                               # GLM and MiniMax: a smaller context leaves VRAM to the experts ...
 TURBO_CONTEXT_FAMILIES = ("glm", "minimax")         # ... DeepSeek's context is cheap, Qwen keeps its own
 # Turbo trades quality for speed on purpose (benchmarks, playing with the engine): it goes past the safeguards.
 # Expert skipping, where the engine has it (docs/SETTINGS.md): GLM's MISS_SKIP leaves out the light experts VRAM does not
-# hold on layers 23 and up, at the highest value the docs measured (0.16: 30.9 vs 27.4 tok/s on Maya-S24, KL 0.075;
+# hold on layers 23 and up, at the highest value the docs measured (0.16: 30.9 vs 27.4 tok/s on Wam-S24, KL 0.075;
 # _FROM stays 23 - the docs warn the early layers notice it far more); DeepSeek's RAM_SKIP the same rule for every
-# expert VRAM does not hold, at the highest value documented (Maya-XS, DSpark: 27.8 -> 39.7 tok/s at 0.14).  MiniMax and
+# expert VRAM does not hold, at the highest value documented (Wam-XS, DSpark: 27.8 -> 39.7 tok/s at 0.14).  MiniMax and
 # Qwen have no skipping.  DeepSeek's DSPARK_CUM is lowered with the draft floor below (longer verified windows).
-# Not used: MAYA_GLM_TRUNK_KEEP(_MAP) (its layer map is per model, a uniform value hurts the early layers),
-# MAYA_*_DISK_SKIP_* (only for experts that fit neither VRAM nor RAM), MAYA_GLM_DFLASH_MIN/_CUM (meant for per-request
-# tuning, no measured fast value).  The loop guard (MAYA_LOOP_GUARD) is deliberately NOT touched: it costs no speed and
+# Not used: WAM_GLM_TRUNK_KEEP(_MAP) (its layer map is per model, a uniform value hurts the early layers),
+# WAM_*_DISK_SKIP_* (only for experts that fit neither VRAM nor RAM), WAM_GLM_DFLASH_MIN/_CUM (meant for per-request
+# tuning, no measured fast value).  The loop guard (WAM_LOOP_GUARD) is deliberately NOT touched: it costs no speed and
 # stops greedy runaway loops, which would ruin a benchmark.
 # Where the whole model is in VRAM those skips have nothing to leave out, so Turbo also caps the routed experts a token
-# computes, wherever they live (MAYA_*_RESIDENT_TOPK, docs/SETTINGS.md; the weight rule MAYA_*_RESIDENT_SKIP_W is not
+# computes, wherever they live (WAM_*_RESIDENT_TOPK, docs/SETTINGS.md; the weight rule WAM_*_RESIDENT_SKIP_W is not
 # used: on the AMD Strix Halo test PC 0.20 already gave garbage, the rank cap degrades more gently).  The values are the
 # fastest whose output was still sound there (a three.js page that parses with `node --check`, short factual answers):
-# DeepSeek IQ1_M keeps 3 of its 6 experts a token (40.8 -> 49.5 tok/s with Turbo's other settings), GLM Maya-M-Derisked 4
+# DeepSeek IQ1_M keeps 3 of its 6 experts a token (40.8 -> 49.5 tok/s with Turbo's other settings), GLM Wam-M-Derisked 4
 # of its 8 (33.2 -> 38.8; 3 gave a page with a duplicate import and slower drafts).
-TURBO_ENV = {"glm": {"MAYA_GLM_MISS_SKIP_W": "0.16", "MAYA_GLM_MISS_SKIP_FROM": "23", "MAYA_GLM_RESIDENT_TOPK": "4"},
-             "deepseek": {"MAYA_DS4_RAM_SKIP_W": "0.14", "MAYA_DS4_DSPARK_CUM": "0.3", "MAYA_DS4_RESIDENT_TOPK": "3"}}
+TURBO_ENV = {"glm": {"WAM_GLM_MISS_SKIP_W": "0.16", "WAM_GLM_MISS_SKIP_FROM": "23", "WAM_GLM_RESIDENT_TOPK": "4"},
+             "deepseek": {"WAM_DS4_RAM_SKIP_W": "0.14", "WAM_DS4_DSPARK_CUM": "0.3", "WAM_DS4_RESIDENT_TOPK": "3"}}
 # the drafter that goes fastest where the pack has it: DSpark (DeepSeek, MiniMax), MTP (Qwen).  GLM keeps the drafter the
 # setup measured for this PC (MTP or DFlash2: which is faster depends on the GPUs).
 TURBO_DRAFT = {"deepseek": "dspark", "minimax": "dspark", "qwen": "mtp"}
 # DSpark's draft confidence floor (default 0.7), lowered so that longer windows are verified
 TURBO_DSPARK_CONF = 0.3
 TURBO_DSPARK_FAMILIES = ("deepseek", "minimax")
-# The smallest quants (GLM and DeepSeek Maya-XS, experts at 1-2 bits) keep every expert a token routes to: on 3x V100 the
-# cap gained at most 2-6% there, and GLM Maya-XS with 4 of 8 experts invented three.js classes and rambled.
-TURBO_NO_TOPK = ("maya-xs",)
+# The smallest quants (GLM and DeepSeek Wam-XS, experts at 1-2 bits) keep every expert a token routes to: on 3x V100 the
+# cap gained at most 2-6% there, and GLM Wam-XS with 4 of 8 experts invented three.js classes and rambled.
+TURBO_NO_TOPK = ("wam-xs",)
 
 
 def turbo_smallest_quant(cfg: dict) -> bool:
@@ -809,7 +809,7 @@ def turbo_enable(path: Path) -> dict:
     must start again."""
     cfg = read(path)
     if not cfg:
-        raise ValueError(f"{Path(path).name}: not a config Maya can read")
+        raise ValueError(f"{Path(path).name}: not a config Wam can read")
     if turbo_on(cfg):
         raise ValueError("Turbo is already on")
     cur, patch = settings_of(cfg), turbo_patch(cfg)
@@ -827,7 +827,7 @@ def turbo_disable(path: Path) -> dict:
     back to what they were."""
     cfg = read(path)
     if not cfg:
-        raise ValueError(f"{Path(path).name}: not a config Maya can read")
+        raise ValueError(f"{Path(path).name}: not a config Wam can read")
     note = cfg.get("turbo")
     if not isinstance(note, dict):
         raise ValueError("Turbo is not on")
@@ -846,8 +846,8 @@ def turbo_disable(path: Path) -> dict:
 
 
 # ------------------------------------------------------------------ deleting a model (the page's Delete)
-# Off the list: its config, its start scripts and what Maya keeps beside it.  With its files: what the setup downloaded
-# for it and the pack Maya built - never a file another model here runs from, nor one outside the models folder the
+# Off the list: its config, its start scripts and what Wam keeps beside it.  With its files: what the setup downloaded
+# for it and the pack Wam built - never a file another model here runs from, nor one outside the models folder the
 # setup downloaded into (a GGUF of your own stays; its pack goes).  Its DFlash2 drafter goes too: another model drafting
 # with the same file drafts with MTP from then on (its --dflash taken out).
 GGUF_PART = re.compile(r"^(.*)-(\d{5})-of-(\d{5})\.gguf$", re.I)
@@ -971,7 +971,7 @@ def delete_plan(root: Path, path: Path) -> dict:
     models = _res((cfg.get("installer") or {}).get("models_dir"))
     pack = _res(pack_of(cfg))
     if models is None or pack is None:
-        out["why"] = "Maya's setup did not download this model's files, so it does not know which ones are its own"
+        out["why"] = "Wam's setup did not download this model's files, so it does not know which ones are its own"
         return out
     folder = pack.parent
     out["folder"] = str(folder)
@@ -1000,7 +1000,7 @@ def delete_plan(root: Path, path: Path) -> dict:
                 if not shared(f):
                     add(f, "gguf")
         else:
-            out["kept"].append(f"Your own model files in {folder} stay; only the pack Maya built from them goes.")
+            out["kept"].append(f"Your own model files in {folder} stay; only the pack Wam built from them goes.")
     for v in map(_res, vision_files(cfg)):
         if v is not None and _within(v, models) and not shared(v):
             add(v, "vision")
@@ -1087,18 +1087,18 @@ def delete(root: Path, path: Path, files: bool = False) -> dict:
 # folder or a file of 100 MB or more (a download's log is not listed), and one level down in a folder another model
 # runs from only a folder with a pack of its own (GLM's quants side by side in GLM-5.3-Flash/: DeepSeek's dspark/ and
 # vision/ beside its GGUF folder are read through the pack, so a folder without one is never taken for unused).  Never
-# a hidden one, the project or the home folder.  Maya may not have downloaded it: the page says what is in it, and
+# a hidden one, the project or the home folder.  Wam may not have downloaded it: the page says what is in it, and
 # deletes one at a time.
 LEFTOVER_MIN = 10 ** 8
 PACK_MARKS = ("sources.json", "tensors.txt", "mm3.txt", "ds4.txt", "native_experts.txt", "index.txt")
 
 
 def models_dirs(root: Path) -> list:
-    """The folders the setup downloaded into: each config's, and the setup's own (Maya-data/models beside the project)
+    """The folders the setup downloaded into: each config's, and the setup's own (Wam-data/models beside the project)
     - not the home folder, nor one the project is in."""
     project, home = _res(root), Path.home().resolve()
     found = [_res((read(p).get("installer") or {}).get("models_dir")) for p in config_paths(root)]
-    found.append(_res(Path(root).parent / "Maya-data" / "models"))
+    found.append(_res(Path(root).parent / "Wam-data" / "models"))
     out = []
     for d in found:
         if d is None or d in out or not d.is_dir() or _within(home, d) or (project and _within(project, d)):
@@ -1108,7 +1108,7 @@ def models_dirs(root: Path) -> list:
 
 
 def _has_pack(p: Path) -> bool:
-    """A pack Maya built is in `p` (or `p` is one), two folders deep at most."""
+    """A pack Wam built is in `p` (or `p` is one), two folders deep at most."""
     try:
         return any(next(p.glob(pat + m), None) is not None for pat in ("", "*/", "*/*/") for m in PACK_MARKS)
     except OSError:
@@ -1117,7 +1117,7 @@ def _has_pack(p: Path) -> bool:
 
 def leftovers(root: Path) -> dict:
     """{"folders": the models folders, "items": [{"path", "name", "bytes", "folder" (a folder, else a file), "pack" (a
-    pack Maya built is in it), "hub" (downloaded from the Hugging Face Hub), "modified"}], "bytes"}: what no model here
+    pack Wam built is in it), "hub" (downloaded from the Hugging Face Hub), "modified"}], "bytes"}: what no model here
     runs from, largest first."""
     project, home = _res(root), Path.home().resolve()
     refs = [r for p in config_paths(root) for r in runs_from(read(p))]

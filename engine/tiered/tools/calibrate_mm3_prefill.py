@@ -1,6 +1,6 @@
-"""The prefill calibration for MiniMax-M3.1 (maya-mm3): how this PC reads prompts fastest, measured on it.
+"""The prefill calibration for MiniMax-M3.1 (wam-mm3): how this PC reads prompts fastest, measured on it.
 
-maya-mm3 reads a prompt in chunks of tokens through its layers; two of its settings depend on the PC and are measured
+wam-mm3 reads a prompt in chunks of tokens through its layers; two of its settings depend on the PC and are measured
 rather than guessed (one engine start, a few minutes):
   - the chunk: more tokens a forward give each routed expert more rows to multiply at once (faster on a GPU that holds
     every expert), but its buffers take GPU memory - a chunk above the default where every expert still fits, or
@@ -9,14 +9,14 @@ rather than guessed (one engine start, a few minutes):
     the default chunk (whose buffers leave the experts more room) measures;
   - the dense GEMMs' backend: the BLAS (cuBLAS / hipBLAS) or, on AMD, hipBLASLt with each matrix shape's fastest kernel
     timed on this GPU (its first product of a shape; the picks kept beside the model, lt-picks.txt).
-The engine measures them itself (maya-mm3 --calibrate-prefill) over a real text's tokens (this repository's
+The engine measures them itself (wam-mm3 --calibrate-prefill) over a real text's tokens (this repository's
 CHANGELOG.md as one chat message, ~4K tokens, the config's tokenizer and chat template), each setting twice, and keeps
 the fastest for this PC in the pack's prefill-tune.txt - a line keyed by the GPUs, their architecture, the GPU runtime
 and the driver, which every later start reads (a new GPU or driver: the defaults until it is measured again).  The
 config's own settings (context, KV cache, pictures, drafter) stay as they are, so the memory measured is the one the
 model runs with.
 
-    python tools/calibrate_mm3_prefill.py maya-mm3.json     # measure and print; ./maya.sh --calibrate does it too
+    python tools/calibrate_mm3_prefill.py wam-mm3.json     # measure and print; ./wam.sh --calibrate does it too
 """
 from __future__ import annotations
 
@@ -130,7 +130,7 @@ def run(cfg: dict, say=print, runner=None) -> dict:
     ...}).  runner(cmd, env, cwd, timeout) -> (returncode, stderr lines) runs the engine (tests: a stand-in).  Raises
     when the engine did not finish."""
     t0 = time.time()
-    with tempfile.TemporaryDirectory(prefix="maya-prefill-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="wam-prefill-") as tmp:
         tmp = Path(tmp)
         ids = prompt_ids(cfg)
         ids_file = None
@@ -178,7 +178,7 @@ def run_engine(cmd: list, env: dict, cwd, timeout: float, say=print) -> tuple[in
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        sys.exit("usage: calibrate_mm3_prefill.py <maya-mm3.json>")
-    import maya_names
-    c = maya_names.env_in(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig")))
+        sys.exit("usage: calibrate_mm3_prefill.py <wam-mm3.json>")
+    import wam_names
+    c = wam_names.env_in(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig")))
     print(json.dumps(run(c), indent=1))

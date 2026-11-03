@@ -1,4 +1,4 @@
-// tests/mm3_lane_test.cpp - maya-mm3's CPU lane: run_multi's one-dispatch schedule against the four phases
+// tests/mm3_lane_test.cpp - wam-mm3's CPU lane: run_multi's one-dispatch schedule against the four phases
 // (MM3_LANE_OLD) on random EXL3 sub-experts (MiniMax-M3.1's at --tp 4: 6144 x 768 gate / up, 768 x 6144 down, 4 bits)
 // - the same bits - and the time of each.
 //     g++ -O3 -std=c++17 -mavx2 -mfma -mf16c -Iinclude -Isrc/mm3 tests/mm3_lane_test.cpp src/mm3/mm3_cpu.cpp \

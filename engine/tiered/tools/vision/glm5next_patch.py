@@ -164,7 +164,7 @@ def main():
          "                    // <|begin_of_image|> ... (image embeddings) ... <|end_of_image|>\n"),
     ])
     print(f"llama.cpp at {root}: {MARK} vision added")
-    # the encoder's float32 sums on NVIDIA and AMD GPUs (compiled only into maya-vision: the engines' ggml is the
+    # the encoder's float32 sums on NVIDIA and AMD GPUs (compiled only into wam-vision: the engines' ggml is the
     # same code as before)
     sys.path.insert(0, str(here))
     import ggml_vision_precision

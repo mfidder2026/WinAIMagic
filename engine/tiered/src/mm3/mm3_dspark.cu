@@ -1,4 +1,4 @@
-// src/mm3/mm3_dspark.cu - maya-mm3's DSpark draft (mm3_dspark.hpp).
+// src/mm3/mm3_dspark.cu - wam-mm3's DSpark draft (mm3_dspark.hpp).
 #include "mm3_dspark.hpp"
 
 #include <functional>
@@ -34,10 +34,10 @@ namespace x3 = strata::mm3::exl3;
 
 namespace {
 const std::string DP = "dspark.language_model.model.dspark.";
-// MAYA_MM3_PROF=2: a proposal's parts timed (the host waits at each) and printed at the end
+// WAM_MM3_PROF=2: a proposal's parts timed (the host waits at each) and printed at the end
 struct DraftProf {
     bool on = [] {
-        const char* v = std::getenv("MAYA_MM3_PROF");
+        const char* v = std::getenv("WAM_MM3_PROF");
         return v != nullptr && std::atoi(v) == 2;
     }();
     double ms[4] = {};
@@ -268,9 +268,9 @@ struct Draft::Impl {
             !vec(pk, DP + "confidence_head.proj.bias", 0.0f, cb, 1, err))
             return false;
 #if !defined(STRATA_USE_HIP)
-        {   // (fc in FP16 where BF16 has no tensor cores; MAYA_MM3_DSPARK_FC16=0 keeps BF16 everywhere)
+        {   // (fc in FP16 where BF16 has no tensor cores; WAM_MM3_DSPARK_FC16=0 keeps BF16 everywhere)
             cudaDeviceProp pr{};
-            const char* fv = std::getenv("MAYA_MM3_DSPARK_FC16");
+            const char* fv = std::getenv("WAM_MM3_DSPARK_FC16");
             if ((fv == nullptr || std::atoi(fv) != 0) && cudaGetDeviceProperties(&pr, dev) == cudaSuccess &&
                 pr.major < 8) {
                 const size_t n = (size_t) D * NT * D;

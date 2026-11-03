@@ -1,4 +1,4 @@
-"""tools/mm3/compare.py - maya-mm3's logits (--dump-logits) against tools/mm3/ref.py's (--dump), position by position.
+"""tools/mm3/compare.py - wam-mm3's logits (--dump-logits) against tools/mm3/ref.py's (--dump), position by position.
 
     python tools/mm3/compare.py engine.bin ref.npz
 
@@ -16,7 +16,7 @@ import numpy as np
 def read_engine(path: str):
     with open(path, "rb") as f:
         if f.read(4) != b"MM3L":
-            raise SystemExit(f"{path}: not a maya-mm3 logits dump")
+            raise SystemExit(f"{path}: not a wam-mm3 logits dump")
         rows, vocab, n = struct.unpack("<3i", f.read(12))
         ids = np.frombuffer(f.read(4 * n), dtype="<i4")
         pos = np.frombuffer(f.read(4 * rows), dtype="<i4")

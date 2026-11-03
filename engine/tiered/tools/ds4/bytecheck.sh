@@ -1,8 +1,8 @@
 #!/bin/bash
-# tools/ds4/bytecheck.sh - maya-ds4's byte-identity check of two builds (a change that must not move a bit: the same
+# tools/ds4/bytecheck.sh - wam-ds4's byte-identity check of two builds (a change that must not move a bit: the same
 # prompt through each, every logit row dumped, the files compared byte for byte, the greedy tokens compared).
 #
-#   tools/ds4/bytecheck.sh <base maya-ds4> <new maya-ds4> <pack> <out dir> <ids file> [<check> ...]
+#   tools/ds4/bytecheck.sh <base wam-ds4> <new wam-ds4> <pack> <out dir> <ids file> [<check> ...]
 #     checks: windows (DS4_CHUNK_MIN=100000: windows of 16), chunked (the prompt as one chunked run), drafter
 #             (--dspark on); default: windows chunked.  64 greedy tokens after the prompt.
 #   env: NEW_RESERVE_MIB (default 600, the engine's --reserve-mib default; the packed KV caches: 624, 626 with the

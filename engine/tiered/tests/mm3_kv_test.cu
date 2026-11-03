@@ -1,4 +1,4 @@
-// tests/mm3_kv_test.cu - maya-mm3's K / V caches (mm3_kernels.cuh: KvQ) and the sparse attention over them, no model
+// tests/mm3_kv_test.cu - wam-mm3's K / V caches (mm3_kernels.cuh: KvQ) and the sparse attention over them, no model
 // needed:
 //   * every format (BF16, INT8, FP8, FP4, and K / V mixed), rows rotated or not: qk_norm_rope writes the rows, the
 //     test reads the codes back and decodes them on the CPU (its own decoder), and sparse_attn's output must match a
