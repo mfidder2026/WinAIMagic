@@ -155,6 +155,12 @@ public sealed record SystemInfo
 
 public static class ByteFormat
 {
+    /// <summary>A capacity as it says on the box: a 16 GB card reports just under 16 GiB and should not read as 15.</summary>
+    public static ulong Gib(this ulong bytes) => (ulong)Math.Round(bytes / (double)(1UL << 30));
+
+    /// <summary>LiveMetrics counts in 1e9 bytes; memory is read in the units it is sold in.</summary>
+    public const double GibPerGb = 1e9 / (1UL << 30);
+
     /// <summary>"12.3 GB", in the app's language.</summary>
     public static string Gb(this ulong bytes) =>
         (bytes / 1e9).ToString("0.0", AppLanguages.Current.Culture()) + " GB";

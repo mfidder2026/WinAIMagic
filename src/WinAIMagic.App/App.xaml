@@ -8,6 +8,15 @@
       <ResourceDictionary.MergedDictionaries>
         <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls"/>
       </ResourceDictionary.MergedDictionaries>
+      <!-- Theme.accent as the tint of every standard control -->
+      <Color x:Key="SystemAccentColor">#5C7AFF</Color>
+      <Color x:Key="SystemAccentColorLight1">#6F8AFF</Color>
+      <Color x:Key="SystemAccentColorLight2">#5C7AFF</Color>
+      <Color x:Key="SystemAccentColorLight3">#9FB1FF</Color>
+      <Color x:Key="SystemAccentColorDark1">#4F6AE6</Color>
+      <Color x:Key="SystemAccentColorDark2">#4057C4</Color>
+      <Color x:Key="SystemAccentColorDark3">#2F429A</Color>
+      <FontFamily x:Key="ContentControlThemeFontFamily">Segoe UI Variable Text</FontFamily>
     </ResourceDictionary>
   </Application.Resources>
 </Application>

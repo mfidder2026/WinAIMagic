@@ -55,9 +55,9 @@ public sealed class SystemCheck
         var s = host.System;
         var b = host.Backend;
         string title = L("Deze pc");
-        string memory = $"{s.RamTotal >> 30} GB RAM · {s.WindowsVersion}";
+        string memory = $"{s.RamTotal.Gib()} GB RAM · {s.WindowsVersion}";
         if (!b.HasGpu) return new Item("hardware", title, L("Geen bruikbare videokaart: de engine rekent op de processor.") + " " + s.Cpu + " · " + memory, CheckState.Ok);
-        var cards = string.Join(" + ", b.Adapters.Select(a => $"{a.Name} ({a.VramBytes >> 30} GB VRAM, driver {a.Driver})"));
+        var cards = string.Join(" + ", b.Adapters.Select(a => $"{a.Name} ({a.VramBytes.Gib()} GB VRAM, driver {a.Driver})"));
         return new Item("hardware", title, $"{cards} · {memory} · {host.Choice.Reason}", b.Experimental ? CheckState.Optional : CheckState.Ok);
     }
 
@@ -153,13 +153,13 @@ public sealed class SystemCheck
         if (best == null)
             return new List<Item>
             {
-                new("model", L("Model"), L($"Op deze pc met {s.RamTotal >> 30} GB RAM streamen alle modellen deels van de SSD. Dat werkt gewoon. De pc kan ook helper zijn in een cluster; daarvoor is geen model nodig."),
+                new("model", L("Model"), L($"Op deze pc met {s.RamTotal.Gib()} GB RAM streamen alle modellen deels van de SSD. Dat werkt gewoon. De pc kan ook helper zijn in een cluster; daarvoor is geen model nodig."),
                     CheckState.Optional, L("Naar Cluster"), CheckAction.OpenCluster),
                 new("disk", L("Schijfruimte"), L($"{free.GbShort()} vrij"), CheckState.Ok),
             };
         bool downloading = models.Downloading.Contains(best.Id);
         string text = downloading ? L($"{best.Name} wordt gedownload.")
-            : L($"Nog geen model. Aanbevolen voor deze pc met {s.VramTotal >> 30} GB VRAM en {s.RamTotal >> 30} GB RAM: {best.Name} ({best.TotalSize.GbShort()}), dat helemaal in VRAM en RAM past.")
+            : L($"Nog geen model. Aanbevolen voor deze pc met {s.VramTotal.Gib()} GB VRAM en {s.RamTotal.Gib()} GB RAM: {best.Name} ({best.TotalSize.GbShort()}), dat helemaal in VRAM en RAM past.")
               + (models.Catalog.Models.Any(m => host.FitOf(m) == MemoryPlanner.Fit.Streams) ? " " + L("De grotere modellen kun je ook gebruiken: die streamen van de SSD.") : "");
         var model = new Item("model", L("Model"), text, CheckState.Todo, downloading ? null : L("Naar Modellen"), downloading ? null : CheckAction.OpenModels);
         bool enough = free > best.TotalSize + (5UL << 30);
@@ -175,9 +175,9 @@ public sealed class SystemCheck
     {
         string title = L("Wisselbestand");
         if (required == 0 || have >= required)
-            return new Item("pagefile", title, L($"{(have >> 30)} GB, genoeg voor het vastzetten van het model."), CheckState.Ok);
+            return new Item("pagefile", title, L($"{have.Gib()} GB, genoeg voor het vastzetten van het model."), CheckState.Ok);
         return new Item("pagefile", title,
-            L($"{(have >> 30)} GB; de engine heeft minstens {(required >> 30)} GB nodig (VRAM + 9 GB), anders zet hij te weinig vast en wordt hij veel trager. Vraagt om toestemming en werkt na een herstart."),
+            L($"{have.Gib()} GB; de engine heeft minstens {required.Gib()} GB nodig (VRAM + 9 GB), anders zet hij te weinig vast en wordt hij veel trager. Vraagt om toestemming en werkt na een herstart."),
             CheckState.Todo, L("Stel in"), CheckAction.SetPageFile);
     }
 

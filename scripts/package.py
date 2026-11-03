@@ -50,7 +50,8 @@ def tiered():
     shutil.copy2(src / "VERSION", dst / "VERSION")
     gguf_py = src / "third_party" / "llama.cpp" / "gguf-py"
     shutil.copytree(gguf_py, dst / "tools" / "gguf-py", ignore=shutil.ignore_patterns("tests", "__pycache__", "examples"))
-    for rel in ("wam.py",):
+    # the licences of the models are shown on their card before the download
+    for rel in ("wam.py", "LICENSE.minimax-m31", "LICENSE.qwen-community-1.0", "LICENSE.deepseek-v41"):
         if (src / rel).exists():
             shutil.copy2(src / rel, dst / rel)
     bin_dir = dst / "bin"

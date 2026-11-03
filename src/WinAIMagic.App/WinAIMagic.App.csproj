@@ -13,11 +13,17 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\WinAIMagic.ico</ApplicationIcon>
     <PublishReadyToRun>false</PublishReadyToRun>
+    <!-- Program.cs has the Main: the single instance is settled before anything of the UI starts. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\WinAIMagic.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\WinAIMagic.Core\WinAIMagic.Core.csproj" />
