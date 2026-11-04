@@ -162,7 +162,9 @@ public sealed class TieredEngine : EngineBase
             var buffer = new byte[f.Length - rawOffset];
             int n = f.Read(buffer, 0, buffer.Length);
             rawOffset += n;
-            foreach (var line in split.Add(buffer, n)) AddLine(line);
+            // (the server's own lines also come over its stdout: only the engine's are new here)
+            foreach (var line in split.Add(buffer, n))
+                if (!line.StartsWith("[wam]", StringComparison.Ordinal)) AddLine(line);
         }
         catch (IOException) { }
     }
