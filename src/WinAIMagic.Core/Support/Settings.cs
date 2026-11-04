@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -134,8 +135,8 @@ public sealed class Settings : INotifyPropertyChanged
         File.Move(tmp, Paths.SettingsFile, true);
     }
 
-    private static IEnumerable<System.Reflection.PropertyInfo> Stored() =>
-        typeof(Settings).GetProperties().Where(p => p.CanWrite && p.CanRead && p.GetIndexParameters().Length == 0);
+    private static IEnumerable<PropertyInfo> Stored() =>
+        typeof(Settings).GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanWrite && p.CanRead && p.GetIndexParameters().Length == 0);
 
     private static string Protect(string text) =>
         text.Length == 0 ? "" : Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(text), null, DataProtectionScope.CurrentUser));

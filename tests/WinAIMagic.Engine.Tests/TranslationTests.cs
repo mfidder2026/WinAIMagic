@@ -5,6 +5,25 @@ using Xunit;
 
 namespace WinAIMagic.Engine.Tests;
 
+/// <summary>Brief §4: settings.json atomically written, API keys encrypted, and each setting there once.</summary>
+public class SettingsFileTests : EngineTest
+{
+    [Fact]
+    public void KeysAreEncryptedAndNothingIsStoredTwice()
+    {
+        Settings.Shared.ApiKey = "geheime-sleutel-123";
+        Settings.Shared.BraveKey = "brave-sleutel-456";
+        var text = File.ReadAllText(Paths.SettingsFile);
+        Assert.DoesNotContain("geheime-sleutel-123", text);
+        Assert.DoesNotContain("brave-sleutel-456", text);
+        Assert.DoesNotContain("\"Shared\"", text);
+        Assert.Equal(1, Regex.Matches(text, "\"Port\"").Count);
+        var again = Settings.Load();
+        Assert.Equal("geheime-sleutel-123", again.ApiKey);
+        Assert.Equal("brave-sleutel-456", again.BraveKey);
+    }
+}
+
 /// <summary>Every text in the code has its translation in every language, with the same values (brief §10).</summary>
 public class TranslationTests : EngineTest
 {
