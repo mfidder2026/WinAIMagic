@@ -51,6 +51,9 @@ public static class Paths
     /// <summary>The folder of the installed app: the engine folder lies beside WinAIMagic.exe.</summary>
     public static string AppRoot => AppContext.BaseDirectory;
 
+    /// <summary>The number in Directory.Build.props: the sidebar, the system check and an exported measurement show it.</summary>
+    public static string AppVersion => typeof(Paths).Assembly.GetName().Version?.ToString(3) ?? "?";
+
     /// <summary>The installation's engine folder: cuda\, vulkan\, cpu\, tiered\, python\ (installer\WinAIMagic.iss).</summary>
     public static string EngineRoot => Path.Combine(AppRoot, "engine");
 

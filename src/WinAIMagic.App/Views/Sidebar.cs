@@ -33,7 +33,10 @@ public sealed partial class Sidebar : Grid
             RowDefinitions.Add(new RowDefinition { Height = h });
 
         var name = Ui.Label("WinAIMagic", 15, null, FontWeights.Bold, display: true);
-        var head = Ui.Row("auto,*", 10, mark, Ui.V(0, name, modelName));
+        var version = Ui.Label("v" + Paths.AppVersion, 11, Theme.Secondary);
+        version.VerticalAlignment = VerticalAlignment.Bottom;
+        version.Margin = new Thickness(0, 0, 0, 2);
+        var head = Ui.Row("auto,*", 10, mark, Ui.V(0, Ui.H(6, name, version), modelName));
         head.Margin = new Thickness(18, 10, 12, 10);
         Children.Add(head.At(0));
 

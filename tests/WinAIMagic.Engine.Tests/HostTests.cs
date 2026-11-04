@@ -298,6 +298,16 @@ public class BenchmarkTests : EngineTest
     }
 
     [Fact]
+    public void TheVersionShownIsTheOneInTheBuildProps()
+    {
+        var props = File.ReadAllText(Path.Combine(RepoRoot, "Directory.Build.props"));
+        var version = Regex.Match(props, "<Version>(.+?)</Version>").Groups[1].Value;
+        Assert.Matches(@"^\d+\.\d+\.\d+$", version);
+        Assert.Equal(version, Paths.AppVersion);
+        Assert.Contains(version, SystemCheck.AppItem().Detail);
+    }
+
+    [Fact]
     public void MeasurementsWithExpertsSkippedStandBesideTheFullModel()
     {
         const string glm = "glm-5.3-flash-compact-24";

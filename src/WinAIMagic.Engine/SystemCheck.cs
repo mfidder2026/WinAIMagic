@@ -46,7 +46,7 @@ public sealed class SystemCheck
     /// <summary>Which copy runs: an older one elsewhere on the PC is easily started by accident.</summary>
     internal static Item AppItem()
     {
-        var version = typeof(SystemCheck).Assembly.GetName().Version?.ToString(3) ?? "?";
+        var version = Paths.AppVersion;
         return new Item("app", "WinAIMagic", L($"Versie {version}") + " · " + Paths.AppRoot, CheckState.Ok);
     }
 

@@ -209,7 +209,7 @@ public sealed class BenchmarkRunner
     {
         var doc = new JsonObject
         {
-            ["app"] = typeof(BenchmarkRunner).Assembly.GetName().Version?.ToString(3),
+            ["app"] = Paths.AppVersion,
             ["hardware"] = new JsonObject
             {
                 ["gpu"] = system.Gpu,
