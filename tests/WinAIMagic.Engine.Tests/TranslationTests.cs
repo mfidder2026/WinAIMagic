@@ -9,6 +9,17 @@ namespace WinAIMagic.Engine.Tests;
 public class SettingsFileTests : EngineTest
 {
     [Fact]
+    public void TheUnencryptedCopyOfTheFirstVersionGoes()
+    {
+        File.WriteAllText(Paths.SettingsFile, "{ \"Shared\": { \"ApiKey\": \"oude-sleutel-789\" }, \"Port\": 8081 }");
+        var loaded = Settings.Load();
+        Assert.Equal(8081, loaded.Port);
+        var text = File.ReadAllText(Paths.SettingsFile);
+        Assert.DoesNotContain("oude-sleutel-789", text);
+        Assert.DoesNotContain("\"Shared\"", text);
+    }
+
+    [Fact]
     public void KeysAreEncryptedAndNothingIsStoredTwice()
     {
         Settings.Shared.ApiKey = "geheime-sleutel-123";

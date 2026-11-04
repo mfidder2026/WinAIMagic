@@ -96,11 +96,14 @@ public sealed class Settings : INotifyPropertyChanged
     public static Settings Load()
     {
         var s = new Settings { loading = true };
+        bool resave = false;
         try
         {
             if (File.Exists(Paths.SettingsFile))
             {
                 using var doc = JsonDocument.Parse(File.ReadAllText(Paths.SettingsFile));
+                // (0.1.0 also wrote a copy with the keys unencrypted: the next save leaves it out)
+                resave = doc.RootElement.TryGetProperty("Shared", out _);
                 foreach (var p in Stored())
                 {
                     if (!doc.RootElement.TryGetProperty(p.Name, out var e)) continue;
@@ -118,6 +121,7 @@ public sealed class Settings : INotifyPropertyChanged
             try { File.Copy(Paths.SettingsFile, Paths.SettingsFile + ".bad", true); } catch (IOException) { }
         }
         s.loading = false;
+        if (resave) s.Save();
         return s;
     }
 
