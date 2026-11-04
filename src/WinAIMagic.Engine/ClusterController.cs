@@ -22,7 +22,7 @@ public sealed class ClusterController : IDisposable
     public const string ServiceType = "_mdsrpc._tcp";
     public const int DefaultPort = 50052;
 
-    public sealed record Helper(string Name, string Chip, double MemoryGb, double GpuGb, string Host, int Port, bool Manual = false)
+    public sealed record Helper(string Name, string Chip, double MemoryGb, double GpuGb, string Host, int Port, bool Manual = false, bool Unreachable = false)
     {
         public string Id => $"{Host}:{Port}";
         /// <summary>A link-local address: a direct USB4 or Thunderbolt cable.</summary>
@@ -94,7 +94,8 @@ public sealed class ClusterController : IDisposable
     /// <summary>The helpers that take part in the next engine start.</summary>
     public IReadOnlyList<Helper> Active
     {
-        get { lock (gate) return IsHelperRole ? Array.Empty<Helper>() : helpers.Where(h => selected.Contains(h.Id)).ToList(); }
+        // (a helper that does not answer stays out: the second engine would not start with it)
+        get { lock (gate) return IsHelperRole ? Array.Empty<Helper>() : helpers.Where(h => selected.Contains(h.Id) && !h.Unreachable).ToList(); }
     }
 
     /// <summary>What each active helper's GPU can hold for the model, in --rpc order (unknown for a helper added by hand: 0).</summary>
@@ -135,6 +136,48 @@ public sealed class ClusterController : IDisposable
         }
         if (save) Save();
         Changed?.Invoke();
+        Probe(h);
+    }
+
+    /// <summary>Tests: what a helper added by hand reports, in MiB; null when it cannot be reached.</summary>
+    public Func<string, long?>? ProbeOverride { get; set; }
+
+    /// <summary>Ask the helpers added by hand again: one may have been turned on since.</summary>
+    public void RecheckManual()
+    {
+        List<Helper> manual;
+        lock (gate) manual = helpers.Where(h => h.Manual).ToList();
+        foreach (var h in manual) Probe(h);
+    }
+
+    /// <summary>A helper added by hand announces nothing: ask it what it can hold, as the second engine would see it.</summary>
+    private void Probe(Helper h)
+    {
+        if (ProbeOverride == null && !File.Exists(LlamaEngine.Binary(backend))) return;
+        Task.Run(() =>
+        {
+            long? mib = ProbeOverride != null ? ProbeOverride(h.Id) : AskHelper(h.Id);
+            lock (gate)
+            {
+                int i = helpers.FindIndex(x => x.Id == h.Id);
+                if (i < 0) return;
+                helpers[i] = h with { GpuGb = (mib ?? 0) * 1048576 / 1e9, Unreachable = mib == null };
+            }
+            Changed?.Invoke();
+        });
+    }
+
+    private long? AskHelper(string id)
+    {
+        var r = ChildProcess.RunToEnd(LlamaEngine.Binary(backend), new[] { "--rpc", id, "--list-devices" }, TimeSpan.FromSeconds(20));
+        return r == null ? null : ParseHelperMemory(r.Value.Output);
+    }
+
+    /// <summary>The MiB of the first RPC device in --list-devices: "RPC0: 10.0.0.2:50052 (16310 MiB, 15172 MiB free)".</summary>
+    internal static long? ParseHelperMemory(string output)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(output, @"RPC\d*:\s+\S+\s+\((\d+) MiB");
+        return m.Success ? long.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) : null;
     }
 
     public void Remove(Helper helper)

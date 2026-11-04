@@ -100,6 +100,7 @@ public sealed class ClusterPage : IPage
             Ui.PageHead(Ui.PageIcon(Glyph.Cluster), L("Cluster"), Ui.Label(L("Verbind meerdere pc's en gebruik hun geheugen samen voor één groot model."), 14, Theme.Secondary, wrap: true)),
             role, mainSide, helperSide, connect);
         app.Watch(View, Refresh);
+        View.Loaded += (_, _) => app.Host.Cluster.RecheckManual();
         View.Loaded += (_, _) => addresses.SetIfChanged(L("Adressen van deze pc: ") + string.Join(" · ", ClusterController.Addresses().Select(a => $"{a.Interface} {a.Ip}")));
     }
 
@@ -208,8 +209,10 @@ public sealed class ClusterPage : IPage
             else next.Remove(h.Id);
             cluster.Selected = next;
         };
-        var line = h.Manual
-            ? L($"{h.Host}:{h.Port} · handmatig toegevoegd")
+        var line = h.Unreachable
+            ? L($"{h.Host}:{h.Port} · niet bereikbaar: staat de helper aan?")
+            : h.Manual
+            ? L($"{h.Host}:{h.Port} · handmatig toegevoegd · {(int)h.GpuGb} GB")
             : L($"{h.Chip} · {(int)h.MemoryGb} GB · GPU {(int)h.GpuGb} GB · {h.Host}");
         var badge = h.ViaDirectLink ? Ui.Badge(L("Directe kabel"), Glyph.Bolt, Theme.Mint) : Ui.Badge(L("Netwerk"), Glyph.Globe, Theme.Amber);
         return Ui.Row("auto,auto,*,auto,auto", 10, box, Ui.Icon("\uE7F4", 16, Theme.Solid(Theme.Mint)),

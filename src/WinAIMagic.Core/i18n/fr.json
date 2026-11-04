@@ -77,6 +77,8 @@
  "%@: relatie %@ wijst naar ontbrekend %@": "%@ : la relation %@ pointe vers %@, qui manque",
  "%@: sha256 controleren": "%@ : vérification du sha256",
  "%@:%@ · handmatig toegevoegd": "%@:%@ · ajouté à la main",
+ "%@:%@ · handmatig toegevoegd · %@ GB": "%@:%@ · ajouté à la main · %@ Go",
+ "%@:%@ · niet bereikbaar: staat de helper aan?": "%@:%@ · injoignable : l'assistant est-il allumé ?",
  "1. Verbind elke helper met de hoofd-pc: een USB4- of Thunderbolt-kabel, of anders ethernet.": "1. Reliez chaque assistant au PC principal : un câble USB4 ou Thunderbolt, sinon Ethernet.",
  "1. Verbind elke helper met een Thunderbolt-kabel met de hoofd-Mac (Thunderbolt 4 of 5, geen gewone USB-C-kabel).": "1. Reliez chaque assistant au Mac principal avec un câble Thunderbolt (Thunderbolt 4 ou 5, pas un simple câble USB-C).",
  "180B MoE · 6B actief · 4 bit · 83 GB in het geheugen · MTP voor sneller schrijven": "180B MoE · 6B actifs · 4 bit · 83 Go en mémoire · MTP pour écrire plus vite",

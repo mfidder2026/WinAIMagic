@@ -457,6 +457,50 @@ public class ClusterTests : EngineTest
     }
 
     [Fact]
+    public void AHelperAddedByHandSaysWhatItCanHold()
+    {
+        Assert.Equal(16310, ClusterController.ParseHelperMemory("Available devices:\n  CUDA0: Kaart (16310 MiB, 15172 MiB free)\n  RPC0: 10.0.0.2:50052 (16310 MiB, 1 MiB free)\n"));
+        Assert.Null(ClusterController.ParseHelperMemory("Failed to connect to 10.0.0.2:50052"));
+        using var c = Make();
+        c.ProbeOverride = _ => 16310;
+        c.AddManual("10.0.0.2:50052");
+        Assert.True(WaitUntil(() => c.Helpers[0].GpuGb > 17));
+        Assert.False(c.Helpers[0].Unreachable);
+        Assert.True(c.HelperBudgets[0] > 13_000_000_000);
+        c.ProbeOverride = _ => null;
+        c.AddManual("10.0.0.3");
+        Assert.True(WaitUntil(() => c.Helpers.Single(h => h.Host == "10.0.0.3").Unreachable));
+        Assert.DoesNotContain(c.Active, h => h.Host == "10.0.0.3");     // the engine would not start with it
+        c.ProbeOverride = _ => 8000;
+        c.RecheckManual();
+        Assert.True(WaitUntil(() => c.Active.Any(h => h.Host == "10.0.0.3")));   // turned on since
+    }
+
+    /// <summary>The real server and the real announcement, only with WAM_REAL_ENGINE set to the installation's engine folder.</summary>
+    [Fact]
+    public void TheRealHelperServesAndIsFound()
+    {
+        if (Environment.GetEnvironmentVariable("WAM_REAL_ENGINE") is not { } root) return;
+        using var helper = Make();
+        helper.ExecutableOverride = Path.Combine(root, "cpu", "ggml-rpc-server.exe");
+        helper.StartHelper("127.0.0.1");
+        Assert.True(helper.HelperRunning);
+        Assert.True(WaitUntil(() =>
+        {
+            try { using var s = new System.Net.Sockets.TcpClient("127.0.0.1", ClusterController.DefaultPort); return true; }
+            catch (System.Net.Sockets.SocketException) { return false; }
+        }));
+        using var main = new ClusterController(Card, browse: true);
+        bool found = WaitUntil(() => main.Helpers.Any(h => h.Host == "127.0.0.1" && !h.Manual), 25);
+        Console.WriteLine("found through DNS-SD: " + found + "; " + string.Join(" | ", main.Helpers.Select(h => $"{h.Name} {h.Chip} {h.GpuGb} {h.Id}")));
+        Console.WriteLine("helper log: " + string.Join(" | ", helper.HelperLog.TakeLast(6)));
+        helper.StopHelper();
+        Assert.True(WaitUntil(() => !helper.HelperRunning));
+        Assert.Throws<System.Net.Sockets.SocketException>(() => new System.Net.Sockets.TcpClient("127.0.0.1", ClusterController.DefaultPort));
+        Assert.True(found, "not found through DNS-SD");
+    }
+
+    [Fact]
     public void TheHelperRunsAndStopsInItsJob()
     {
         using var c = Make();

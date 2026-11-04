@@ -107,5 +107,14 @@ class GlmWamXS(unittest.TestCase):
                          {"temperature": 0.7, "top_p": 0.95, "min_p": 0.05})
 
 
+class EngineToken(unittest.TestCase):
+    """An id below 0 from the engine is the request's error, never a token (upstream 5ee1c38)."""
+
+    def test_ids(self):
+        self.assertEqual(server.engine_token("7"), 7)
+        with self.assertRaises(ValueError):
+            server.engine_token("-1")
+
+
 if __name__ == "__main__":
     unittest.main()
