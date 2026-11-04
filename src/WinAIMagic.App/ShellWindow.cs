@@ -178,7 +178,7 @@ public sealed partial class ShellWindow : Window
 
     private async Task StartUp()
     {
-        string? pageArg = Arg("page");
+        string? pageArg = Arg("page") switch { "Documenten" => "Documents", "Vergelijken" => "Compare", "Modellen" => "Models", "Systeem" => "System", var p => p };
         Pane? forced = Enum.TryParse<PaneKind>(pageArg, true, out var kind) ? new Pane(kind, kind == PaneKind.Chat ? app.Store.Selection : null) : null;
         // first run: the models until one is there
         bool ready = app.Host.Store.StatusOf(app.Host.SelectedModelId).IsComplete;
@@ -243,7 +243,29 @@ public sealed partial class ShellWindow : Window
     /// <summary>Hidden, debug builds: --fake-engine (a scripted stream), --fake-state=starting|failed, --attach=file;file,
     /// --paste=file:path|bitmap:path|textbitmap:path (the paste logic on a local data package), --folder=path, --lag-log=file (the
     /// longest wait of the UI thread per second).</summary>
-    private Microsoft.UI.Dispatching.DispatcherQueueTimer? chatHook;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? chatHook, documentHook;
+
+    /// <summary>Hidden: --project, --huisstijl, --attach-doc, --doc=busy (see DocumentHooks), --export=file (Vergelijken), --sim-nvidia=VRAM in GB
+    /// (a PC with the main engine, for the cluster screen).</summary>
+    private void RunDocumentHooks()
+    {
+        if (int.TryParse(Arg("sim-nvidia"), out var vram)) app.Host.SimulatedSystem = Engine.SystemInfo.Simulated(Engine.FakeGpuBackend.Nvidia(vram), 128);
+        if (Arg("project") is { } folder) app.Studio.Choose(folder);
+        if (args.Contains("--fake-engine")) DocumentHooks.Offline(app.Studio);
+        if (Arg("huisstijl") is { } style) app.Studio.UseHouseStyle(style);
+        if (Arg("attach-doc") is { } file) app.Studio.AddAttachment(file);
+        documentHook = DispatcherQueue.CreateTimer();
+        documentHook.IsRepeating = false;
+        documentHook.Interval = TimeSpan.FromSeconds(1.2);
+        documentHook.Tick += async (_, _) =>
+        {
+            if (Arg("export") is { } path && pages.GetValueOrDefault(PaneKind.Compare) is ComparePage compare) compare.Export(path);
+            if (pages.GetValueOrDefault(PaneKind.Documents) is not DocumentsPage page) return;
+            DocumentHooks.LogLayout("start", page, this);
+            if (Arg("doc") == "busy") await DocumentHooks.Busy(app, page, this);
+        };
+        documentHook.Start();
+    }
 
     private void RunChatHooks()
     {
@@ -255,6 +277,7 @@ public sealed partial class ShellWindow : Window
             _ => args.Contains("--fake-engine") ? Engine.EngineState.Running : null,
         };
         if (args.Contains("--fake-engine")) app.Host.Metrics.Fast = true;
+        RunDocumentHooks();
         if (Arg("lag-log") is { } lagFile)
         {
             var tick = DispatcherQueue.CreateTimer();

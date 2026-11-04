@@ -14,12 +14,15 @@ public static class Program
     /// <summary>A second start asks for this.</summary>
     public static event Action? Woken;
 
+    /// <summary>Runs with --data: nothing outside that folder is written.</summary>
+    public static bool TestData { get; private set; }
+
     [STAThread]
     public static int Main(string[] args)
     {
         // hidden, for tests: another data folder (before anything reads the settings); such a copy runs beside the real app
         var data = args.FirstOrDefault(a => a.StartsWith("--data=", StringComparison.Ordinal))?[7..];
-        if (data != null) Paths.AppData = data;
+        if (data != null) { Paths.AppData = data; TestData = true; }
         string instance = data == null ? "" : "." + Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(data)))[..8];
 
         using var mutex = new Mutex(true, MutexName + instance, out bool first);

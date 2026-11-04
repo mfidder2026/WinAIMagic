@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using WinAIMagic.Chat;
 using WinAIMagic.Core.Support;
 using WinAIMagic.Engine;
+using WinAIMagic.Studio;
 
 namespace WinAIMagic.App;
 
@@ -37,11 +38,15 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     private readonly DispatcherQueueTimer throttle;
     private int pending, sampling;
     private Pane pane = new(PaneKind.Models);
+    private DocumentStudio? studio;
+    private DocumentEngines? documentEngines;
+    private DocumentEngineHost? documentHost;
 
     public AppState()
     {
         Host = new EngineHost();
         Chat.TokensStreamed += Host.Metrics.AddTokens;
+        LocalModel.TokensStreamed += Host.Metrics.AddTokens;
         throttle = Ui.CreateTimer();
         throttle.IsRepeating = false;
         throttle.Interval = TimeSpan.FromSeconds(0.1);
@@ -129,11 +134,13 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
         Chat.Send(text, attachments, conversation, Store, BaseUrl);
     }
 
-    public void StartEngine()
+    public void StartEngine() => _ = StartEngineTask();
+
+    public Task StartEngineTask()
     {
         if (Host.Plan is { } plan) Chat.ContextLimit = plan.ContextSize;
         if (Host.SelectedModel is { } m) Chat.ModelName = m.Name;
-        Task.Run(Host.StartEngine);
+        return Task.Run(Host.StartEngine);
     }
 
     public void StopEngine() => Task.Run(Host.StopEngine);
@@ -149,6 +156,17 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     }
 
     public Task RunCheck() => Task.Run(() => Host.Check.Run(Host));
+
+    // MARK: - the documents module
+
+    /// <summary>Made when the module is first used: it makes its folder under Documents. A test copy of the app stays inside its data folder.</summary>
+    public DocumentStudio Studio => studio ??= new DocumentStudio(root: Program.TestData ? Path.Combine(Paths.AppData, "Documenten") : null)
+    {
+        Endpoint = (role, ct) => DocumentEngines.EndpointAsync(role, ct),
+        ContextLimit = () => Host.Plan?.ContextSize ?? 32_768,
+    };
+
+    public DocumentEngines DocumentEngines => documentEngines ??= new DocumentEngines(documentHost = new DocumentEngineHost(this));
 
     // MARK: - screens subscribe while they are on screen
 
@@ -169,6 +187,9 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     {
         Closing?.Invoke();
         Chat.Stop();
+        studio?.Stop();
+        studio?.Save();
+        documentHost?.Dispose();
         Settings.PropertyChanged -= OnSetting;
         Store.Save();
         Host.Dispose();

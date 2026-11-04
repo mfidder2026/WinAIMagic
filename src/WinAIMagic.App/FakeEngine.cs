@@ -41,6 +41,18 @@ internal static class FakeEngine
             for (int i = messages.Count - 1; i >= 0 && lastUser < 0; i--)
                 if (messages[i]!["role"]!.GetValue<string>() == "user" && !IsNudge(messages[i]!)) lastUser = i;
             var ask = lastUser < 0 ? "" : Text(messages[lastUser]!);
+            var system = messages.Count > 0 && messages[0]!["role"]!.GetValue<string>() == "system" ? Text(messages[0]!) : "";
+            if (DocumentAnswer(system, ask) is { } answer)
+            {
+                ctx.Response.ContentType = "text/event-stream";
+                ctx.Response.SendChunked = true;
+                var output = ctx.Response.OutputStream;
+                if (answer.Length > 0) await Words(output, "content", answer, ask.Contains("traag") ? 40 : answer.Length > 20_000 ? 0 : 8);
+                await Send(output, new JsonObject(), "stop", new JsonObject { ["timings"] = new JsonObject { ["predicted_per_second"] = 38.4 } });
+                await output.WriteAsync(Encoding.UTF8.GetBytes("data: [DONE]\n\n"));
+                ctx.Response.Close();
+                return;
+            }
             int tools = 0, nudges = 0;
             for (int i = lastUser + 1; i < messages.Count; i++)
             {
@@ -66,6 +78,54 @@ internal static class FakeEngine
         }
         catch (Exception e) when (e is HttpListenerException or IOException or ObjectDisposedException or InvalidOperationException) { }
     }
+
+    /// <summary>The documents module talks to the same address; its system prompts say which piece of work this is.</summary>
+    private static string? DocumentAnswer(string system, string ask)
+    {
+        if (system.Contains("hoe een document eruit moet zien")) return ask.Contains("stille secties") ? SilentPlan : Plan;
+        if (ask.Contains("Schrijf nu de inhoud van sectie '"))
+        {
+            if (ask.Contains("stille secties")) return "";
+            int from = ask.LastIndexOf("Schrijf nu de inhoud van sectie '", StringComparison.Ordinal) + 33;
+            var title = ask[from..ask.IndexOf('\'', from)];
+            return ask.Contains("4000 regels") && title == "Aanleiding"
+                ? string.Concat(Enumerable.Range(1, 4000).Select(i => $"Regel {i} van een lang document met tekst die doorloopt op de volgende regel van het scherm.\n\n"))
+                : Section(title);
+        }
+        if (system.Contains("Je vult velden"))
+        {
+            int at = ask.IndexOf("Velden: ", StringComparison.Ordinal) + 8;
+            return string.Join("\n", ask[at..ask.IndexOf('\n', at)].Split(", ").Select(f => $"{f}: Testdam"));
+        }
+        if (system.Contains("Je bewerkt een stuk"))
+        {
+            int open = ask.LastIndexOf("<<<\n", StringComparison.Ordinal) + 4, close = ask.LastIndexOf("\n>>>", StringComparison.Ordinal);
+            var old = open > 3 && close > open ? ask[open..close].TrimEnd() : "";
+            return old + "\n\nDeze alinea komt van de fake engine en bevestigt de wijziging.";
+        }
+        if (system.Contains("Je haalt uit een webpagina")) return "De BIO vraagt om multi-factor authenticatie bij toegang op afstand. Dit geldt sinds 2020.";
+        if (system.Contains("Je maakt volledige")) return "Notities: het zaaksysteem wordt vervangen; besluit van de stuurgroep.";
+        return null;
+    }
+
+    private const string Plan = "TITEL: Vervanging zaaksysteem\nOPBOUW: eigen keuze\n# Samenvatting\n> De kern in vijf regels.\n# Aanleiding\n> Waarom nu.\n## Huidige situatie\n> Wat er staat.\n## Knelpunten\n> Wat er misgaat.\n# Aanpak\n> Hoe het verloopt.\n# Planning en kosten\n> Een tabel per fase.\nZOEK: BIO eisen multi-factor authenticatie\n";
+
+    private static string SilentPlan
+    {
+        get
+        {
+            var title = string.Concat(Enumerable.Repeat("Heel lange titel van een sectie ", 6));
+            return "TITEL: Rapport\nOPBOUW: x\n" + string.Concat(Enumerable.Range(1, 25).Select(i => $"# {title}{i}\n")) + "ZOEK: " + string.Concat(Enumerable.Repeat("zoekvraag met heel veel woorden ", 12)) + "\n";
+        }
+    }
+
+    private static string Section(string title) => title switch
+    {
+        "Samenvatting" => "De gemeente vervangt het zaaksysteem in drie fasen. De kosten blijven binnen het budget van de stuurgroep en de toegang voldoet aan de BIO [1].\n\n- **Besluit:** doorgaan met fase 1\n- **Eerste oplevering:** tweede kwartaal",
+        "Planning en kosten" => "De planning volgt de drie fasen uit het besluit.\n\n| Fase | Periode | Kosten |\n|---|---|---|\n| Voorbereiding | Q1 | 40.000 |\n| Migratie | Q2 | 120.000 |\n| Nazorg | Q3 | 25.000 |\n\nDe bedragen zijn exclusief btw.",
+        "Knelpunten" => "Drie zaken vragen nu de meeste aandacht:\n\n1. De leverancier stopt met onderhoud aan de huidige versie.\n2. Koppelingen met het documentsysteem vallen regelmatig uit.\n3. Toegang op afstand gebeurt nog zonder tweede factor [1].",
+        _ => $"Deze tekst gaat over {title.ToLowerInvariant()}. De afdeling heeft de uitgangspunten met de stuurgroep afgestemd en legt elk besluit vast in het projectdossier. Waar gegevens ontbreken, staat dat er bij.\n\nNog te bevestigen: de precieze startdatum van de eerste fase.",
+    };
 
     private static bool IsNudge(JsonNode m) => Text(m).StartsWith("Je stopte", StringComparison.Ordinal) || Text(m).StartsWith("You stopped", StringComparison.Ordinal);
 
@@ -168,6 +228,49 @@ internal static class FakeEngine
             ["timings"] = new JsonObject { ["predicted_per_second"] = 38.4, ["prompt_per_second"] = 512.0 },
         });
         await s.WriteAsync(Encoding.UTF8.GetBytes("data: [DONE]\n\n"));
+    }
+}
+
+/// <summary>Hidden, debug builds: the documents module without file pickers. --project=folder, --huisstijl=docx, --attach-doc=file;
+/// --doc=busy runs 25 silent sections and then shows 4000 lines (the layout rule of DocumentLayoutTests.swift) and logs the sizes.</summary>
+internal static class DocumentHooks
+{
+    public static void Offline(WinAIMagic.Studio.DocumentStudio s)
+    {
+        s.SearchWeb = (_, _) => Task.FromResult(new List<WinAIMagic.Chat.WebTools.Hit> { new("Baseline Informatiebeveiliging Overheid", "https://bio.example/mfa", "") });
+        s.FetchPage = (_, _) => Task.FromResult(("Baseline Informatiebeveiliging Overheid", "Pagina over multi-factor authenticatie."));
+    }
+
+    public static void Log(string line) => File.AppendAllText(Path.Combine(WinAIMagic.Core.Support.Paths.AppData, "doc-test.log"), line + "\n");
+
+    /// <summary>Where the editor is in the window, the way the layout tests look at it.</summary>
+    public static void LogLayout(string when, Views.DocumentsPage page, Microsoft.UI.Xaml.Window window)
+    {
+        var e = page.Editor;
+        var box = e.TransformToVisual(window.Content).TransformBounds(new Windows.Foundation.Rect(0, 0, e.ActualWidth, e.ActualHeight));
+        var root = (Microsoft.UI.Xaml.FrameworkElement)window.Content;
+        bool inside = box.Top >= 0 && box.Bottom <= root.ActualHeight + 1 && box.Right <= root.ActualWidth + 1;
+        Log($"{when}: editor {box.Width:0}x{box.Height:0} at {box.Top:0}..{box.Bottom:0}, window {root.ActualWidth:0}x{root.ActualHeight:0}, inside={inside}, height>80={box.Height > 80}");
+    }
+
+    public static async Task Busy(AppState app, Views.DocumentsPage page, Microsoft.UI.Xaml.Window window)
+    {
+        var s = app.Studio;
+        var query = string.Concat(Enumerable.Repeat("zoekvraag met heel veel woorden ", 12));
+        s.SearchWeb = (_, _) => Task.FromResult(new List<WinAIMagic.Chat.WebTools.Hit> { new(query, "https://a.example/1", "") });
+        s.FetchPage = (_, _) => throw new HttpRequestException("geen verbinding");
+        var file = Path.Combine(s.Folder, "b.txt");
+        Directory.CreateDirectory(s.Folder);
+        await File.WriteAllTextAsync(file, "Iets om te lezen.");
+        s.AddAttachment(file);
+        s.Make("Maak iets: stille secties", true);
+        await s.Completion;
+        Log($"notes {s.Notes.Count}, steps {s.Steps.Count}, problem [{s.Problem}]");
+        await Task.Delay(800);
+        LogLayout("25 notes", page, window);
+        s.Text = string.Join("\n\n", Enumerable.Range(1, 4000).Select(i => $"Regel {i} van een lang document met tekst die doorloopt op de volgende regel van het scherm."));
+        await Task.Delay(1500);
+        LogLayout("25 notes, 4000 lines", page, window);
     }
 }
 #endif
