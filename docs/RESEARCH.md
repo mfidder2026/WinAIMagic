@@ -61,7 +61,16 @@ Free RAM: 31 GB with GLM alone, 6 GB with both. It works on 128 GB, narrowly. Th
 
 ## 4. Real tasks
 
-REAL_TASKS
+All with GLM-5.3-Flash Compact 24 through the installed app, using `RealEngineTests` (set `WAM_REAL_URL`).
+
+- **Agent task in a work folder:** write a Python module and its tests, run them, write the primes up to 50 to a file. Done in 2.0-2.2 minutes and 5 rounds, with the correct output. In one run the model noticed that Windows PowerShell 5.1 has no `&&` and adapted by itself.
+- **Summarizing:** a three-question conversation was summarized, and the model still answered from it afterwards.
+- **Document pipeline:** a short note in the house style from the fixture `sjabloon.docx`: 3.5 minutes, no validator problems, 4 pages. It opens in Microsoft Word with cover, working table of contents and headings. Fields nobody filled in stay visible and are reported. The content comes from the model and needs checking: this draft named a law that does not seem to exist.
+- **APIs:** OpenAI, Anthropic (with a tool) and Responses all answered. A prompt beyond the context gives a 400 that names the context.
+- **Thinking budget per request:** budget 0 gives no reasoning; a budget of 120 tokens closed the thinking 26 tokens later at a sentence end, with the closing message in the reasoning and the answer after it.
+- **Forced close of the app:** no process of the installation stays behind, measured several times.
+
+A session that really fills the 64K context has not been run.
 
 ## 5. Engine build
 

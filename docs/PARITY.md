@@ -11,7 +11,7 @@ How this version relates to MacAIMagic at commit `9b3d166`. Test cases are liste
 | `Chat/WorkspaceTools` | `Chat/WorkspaceTools`, `CommandRunner`, `KillOnCloseJob` | Done, sandbox extended for Windows |
 | `Chat/WebTools`, `WorkspaceNotes` | Same names | Done; web parsers tested on fixtures only |
 | `Documents/Zip`, `XNode`, `DocxPackage`, `DocxModel`, `DocxBuilder`, `DocxFields`, `DocxCompose`, `MarkdownBlocks` | `Documents/` same names | Done |
-| `Documents/DocumentStudio`, `DocumentModels` | `Studio/` same names | Done; run with a scripted engine, not with a real model |
+| `Documents/DocumentStudio`, `DocumentModels` | `Studio/` same names | Done; one real document on GLM, the fast model beside it only measured by hand |
 | `Engine/ModelCatalog`, `GGUFIndex`, `ModelStore` | `Engine/` same names, `Downloader`, `PackBuilder` | Done |
 | `Engine/MemoryPlanner` | `Engine/MemoryPlanner` | Redesigned for VRAM + RAM + SSD |
 | `Engine/EngineController` | `Engine/IEngine`, `TieredEngine`, `LlamaEngine`, `ChildProcess` | Redesigned, two engines |
@@ -67,10 +67,12 @@ The same gaps still exist in MacAIMagic.
 - The page file button (UAC), a real move of models, real cluster helpers, downloading through the app beyond a short test.
 - Drag and drop, real Ctrl+V, Ctrl+Enter and the file and folder pickers (run only through test hooks).
 - Claude Code itself: the Anthropic API was tested directly, with and without tools.
-- A long agent session that fills the 64K context. The real task ran 5 rounds and 2 minutes. Summarizing is tested with a scripted engine.
-- The Word check covered one generated document without visual comparison with the house style.
+- A long agent session that fills the 64K context. The real task ran 5 rounds and 2 minutes; summarizing ran on a short conversation.
+- Web search and quick actions in the documents editor against a real model.
+- Word was checked on two generated documents, by opening them and looking at the result, not with a comparison against the template.
 
 **Release**
 
 - The installer is not code-signed, so SmartScreen warns.
-- The upstream name still appears in comments of the fork's quant tools only through file names on download servers, and in the required licence text.
+- The upstream name remains in the licence text, in model file names on download servers, in the log filter and in the original brief `WinAIMagic-PROMPT.md`.
+- No separate zip is published next to the installer.
