@@ -45,6 +45,17 @@ internal static class ChatUi
         return new Flyout { Content = content, FlyoutPresenterStyle = style };
     }
 
+    /// <summary>A menu in the colours of the app.</summary>
+    public static void Dress(MenuFlyout menu)
+    {
+        var style = new Style(typeof(MenuFlyoutPresenter));
+        style.Setters.Add(new Setter(FrameworkElement.RequestedThemeProperty, ElementTheme.Dark));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(Theme.Rgb(0x16, 0x18, 0x2A))));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Theme.Solid(Theme.Accent, 0.35)));
+        style.Setters.Add(new Setter(Control.CornerRadiusProperty, new CornerRadius(10)));
+        menu.MenuFlyoutPresenterStyle = style;
+    }
+
     /// <summary>A picture from JPEG bytes, cut to the rounded square of `size`.</summary>
     public static Border Thumb(byte[] jpeg, double size, double radius)
     {
@@ -118,17 +129,17 @@ public sealed partial class MessageRow : Grid
     private Disclosure thinking = null!;
     private MarkdownView? thoughts;
     private ActivityList steps = null!;
-    private ProgressRing spinner = null!;
+    private Spinner spinner = null!;
     private MarkdownView answer = null!;
     private TextBlock error = null!;
     private Border sources = null!;
     private TextBlock stats = null!;
     private Button copy = null!;
     private FrameworkElement statsRow = null!;
-    private string copyText = "", sourcesShown = "";
+    private string copyText = "", sourcesShown = "", reasoning = "";
     private bool wasStreaming;
 
-    internal MessageRow(ChatMessage m, RowMemory memory, Action<double>? shifted)
+    internal MessageRow(ChatMessage m, RowMemory memory, Action<double>? shifted, bool streaming)
     {
         this.memory = memory;
         this.shifted = shifted;
@@ -136,7 +147,7 @@ public sealed partial class MessageRow : Grid
         if (m.Automatic == true) BuildNudge();
         else if (m.Role == ChatRole.User) BuildUser(m);
         else BuildAssistant();
-        Update(m, false);
+        Update(m, streaming);
     }
 
     private void BuildNudge()
@@ -186,7 +197,7 @@ public sealed partial class MessageRow : Grid
         Children.Add(pulse);
         Children.Add(mark);
 
-        thinking = new Disclosure(Glyph.Think, memory.Thinking, on =>
+        thinking = new Disclosure(Glyph.Think, false, on =>
         {
             memory.Thinking = on;
             if (on && thoughts == null)
@@ -194,10 +205,12 @@ public sealed partial class MessageRow : Grid
                 thoughts = new MarkdownView(shifted, true, 13, Theme.Secondary);
                 var rule = new Border { Child = thoughts, BorderBrush = Theme.Solid(Colors.White, 0.18), BorderThickness = new Thickness(2, 0, 0, 0), Padding = new Thickness(10, 0, 0, 0), Margin = new Thickness(0, 4, 0, 0) };
                 thinking.Content = rule;
+                thoughts.Set(reasoning);
             }
         });
+        if (memory.Thinking) thinking.SetOpen(true);
         steps = new ActivityList(memory);
-        spinner = new ProgressRing { Width = 16, Height = 16, IsActive = false, HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Collapsed };
+        spinner = new Spinner(16, false) { HorizontalAlignment = HorizontalAlignment.Left };
         answer = new MarkdownView(shifted);
         error = Ui.Caption("", new SolidColorBrush(Theme.Red), 13);
         error.IsTextSelectionEnabled = true;
@@ -228,13 +241,13 @@ public sealed partial class MessageRow : Grid
         if (m.Reasoning.Length > 0)
         {
             thinking.SetTitle(waiting ? L("Denkt na…") : L("Gedachtegang"), waiting);
-            thoughts?.Set(m.Reasoning);
+            reasoning = m.Reasoning;
+            thoughts?.Set(reasoning);
         }
         steps.Show(m.Activities.Count > 0);
         if (m.Activities.Count > 0) steps.Update(m.Activities, streaming);
         bool spin = m.Text.Length == 0 && m.Reasoning.Length == 0 && streaming && m.Error == null;
-        spinner.Show(spin);
-        if (spinner.IsActive != spin) spinner.IsActive = spin;
+        spinner.Active = spin;
         answer.Show(m.Text.Length > 0);
         answer.Set(m.Text);
         error.Show(m.Error != null);
@@ -285,6 +298,42 @@ public sealed partial class MessageRow : Grid
             Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollMode = ScrollMode.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollMode = ScrollMode.Disabled, ZoomMode = ZoomMode.Disabled,
         };
+    }
+}
+
+/// <summary>A small turning arc; its storyboard only runs while it is active.</summary>
+public sealed partial class Spinner : Grid
+{
+    private readonly Storyboard turn = new();
+    private bool active;
+
+    public Spinner(double size, bool start = true)
+    {
+        Width = Height = size;
+        var rotate = new RotateTransform { CenterX = size / 2, CenterY = size / 2 };
+        Children.Add(new Ellipse { Stroke = Theme.Solid(Colors.White, 0.15), StrokeThickness = 1.6 });
+        Children.Add(new Microsoft.UI.Xaml.Shapes.Path { Data = Draw.Arc(size / 2, size / 2, size / 2 - 0.8, 0, 0.3), Stroke = new SolidColorBrush(Theme.Cyan), StrokeThickness = 1.6, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, RenderTransform = rotate });
+        var a = new DoubleAnimation { From = 0, To = 360, Duration = TimeSpan.FromSeconds(0.9), RepeatBehavior = RepeatBehavior.Forever };
+        Storyboard.SetTarget(a, rotate);
+        Storyboard.SetTargetProperty(a, "Angle");
+        turn.Children.Add(a);
+        active = start;
+        this.Show(start);
+        Loaded += (_, _) => { if (active) turn.Begin(); };
+        Unloaded += (_, _) => turn.Stop();
+    }
+
+    public bool Active
+    {
+        get => active;
+        set
+        {
+            if (active == value) return;
+            active = value;
+            this.Show(value);
+            if (value) turn.Begin();
+            else turn.Stop();
+        }
     }
 }
 
@@ -382,7 +431,7 @@ public sealed partial class Disclosure : StackPanel
         else shimmer.Stop();
     }
 
-    private void SetOpen(bool on)
+    public void SetOpen(bool on)
     {
         open = on;
         chevron.Glyph = on ? Glyph.ChevronDown : Glyph.ChevronRight;
@@ -447,7 +496,7 @@ public sealed partial class ActivityRow : StackPanel
         Spacing = 4;
         UIElement mark = a.Denied == true ? Ui.Icon(Glyph.Blocked, 13, new SolidColorBrush(Theme.Amber))
             : a.Done ? Ui.Icon(Glyph.Done, 13, new SolidColorBrush(Theme.Mint))
-            : new ProgressRing { Width = 13, Height = 13, IsActive = true };
+            : new Spinner(13);
         var chevron = Ui.Icon(Glyph.ChevronRight, 9, Theme.Tertiary).Show(a.Output != null);
         var label = Ui.Label(a.Label, 13, Theme.Secondary);
         var row = Ui.Row("auto,*,auto", 6, mark, label, chevron);

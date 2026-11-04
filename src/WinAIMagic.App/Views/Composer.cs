@@ -364,6 +364,8 @@ public sealed partial class Composer : Grid
         toggle.CornerRadius = new CornerRadius(7, 0, 0, 7);
         var more = new Button { Content = Ui.Icon(Glyph.ChevronDown, 8), Width = 20, Padding = new Thickness(0), BorderThickness = new Thickness(0), CornerRadius = new CornerRadius(0, 7, 7, 0), Background = Theme.Solid(Colors.White, 0.07), Flyout = menu, VerticalAlignment = VerticalAlignment.Stretch };
         menu.Placement = FlyoutPlacementMode.TopEdgeAlignedLeft;
+        menu.ShouldConstrainToRootBounds = true;
+        ChatUi.Dress(menu);
         var name = Automation.GetName(toggle);
         if (name.Length > 0) Automation.SetName(more, name + " …");
         return Ui.H(1, toggle, more);

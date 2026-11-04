@@ -7324,7 +7324,7 @@ bool Glm5Model::ckpt_restore(int slot, std::string& err) {
 // the NextN block's too.  The file: a header (magic, halves, positions, per half its layer range and run sizes), then
 // per half the KDA snapshot and the DSA runs in that order.
 namespace {
-constexpr uint64_t kSlotMagic = 0x3254534C4159414Dull;   // "WAMLST2" (v2: the ik / ig ring's open pool only)
+constexpr uint64_t kSlotMagic = 0x32544F4C534D4157ull;   // "WAMSLOT2" (v2: the ik / ig ring's open pool only)
 
 // (start, floats) of each DSA cache run a slot of n positions holds on one half, in file order: in the state arena, or a
 // KV-streamed layer's latents in its host copy (kv_host[il])

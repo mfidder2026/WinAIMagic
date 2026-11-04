@@ -36,7 +36,7 @@ public sealed class ChatPage : IPage
     private readonly Dictionary<Guid, ChatMessage> visible = new();
     private readonly Dictionary<Guid, RowMemory> memory = new();
     private readonly TextBlock emptyTitle = Ui.Label("", 36, Theme.Brand, FontWeights.Bold, display: true);
-    private Guid? shown;
+    private Guid? shown, lastMessage;
     private Approval? approvalShown;
     private string bannerKey = "";
     private string? summaryText;
@@ -69,6 +69,7 @@ public sealed class ChatPage : IPage
         scroller = new ScrollViewer { Content = list, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, ZoomMode = ZoomMode.Disabled };
         scroller.ViewChanged += (_, _) => OnScrolled();
         list.SizeChanged += (_, _) => FollowEnd();
+        scroller.SizeChanged += (_, _) => FollowEnd();
         root.Children.Add(scroller.At(1));
         empty = BuildEmpty();
         root.Children.Add(empty.At(1));
@@ -167,7 +168,7 @@ public sealed class ChatPage : IPage
         if (key is SummaryKey s)
             return new SummaryRow(summaryText ?? "", Shift, () => Memory(s.Conversation).Summary, on => Memory(s.Conversation).Summary = on);
         var id = (Guid)key;
-        return new MessageRow(visible[id], Memory(id), Shift);
+        return new MessageRow(visible[id], Memory(id), Shift, app.Chat.Busy && id == lastMessage);
     }
 
     private RowMemory Memory(Guid id)
@@ -267,6 +268,7 @@ public sealed class ChatPage : IPage
     private void UpdateList(Conversation c)
     {
         var last = c.Messages[^1].Id;
+        lastMessage = last;
         bool busy = app.Chat.Busy;
         var keys = new List<object>(c.Messages.Count);
         visible.Clear();
@@ -313,7 +315,7 @@ public sealed class ChatPage : IPage
         switch (s.Status)
         {
             case EngineStatus.Starting:
-                content = Ui.Row("auto,*", 8, new ProgressRing { Width = 16, Height = 16, IsActive = true }, Ui.Caption(L($"{s.Message} Het eerste laden duurt enkele minuten."), Theme.Primary, 13));
+                content = Ui.Row("auto,*", 8, new Spinner(16), Ui.Caption(L($"{s.Message} Het eerste laden duurt enkele minuten."), Theme.Primary, 13));
                 break;
             case EngineStatus.Failed:
                 var again = Ui.Btn(L("Opnieuw"), app.StartEngine);
@@ -425,7 +427,7 @@ public sealed class ChatPage : IPage
 public sealed partial class ContextMeter : Button
 {
     private readonly AppState app;
-    private readonly ProgressRing ring = new() { Width = 12, Height = 12, IsActive = false, Visibility = Visibility.Collapsed };
+    private readonly Spinner ring = new(12, false);
     private readonly TextBlock text = Ui.Label("", 12, null, FontWeights.SemiBold);
     private readonly Border fill = new() { Height = 5, CornerRadius = new CornerRadius(2.5), HorizontalAlignment = HorizontalAlignment.Left };
     private readonly TextBlock counts = Ui.Caption("", Theme.Primary, 13);
@@ -479,8 +481,7 @@ public sealed partial class ContextMeter : Button
         double share = Math.Min((double)used / limit, 1);
         var color = share > 0.9 ? Theme.Red : share > ChatClient.CompactAt * 0.85 ? Theme.Amber : Theme.Mint;
         bool working = app.Chat.Compacting || app.Chat.Learning;
-        ring.Show(working);
-        if (ring.IsActive != working) ring.IsActive = working;
+        ring.Active = working;
         text.SetIfChanged(app.Chat.Compacting ? L("Samenvatten…") : app.Chat.Learning ? L("Noteert wat het geleerd heeft…") : $"{Short(used)} / {Short(limit)}");
         fill.Width = 46 * share;
         if (color != shownColor)

@@ -243,6 +243,8 @@ public sealed partial class ShellWindow : Window
     /// <summary>Hidden, debug builds: --fake-engine (a scripted stream), --fake-state=starting|failed, --attach=file;file,
     /// --paste=file:path|bitmap:path|textbitmap:path (the paste logic on a local data package), --folder=path, --lag-log=file (the
     /// longest wait of the UI thread per second).</summary>
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? chatHook;
+
     private void RunChatHooks()
     {
         if (args.Contains("--fake-engine")) app.TestUrl = FakeEngine.Start();
@@ -271,10 +273,10 @@ public sealed partial class ShellWindow : Window
             tick.Start();
             tokenTimer = tick;
         }
-        var hook = DispatcherQueue.CreateTimer();
-        hook.IsRepeating = false;
-        hook.Interval = TimeSpan.FromSeconds(1);
-        hook.Tick += async (_, _) =>
+        chatHook = DispatcherQueue.CreateTimer();
+        chatHook.IsRepeating = false;
+        chatHook.Interval = TimeSpan.FromSeconds(1);
+        chatHook.Tick += async (_, _) =>
         {
             if (pages.GetValueOrDefault(PaneKind.Chat) is not ChatPage chat) return;
             if (Arg("folder") is { } folder) chat.Composer.SetFolder(folder);
@@ -291,7 +293,7 @@ public sealed partial class ShellWindow : Window
                 File.AppendAllText(Path.Combine(Paths.AppData, "paste.log"), $"{kind}: took={await chat.Composer.TakeImages(package.GetView())}\n");
             }
         };
-        hook.Start();
+        chatHook.Start();
     }
 #endif
 

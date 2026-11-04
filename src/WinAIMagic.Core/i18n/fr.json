@@ -597,5 +597,15 @@
  "experts 1,6 bit · 93 GB in het geheugen · eigen licentie": "experts 1,6 bit · 93 Go en mémoire · licence propre",
  "748B MoE · 4 bit, vrijwel gelijk aan het origineel · de meest gebruikte experts staan in VRAM en RAM, de rest komt van de SSD": "748B MoE · 4 bits, presque identique à l'original · les experts les plus utilisés restent en VRAM et RAM, le reste vient du SSD",
  "321B MoE · 4 bit · de meest gebruikte experts staan in VRAM en RAM, de rest komt van de SSD": "321B MoE · 4 bits · les experts les plus utilisés restent en VRAM et RAM, le reste vient du SSD",
- "35B MoE · 3B actief · 4 bit · 22 GB in het geheugen": "35B MoE · 3B actifs · 4 bits · 22 Go en mémoire"
+ "35B MoE · 3B actief · 4 bit · 22 GB in het geheugen": "35B MoE · 3B actifs · 4 bits · 22 Go en mémoire",
+ "Volledig lokaal op deze pc. Niets verlaat je computer, behalve zoekopdrachten als je web zoeken aanzet.": "Entièrement local sur ce PC. Rien ne quitte votre ordinateur, sauf les recherches si vous activez la recherche web.",
+ "Wat is het laatste nieuws over grafische kaarten?": "Quelles sont les dernières nouvelles sur les cartes graphiques ?",
+ "Schrijf een C#-functie die priemgetallen zoekt": "Écris une fonction C# qui cherche des nombres premiers",
+ "Werkmap van dit gesprek: klik om hem in de Verkenner te openen": "Dossier de travail de cette conversation : cliquez pour l'ouvrir dans l'Explorateur",
+ "Toon in Verkenner": "Afficher dans l'Explorateur",
+ "Model of engine nog niet klaar: zie Modellen.": "Modèle ou moteur pas encore prêt : voir Modèles.",
+ "%@ Het eerste laden duurt enkele minuten.": "%@ Le premier chargement prend quelques minutes.",
+ "Versturen": "Envoyer",
+ "Bericht": "Message",
+ "Verwijder afbeelding": "Retirer l'image"
 }
