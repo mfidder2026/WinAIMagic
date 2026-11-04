@@ -78,6 +78,12 @@ public sealed class EngineHost : IDisposable
     /// <summary>Which engine runs the selected model here; null: none can (`Blocked` says why).</summary>
     public EngineKind? EngineForSelected => SelectedModel is { } m ? MemoryPlanner.EngineFor(m, System) : null;
 
+    /// <summary>Skipping experts is a choice for GLM on the main engine only: the second engine has no such setting.</summary>
+    public bool OffersSkipExperts(ModelInfo m) => m.Family == "glm" && MemoryPlanner.EngineFor(m, System) == EngineKind.Tiered;
+
+    /// <summary>What this model skips when it starts now: off, light or strong.</summary>
+    public string SkipExpertsFor(ModelInfo m) => OffersSkipExperts(m) ? Settings.Shared.SkipExperts : "off";
+
     /// <summary>Why the selected model cannot start on this PC, in words; there is no "too big".</summary>
     public string? Blocked => SelectedModel is { } m ? MemoryPlanner.Blocked(m, System) : null;
 

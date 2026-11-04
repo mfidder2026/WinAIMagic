@@ -298,6 +298,26 @@ public class BenchmarkTests : EngineTest
     }
 
     [Fact]
+    public void MeasurementsWithExpertsSkippedStandBesideTheFullModel()
+    {
+        const string glm = "glm-5.3-flash-compact-24";
+        // written by 0.2.0: no field for it, so the full model
+        File.WriteAllText(Paths.BenchmarksFile, "[{\"modelID\":\"" + glm + "\",\"modelName\":\"GLM\",\"decodeTPS\":8.9}]");
+        Assert.Equal("off", new BenchmarkRunner().Results[0].SkipExperts);
+
+        File.WriteAllText(Paths.BenchmarksFile, JsonSerializer.Serialize(new[]
+        {
+            new BenchResult { ModelId = glm, ModelName = "GLM", DecodeTps = 12, SkipExperts = "strong" },
+            new BenchResult { ModelId = glm, ModelName = "GLM", DecodeTps = 8 },
+            new BenchResult { ModelId = glm, ModelName = "GLM", DecodeTps = 11, SkipExperts = "light" },
+            new BenchResult { ModelId = glm, ModelName = "GLM", DecodeTps = 9 },
+        }));
+        var latest = new BenchmarkRunner().Latest(ModelCatalog.Shared);
+        Assert.Equal(new[] { "off", "light", "strong" }, latest.Select(r => r.SkipExperts));
+        Assert.Equal(new double[] { 9, 11, 12 }, latest.Select(r => r.DecodeTps));
+    }
+
+    [Fact]
     public void ResultsStayAndTheExportHasNoPersonalData()
     {
         var bench = new BenchmarkRunner();
@@ -725,6 +745,24 @@ public class HostTests : EngineTest
         Assert.Equal(EngineKind.Llama, limited.EngineForSelected);
         Assert.True(limited.CanStart);
         Assert.True(limited.ClusterApplies);
+    }
+
+    [Fact]
+    public void SkippingExpertsIsOfferedForGlmOnTheMainEngineOnly()
+    {
+        var glm = ModelCatalog.Shared.Models.First(m => m.Family == "glm" && m.Engine == "tiered");
+        var other = ModelCatalog.Shared.Models.First(m => m.Family == "deepseek" && m.Engine == "tiered");
+        var (store, _) = TinyStore(TestModels.TinyModel(), "tiered");
+        using var nvidia = Host(store, FakeGpuBackend.Nvidia(16));
+        using var vulkan = Host(TinyStore(TestModels.TinyModel(), "tiered").Store, FakeGpuBackend.Vulkan(16));
+        Assert.True(nvidia.OffersSkipExperts(glm));
+        Assert.False(nvidia.OffersSkipExperts(other));
+        Assert.False(vulkan.OffersSkipExperts(glm));
+
+        Settings.Shared.SkipExperts = "light";
+        Assert.Equal("light", nvidia.SkipExpertsFor(glm));
+        Assert.Equal("off", nvidia.SkipExpertsFor(other));
+        Assert.Equal("off", vulkan.SkipExpertsFor(glm));
     }
 
     [Fact]

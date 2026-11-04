@@ -110,7 +110,7 @@ public sealed class ComparePage : IPage
         if (seen == shownResults) return;
         shownResults = seen;
         string Family(BenchResult r) => app.Host.Store.Catalog.Model(r.ModelId)?.Family ?? "deepseek";
-        void Fill(BarChart c, Func<BenchResult, double> value) => c.Set(latest.Select(r => (r.ModelName, value(r), Family(r))).ToList());
+        void Fill(BarChart c, Func<BenchResult, double> value) => c.Set(latest.Select(r => (Name(r), value(r), Family(r))).ToList());
         Fill(write, r => r.DecodeTps);
         Fill(read, r => r.PromptTps);
         Fill(load, r => r.LoadSeconds);
@@ -165,7 +165,7 @@ public sealed class ComparePage : IPage
             FrameworkElement Cell(string text) => Ui.Label(text, 13);
             Row(row++,
             [
-                Ui.Label(r.ModelName, 13, null, FontWeights.Medium),
+                Ui.Label(Name(r), 13, null, FontWeights.Medium),
                 Cell($"{N(r.DecodeTps, "0.0")} tok/s"),
                 Cell($"{N(r.PromptTps, "0")} tok/s"),
                 Cell($"{N(r.LoadSeconds, "0")} s"),
@@ -177,6 +177,14 @@ public sealed class ComparePage : IPage
             ]);
         }
     }
+
+    /// <summary>A measurement with experts skipped is not one of the full model, and says so first: the charts cut long names off.</summary>
+    private static string Name(BenchResult r) => r.SkipExperts switch
+    {
+        "light" => L("Licht") + " · " + r.ModelName,
+        "strong" => L("Sterk") + " · " + r.ModelName,
+        _ => r.ModelName,
+    };
 
     /// <summary>Where the experts were: all on the GPU, some layers on the CPU, or mapped from the SSD with a GPU cache.</summary>
     private static string Experts(BenchResult r)

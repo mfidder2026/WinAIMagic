@@ -150,7 +150,8 @@ public sealed class ModelCard
 
         // badges: size, the plan's label, a measured speed or that it is not measured, what it can do
         var fit = host.FitOf(model);
-        var bench = host.Bench.Results.LastOrDefault(r => r.ModelId == model.Id && r.DecodeTps > 0);
+        var skip = host.SkipExpertsFor(model);
+        var bench = host.Bench.Results.LastOrDefault(r => r.ModelId == model.Id && r.SkipExperts == skip && r.DecodeTps > 0);
         var visionFiles = store.VisionStatus(model);
         bool vision = store.VisionPaths(model).Count > 0;
         bool gettingVision = downloading && st.IsComplete && !vision;
@@ -365,6 +366,9 @@ public sealed class EngineCard
     private readonly TextBlock why = Ui.Caption(color: Theme.Solid(Theme.Amber), size: 13);
     private readonly TextBlock warnings = Ui.Caption(color: Theme.Solid(Theme.Amber), size: 13);
     private readonly Button buildPack;
+    private readonly (string Label, string Value)[] skipOptions = SettingsDialog.SkipExpertsOptions();
+    private readonly ComboBox skip;
+    private readonly FrameworkElement skipPart;
     private readonly TextBlock log = Ui.Label("", 11, Theme.Secondary, wrap: true, mono: true, select: true);
     private readonly ScrollViewer logView;
     private bool logOpen;
@@ -375,6 +379,10 @@ public sealed class EngineCard
         var head = Ui.Row("auto,*,auto", 10, new StatusPill(app), model, new EngineButton(app));
         buildPack = Ui.Btn(L("Bouw het pack"), () => _ = app.Host.BuildPack(), Glyph.Fixed);
         buildPack.HorizontalAlignment = HorizontalAlignment.Left;
+        skip = SettingsDialog.Pick(skipOptions, Settings.Shared.SkipExperts, v => Settings.Shared.SkipExperts = v);
+        skip.VerticalAlignment = VerticalAlignment.Center;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(skip, SettingsDialog.SkipExpertsTitle);
+        skipPart = Ui.V(5, Ui.Row("*,auto", 12, Ui.Label(SettingsDialog.SkipExpertsTitle, 14, wrap: true), skip), Ui.Caption(SettingsDialog.SkipExpertsNote));
         logView = new ScrollViewer { Content = log, Height = 220, Padding = new Thickness(0, 0, 14, 0), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Visibility = Visibility.Collapsed };
         var chevron = Ui.Icon(Glyph.ChevronDown, 11, Theme.Secondary);
         var toggle = new Button { Content = Ui.H(7, chevron, Ui.Label(L("Log"), 13, Theme.Secondary)), Background = new SolidColorBrush(Colors.Transparent), BorderThickness = new Thickness(0), Padding = new Thickness(4, 3, 8, 3), CornerRadius = new CornerRadius(6) };
@@ -385,7 +393,7 @@ public sealed class EngineCard
             logView.Show(logOpen);
             Update();
         };
-        var body = Ui.V(10, head, bar, failed, why, warnings, buildPack, Ui.V(4, toggle, logView));
+        var body = Ui.V(10, head, bar, failed, why, warnings, buildPack, skipPart, Ui.V(4, toggle, logView));
         View = Ui.Card(body, L("Engine"), Glyph.Bolt, Theme.Mint);
     }
 
@@ -407,6 +415,11 @@ public sealed class EngineCard
         bool packMissing = host.SelectedModel is { } m && !state.IsActive && host.EngineForSelected == EngineKind.Tiered
             && host.Store.StatusOf(m.Id).IsComplete && !host.Store.PackProgress.ContainsKey(m.Id) && PackBuilder.WhyNotReady(m) != null;
         buildPack.Show(packMissing);
+        bool offerSkip = host.SelectedModel is { } chosen && host.OffersSkipExperts(chosen);
+        skipPart.Show(offerSkip);
+        // also changed under Settings
+        int skipIndex = Math.Max(Array.FindIndex(skipOptions, o => o.Value == Settings.Shared.SkipExperts), 0);
+        if (offerSkip && skip.SelectedIndex != skipIndex) skip.SelectedIndex = skipIndex;
         if (logOpen)
         {
             var tail = host.Engine?.LogTail ?? [];

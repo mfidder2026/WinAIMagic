@@ -58,7 +58,7 @@ Writing at 8-9 tok/s is well below the 17-24 tok/s the brief estimated from fast
 | `TRUNK_KEEP_MAP=...55555554444...` | **11.2-11.5 tok/s** (+31%) | Setting "Skip experts: light", changes the answers |
 | `MISS_SKIP_W=0.14`, `MISS_SKIP_FROM=23` | **12.2-12.5 tok/s** (+42%) | Setting "Skip experts: strong", changes the answers |
 
-Through the installed app: light 11.3-11.4, strong 12.1-12.3 tok/s.
+Through the installed app: light 11.3-11.4, strong 12.1-12.3 tok/s. Through the Compare screen, chosen beside the Start button: full model 8.9-9.0 (two runs), light 11.1-11.8 (three runs), strong 12.6 tok/s (one run).
 
 Prompt reading did not change. The gain is large here because this PC is held back by its CPU lane and PCIe link. How much the answers change was **not measured here**. Upstream measured it on an RTX 3090 with this model: KL to the full model 0.027 for this map and 0.052 for 0.14. The settings are off by default, because they trade accuracy for speed.
 

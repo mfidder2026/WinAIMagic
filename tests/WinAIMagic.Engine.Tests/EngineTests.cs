@@ -519,11 +519,15 @@ public class TieredEngineTests : EngineTest
     [Fact]
     public void SkippingExpertsIsAChoiceAndOnlyForGlm()
     {
-        var off = new TieredEngine(1).Config(Start(), "log")["env"]!.AsObject();
+        var engine = new TieredEngine(1);
+        var off = engine.Config(Start(), "log")["env"]!.AsObject();
+        Assert.Equal("off", engine.SkipExpertsInUse);
         Assert.False(off.ContainsKey("STRATA_GLM_TRUNK_KEEP_MAP"));
         Assert.False(off.ContainsKey("STRATA_GLM_MISS_SKIP_W"));
         Settings.Shared.SkipExperts = "light";
-        var light = new TieredEngine(1).Config(Start(), "log")["env"]!.AsObject();
+        Assert.Equal("off", engine.SkipExpertsInUse);   // the running engine keeps what it started with
+        var light = engine.Config(Start(), "log")["env"]!.AsObject();
+        Assert.Equal("light", engine.SkipExpertsInUse);
         Assert.Equal(46, light["STRATA_GLM_TRUNK_KEEP_MAP"]!.GetValue<string>().Length);
         Assert.False(light.ContainsKey("STRATA_GLM_MISS_SKIP_W"));
         Settings.Shared.SkipExperts = "strong";

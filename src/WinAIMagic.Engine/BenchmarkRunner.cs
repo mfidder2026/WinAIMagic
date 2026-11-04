@@ -27,6 +27,8 @@ public sealed record BenchResult
     [JsonPropertyName("cpuMoELayers")] public int CpuMoELayers { get; init; }
     /// <summary>Larger than memory: the expert cache on the card.</summary>
     [JsonPropertyName("expertCacheGB")] public double? ExpertCacheGb { get; init; }
+    /// <summary>What the engine skipped: off, light or strong. A measurement from before this choice is of the full model.</summary>
+    [JsonPropertyName("skipExperts")] public string SkipExperts { get; init; } = "off";
 }
 
 /// <summary>Runs the same measurement on each model in turn: start it, read a ~2.5K-token prompt, write 300 tokens.</summary>
@@ -53,10 +55,14 @@ public sealed class BenchmarkRunner
     public string? Running { get; private set; }
     public string Step { get; private set; } = "";
 
-    /// <summary>The latest result per model, in catalog order.</summary>
+    /// <summary>The latest result per model and per choice of what to skip, in catalog order: they stand side by side.</summary>
     public IReadOnlyList<BenchResult> Latest(ModelCatalog catalog)
     {
-        lock (gate) return catalog.Models.Select(m => results.LastOrDefault(r => r.ModelId == m.Id)).Where(r => r != null).Select(r => r!).ToList();
+        string[] order = ["off", "light", "strong"];
+        lock (gate)
+            return catalog.Models
+                .SelectMany(m => results.Where(r => r.ModelId == m.Id).GroupBy(r => r.SkipExperts).OrderBy(g => Array.IndexOf(order, g.Key)).Select(g => g.Last()))
+                .ToList();
     }
 
     public async Task Run(IEnumerable<string> ids, EngineHost host)
@@ -68,7 +74,9 @@ public sealed class BenchmarkRunner
             Running = model.Name;
             SetStep("Engine starten…");
             var started = DateTime.UtcNow;
-            if (host.Engine?.Model?.Id != id || host.Engine?.State.IsRunning != true)
+            // an engine started with another choice of what to skip would measure that choice instead
+            string running = (host.Engine as TieredEngine)?.SkipExpertsInUse ?? "off";
+            if (host.Engine?.Model?.Id != id || host.Engine?.State.IsRunning != true || running != host.SkipExpertsFor(model))
             {
                 if (host.Engine != null) await host.Engine.StopAndWait();
                 host.SelectedModelId = id;
@@ -106,6 +114,7 @@ public sealed class BenchmarkRunner
                     RamGb = during.Count == 0 ? 0 : during.Max(s => s.RamUsedGB),
                     CpuMoELayers = plan.CpuMoELayers,
                     ExpertCacheGb = plan.ExpertCache / 1e9,
+                    SkipExperts = (host.Engine as TieredEngine)?.SkipExpertsInUse ?? "off",
                 };
                 lock (gate) results.Add(r);
                 Save();

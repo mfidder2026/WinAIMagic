@@ -134,8 +134,8 @@ public static class SettingsDialog
                 Note(L("Meer context kost geheugen (KV-cache): bij 1M ~6 GB voor DeepSeek, ~20 GB voor GLM. Qwen gaat tot 256K. Een vol gesprek wordt automatisch samengevat.")),
                 Toggle(L("Afbeeldingen (vision, 1 GB extra)"), s.Vision, v => s.Vision = v),
                 Toggle(L("Sneller schrijven met MTP (GLM en Qwen)"), s.Mtp, v => s.Mtp = v),
-                Row(L("Experts overslaan (GLM)"), Pick([(L("Uit: het volledige model"), "off"), (L("Licht"), "light"), (L("Sterk"), "strong")], s.SkipExperts, v => s.SkipExperts = v)),
-                Note(L("Laat experts weg die niet in het VRAM staan en weinig meetellen. GLM schrijft dan sneller, maar de antwoorden wijken iets af van het volledige model. Geldt na het herstarten van de engine.")),
+                Row(SkipExpertsTitle, Pick(SkipExpertsOptions(), s.SkipExperts, v => s.SkipExperts = v)),
+                Note(SkipExpertsNote),
                 Toggle(L("Engine starten bij openen app"), s.AutoStart, v => s.AutoStart = v),
                 Toggle(L("Bewegende achtergrond"), s.AnimatedBackground, v => s.AnimatedBackground = v)),
             Section(L("Videokaart"),
@@ -150,6 +150,11 @@ public static class SettingsDialog
                 Secret(L("API-sleutel (leeg = alleen deze pc)"), s.ApiKey, v => s.ApiKey = v),
                 Note(L("Wijzigingen gelden na het herstarten van de engine. Gebruik 0.0.0.0 alleen met een API-sleutel."))));
     }
+
+    // the same choice stands beside the engine's Start button on the models page
+    internal static string SkipExpertsTitle => L("Experts overslaan (GLM)");
+    internal static string SkipExpertsNote => L("Laat experts weg die weinig meetellen. GLM schrijft dan sneller, vooral op een kaart met weinig VRAM, maar de antwoorden wijken iets af van het volledige model: bij Sterk meer dan bij Licht. Geldt na het herstarten van de engine.");
+    internal static (string Label, string Value)[] SkipExpertsOptions() => [(L("Uit: het volledige model"), "off"), (L("Licht: sneller"), "light"), (L("Sterk: nog sneller"), "strong")];
 
     private static (string, string)[] Rights() => [(L("Toestaan"), "allow"), (L("Eerst vragen"), "ask"), (L("Weigeren"), "deny")];
 
@@ -196,7 +201,7 @@ public static class SettingsDialog
         return Row(label, p);
     }
 
-    private static ComboBox Pick<T>(IEnumerable<(string Label, T Value)> options, T current, Action<T> set) where T : notnull
+    internal static ComboBox Pick<T>(IEnumerable<(string Label, T Value)> options, T current, Action<T> set) where T : notnull
     {
         var list = options.ToList();
         var c = new ComboBox { MinWidth = 200, ItemsSource = list.Select(o => o.Label).ToList() };

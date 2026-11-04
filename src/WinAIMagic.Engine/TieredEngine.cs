@@ -89,13 +89,18 @@ public sealed class TieredEngine : EngineBase
         _ => new Dictionary<string, string>(),
     };
 
+    /// <summary>What this engine skips: the setting at its start, whatever the setting says now.</summary>
+    public string SkipExpertsInUse { get; private set; } = "off";
+
     /// <summary>The config for serve.server.</summary>
     public JsonObject Config(EngineStart s, string logPath)
     {
         var settings = Settings.Shared;
         var engineEnv = new JsonObject();
         foreach (var (k, v) in s.Backend.Environment) engineEnv[k] = v;
-        foreach (var (k, v) in SkipExpertsEnvironment(s.Model.Family, settings.SkipExperts)) engineEnv[k] = v;
+        var skip = SkipExpertsEnvironment(s.Model.Family, settings.SkipExperts);
+        foreach (var (k, v) in skip) engineEnv[k] = v;
+        SkipExpertsInUse = skip.Count > 0 ? settings.SkipExperts : "off";
         var cfg = new JsonObject
         {
             ["exe"] = Path.Combine(Root, "bin", s.Model.Tier?.Exe ?? ""),
