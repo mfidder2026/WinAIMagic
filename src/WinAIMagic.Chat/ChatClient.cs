@@ -443,6 +443,13 @@ public sealed class ChatClient(HttpClient? http = null)
 
     /// <summary>Summarize the start of a conversation, so it fits in the context again: everything before the last two questions
     /// becomes a summary that goes with the system prompt; the messages stay visible in the chat.</summary>
+    /// <summary>The transcript's own labels at the start of a line: no summary but more of the conversation.</summary>
+    internal static bool LooksLikeTranscript(string text)
+    {
+        string result = L("Resultaat:"), user = L("Gebruiker:");
+        return text.Split('\n').Any(l => l.StartsWith(result, StringComparison.Ordinal) || l.StartsWith(user, StringComparison.Ordinal));
+    }
+
     public async Task CompactAsync(Guid id, ConversationStore store, Uri baseUrl, Guid? excluding = null, CancellationToken ct = default)
     {
         var c = store.Find(id);
@@ -499,7 +506,7 @@ public sealed class ChatClient(HttpClient? http = null)
                 ["model"] = ModelName,
                 ["messages"] = new JsonArray(
                     new JsonObject { ["role"] = "system", ["content"] = L("Je vat een gesprek samen zodat het verder kan zonder de oorspronkelijke berichten. Houd vast: het doel van de gebruiker, beslissingen, namen en paden van bestanden, commando's die werkten of faalden, de stand van het werk en open vragen of taken. Schrijf beknopt, in het Nederlands, als lijst met kopjes.") },
-                    new JsonObject { ["role"] = "user", ["content"] = L("Vat dit gesprek samen:") + "\n\n" + transcript }),
+                    new JsonObject { ["role"] = "user", ["content"] = L("Vat dit gesprek samen:") + "\n\n" + transcript + "\n\n" + L("Dit was het gesprek. Ga het niet voortzetten: schrijf nu de samenvatting.") }),
                 ["stream"] = false,
                 ["temperature"] = 0.3,
                 ["max_tokens"] = 2000,
@@ -507,6 +514,8 @@ public sealed class ChatClient(HttpClient? http = null)
                 ["thinking_budget_tokens"] = 0,    // GLM's template ignores enable_thinking and always opens with <think>
             };
             var summary = await CompleteAsync(body, baseUrl, 1800, ct);
+            // on a long transcript a model can carry on with the conversation instead (seen on GLM in a 64K session): once more
+            if (summary != null && LooksLikeTranscript(summary)) summary = await CompleteAsync(body, baseUrl, 1800, ct);
             if (string.IsNullOrEmpty(summary)) return;
             store.Update(id, conversation =>
             {

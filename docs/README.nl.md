@@ -34,6 +34,8 @@ Op één pc: RTX 5060 Ti 16 GB op PCIe 3.0 x8, Core i9-10900K, 128 GB DDR4-2400 
 | Qwen3.6-35B-A3B Q4 | 15 s | 380 tok/s | **39,5 tok/s** |
 | GLM-5.3-Flash Compact 24 | 98 s | 354 tok/s | **8,9 tok/s** |
 
+Met **Experts overslaan** onder Instellingen schrijft GLM op deze pc 11,3 (Licht) of 12,2 tok/s (Sterk), maar de antwoorden wijken dan iets af van het volledige model. Standaard staat dit uit.
+
 Op jouw pc kan dat flink anders zijn. Meet het zelf onder **Vergelijken**. De overige modellen zijn hier nog niet gedraaid en AMD is nog niet gemeten.
 
 ## Wat nog niet werkt
@@ -43,3 +45,4 @@ Zie [PARITY.md](PARITY.md) voor de hele lijst. De belangrijkste punten:
 - AMD-kaarten gebruiken alleen de tweede engine via Vulkan.
 - Afbeeldingen zijn getest op GLM (hoofdengine) en Qwen3.6 (tweede engine). Op DeepSeek en MiniMax zijn ze aangesloten, maar nog niet met een echte afbeelding gedraaid. Elk model haalt zijn afbeeldingsbestanden apart op (ongeveer 1 tot 1,7 GB).
 - De setup is nog niet ondertekend en nog niet getest op een schone pc.
+- De cluster is alleen getest met een helper op dezelfde pc, nog niet met twee aparte pc's.

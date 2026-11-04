@@ -30,7 +30,7 @@ A card that is nearly full does not fail on Windows: the driver starts paging an
 
 CUDA beats Vulkan on this card at the same setting (24.5 against 19 tok/s).
 
-## 2. GLM-5.3-Flash Compact 24: settings hardly matter
+## 2. GLM-5.3-Flash Compact 24: exact settings hardly matter
 
 | Setting | Prompt | Writing |
 |---|---|---|
@@ -45,6 +45,24 @@ CUDA beats Vulkan on this card at the same setting (24.5 against 19 tok/s).
 - **Where the time goes** (engine log): about 120 ms per token, of which 56-63 ms in the CPU lane. An expert costs 0.40-0.48 ms on the CPU and 1.1 ms over PCIe, so this PC's PCIe 3.0 x8 link sends most missing experts to the CPU. 43-53% of experts hit VRAM; none came from the SSD while writing.
 
 Writing at 8-9 tok/s is well below the 17-24 tok/s the brief estimated from faster systems. Likely causes are the PCIe link and two channels of DDR4-2400. The RAM is rated for 3200 MT/s (XMP is off); this was not measured.
+
+## 2b. Candidates from the Strata repositories
+
+`niko1221/strata` and its frozen copy `mach10x/strata` were compared with the engine fork. Each candidate was measured here with three runs, with the default before and after: 8.6-8.8 tok/s both times.
+
+| Setting | Writing | Verdict |
+|---|---|---|
+| `KDA_GRAPH=1` | 8.0-8.2 tok/s | Slower here, left off |
+| `DEFER_CPU=1` | 8.1-8.3 tok/s | Slower here, left off |
+| VRAM reserve 700 MiB | 8.6-9.1 tok/s | Within the noise, and the card fills to 15.1 of 15.9 GB: left at 1500 |
+| `TRUNK_KEEP_MAP=...55555554444...` | **11.2-11.5 tok/s** (+31%) | Setting "Skip experts: light", changes the answers |
+| `MISS_SKIP_W=0.14`, `MISS_SKIP_FROM=23` | **12.2-12.5 tok/s** (+42%) | Setting "Skip experts: strong", changes the answers |
+
+Through the installed app: light 11.3-11.4, strong 12.1-12.3 tok/s.
+
+Prompt reading did not change. The gain is large here because this PC is held back by its CPU lane and PCIe link. How much the answers change was **not measured here**. Upstream measured it on an RTX 3090 with this model: KL to the full model 0.027 for this map and 0.052 for 0.14. The settings are off by default, because they trade accuracy for speed.
+
+Taken over as well: an engine token below 0 is now a request error (upstream `5ee1c38`). Nothing was usable for MacAIMagic: the Metal engine does not port to llama.cpp, and the one relevant change gains only on small Macs.
 
 ## 3. The second model beside the heavy one
 
@@ -70,7 +88,12 @@ All with GLM-5.3-Flash Compact 24 through the installed app, using `RealEngineTe
 - **Thinking budget per request:** budget 0 gives no reasoning; a budget of 120 tokens closed the thinking 26 tokens later at a sentence end, with the closing message in the reasoning and the answer after it.
 - **Forced close of the app:** no process of the installation stays behind, measured several times.
 
-A session that really fills the 64K context has not been run.
+- **A session that fills the 64K context:** 30 files of about 3,000 tokens each, one code to find in each, and every code to be added to a file as it goes. Full model, 33.5 minutes, 130 messages, 63 tool calls. The app summarized on the way and finished; all 30 codes were correct, and the model checked the result by itself at the end.
+- **The summary in that session** started as a continuation of the conversation instead of a summary. A separate test on a long transcript gave proper summaries in four of four runs, so it does not always happen. The request now ends with a closing line, and the app asks once more if the answer still carries the transcript's labels. Neither has run in a whole new long session.
+- **Images:** a test picture pasted with real Ctrl+V into the installed app. GLM answered with the right text and shape. Qwen3.6 did too through the API. On this 16 GB card GLM's encoder runs on the CPU, about 15 s per new picture.
+- **Cluster:** a real helper on this PC (the CPU build of the RPC server, 127.0.0.1), added by hand in the app. The app read its memory (137 GB) and put 39 of 40 layers on it, which took 20.5 GB there. Qwen3.6 answered at 9.7 tok/s. It was also found through DNS-SD. Two separate PCs have not been run.
+- **Real input:** Ctrl+V with an image file, a bitmap and text, Ctrl+Enter, dragging a file in from another program, and the file and folder dialogs, all with real keyboard and mouse input.
+- **Skipping experts:** the same agent task succeeded in both modes, in 2.4 minutes (light) and 1.7 minutes (strong).
 
 ## 5. Engine build
 

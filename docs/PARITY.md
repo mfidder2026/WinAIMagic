@@ -26,7 +26,8 @@ How this version relates to MacAIMagic at commit `9b3d166`. Test cases are liste
 - **GPU limit button:** removed, it has no Windows counterpart. The page file check takes its place.
 - **Model files on disk** get a neutral name; the download servers keep theirs.
 - **Moving models:** the Mac only points at another folder. Here the app also moves the files, resumable and verified.
-- **Verwijder model** is the one added feature.
+- **Verwijder model** was the one added feature in the brief. The owner also asked for **skipping experts on GLM** (faster, answers change a little; off by default; see RESEARCH.md).
+- **File and folder dialogs** use IFileOpenDialog directly: the WinRT folder picker failed with E_FAIL from this unpackaged app.
 - **Stop for the main engine** closes its parent pipe rather than sending a console break, because the engine would otherwise lose its expert profile.
 - **pwsh from the Microsoft Store** is skipped for `run_command`: its children leave the Job Object. Windows PowerShell 5.1 runs instead.
 
@@ -65,10 +66,12 @@ The same gaps still exist in MacAIMagic.
 
 - A clean Windows 11 PC, and any PC other than the one test PC.
 - DeepSeek, MiniMax, Qwen3.8 and the larger GLM models.
-- The page file button (UAC), a real move of models, real cluster helpers, downloading through the app beyond a short test.
-- Drag and drop, real Ctrl+V, Ctrl+Enter and the file and folder pickers (run only through test hooks).
+- The page file button: a dry run checked the commands, and the change itself needs someone to accept the UAC prompt.
+- A real move of models; downloading through the app beyond a short test.
+- A cluster of two separate PCs: the helper has run on the same PC only, and on its CPU build.
+- The documents file dialogs and the models folder dialog past the chosen folder (the same code as the composer's, which ran).
+- Images with skipped experts.
 - Claude Code itself: the Anthropic API was tested directly, with and without tools.
-- A long agent session that fills the 64K context. The real task ran 5 rounds and 2 minutes; summarizing ran on a short conversation.
 - Web search and quick actions in the documents editor against a real model.
 - Word was checked on two generated documents, by opening them and looking at the result, not with a comparison against the template.
 

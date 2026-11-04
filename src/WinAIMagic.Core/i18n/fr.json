@@ -243,6 +243,7 @@
  "Dit model past niet helemaal in VRAM en RAM. De experts die het gesprek het meest gebruikt (%@) blijven in het VRAM; de rest (%@) komt van RAM en SSD als een woord ze nodig heeft.": "Ce modèle ne tient pas entièrement dans la VRAM et la RAM. Les experts que la conversation utilise le plus (%@) restent en VRAM ; le reste (%@) vient de la RAM et du SSD quand un token en a besoin.",
  "Dit model staat niet in de catalogus.": "Ce modèle n'est pas dans le catalogue.",
  "Dit model wordt nog gedownload. Pauzeer de download eerst.": "Ce modèle est encore en cours de téléchargement. Mettez d'abord le téléchargement en pause.",
+ "Dit was het gesprek. Ga het niet voortzetten: schrijf nu de samenvatting.": "C'était la conversation. Ne la poursuivez pas : rédigez maintenant le résumé.",
  "Document": "Document",
  "Document met deze opbouw:": "Document avec cette structure :",
  "Document opbouwen in de huisstijl": "Création du document dans la charte",

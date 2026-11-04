@@ -9,6 +9,17 @@ using Xunit;
 
 namespace WinAIMagic.Chat.Tests;
 
+public class SummaryShapeTests : ChatTest
+{
+    [Fact]
+    public void AContinuationOfTheConversationIsNoSummary()
+    {
+        Assert.True(ChatClient.LooksLikeTranscript("Code gevonden.\nAssistent gebruikt read_file: {}\nResultaat: Wrote 243 bytes"));
+        Assert.True(ChatClient.LooksLikeTranscript("Gebruiker: en verder?"));
+        Assert.False(ChatClient.LooksLikeTranscript("# Samenvatting\n## Doel\n- De resultaten staan in codes.txt."));
+    }
+}
+
 public class WebToolTests : ChatTest
 {
     private static HttpResponseMessage Ok(string text, string type = "text/html") => new(HttpStatusCode.OK)
