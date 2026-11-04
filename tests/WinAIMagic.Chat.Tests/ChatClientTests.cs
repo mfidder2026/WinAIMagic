@@ -401,7 +401,8 @@ public class ChatRequestTests : ChatTest
         await new ChatClient(engine.Client) { ContextLimit = 1000 }.CompactAsync(Id, store, Base);
         var transcript = engine.CompleteRequests[0]["messages"]![1]!["content"]!.GetValue<string>();
         Assert.StartsWith("Vat dit gesprek samen:\n\n[begin weggelaten]\n", transcript);
-        Assert.True(transcript.Length < 2600);
+        Assert.EndsWith("Ga het niet voortzetten: schrijf nu de samenvatting.", transcript);
+        Assert.True(transcript.Length < 2700);
     }
 
     /// <summary>One long task with one question: the latest steps stay, a tool result stays with its call.</summary>
