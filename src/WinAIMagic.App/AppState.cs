@@ -112,9 +112,22 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
 
     // MARK: - the engine
 
-    public EngineState EngineState => Host.Engine?.State ?? EngineState.Stopped;
+    /// <summary>Hidden flags: the state and address of a stand-in for the engine.</summary>
+    internal EngineState? TestState { get; set; }
+    internal Uri? TestUrl { get; set; }
+
+    public EngineState EngineState => TestState ?? Host.Engine?.State ?? EngineState.Stopped;
     public double TokensPerSec => Host.Metrics.Current?.TokensPerSec ?? 0;
-    public Uri BaseUrl => Host.Engine?.BaseUrl ?? new Uri($"http://{(Settings.Host == "0.0.0.0" ? "127.0.0.1" : Settings.Host)}:{Settings.Port}");
+    public Uri BaseUrl => TestUrl ?? Host.Engine?.BaseUrl ?? new Uri($"http://{(Settings.Host == "0.0.0.0" ? "127.0.0.1" : Settings.Host)}:{Settings.Port}");
+    /// <summary>The model the chat talks to.</summary>
+    public ModelInfo? ChatModel => Host.Engine?.Model ?? Host.SelectedModel;
+
+    /// <summary>Sends a question in a conversation; on the UI thread, where the chat's loop then stays.</summary>
+    public void Send(string text, IReadOnlyList<Attachment> attachments, Guid conversation)
+    {
+        if (ChatModel is { } m) Chat.ModelName = m.Name;
+        Chat.Send(text, attachments, conversation, Store, BaseUrl);
+    }
 
     public void StartEngine()
     {
@@ -155,6 +168,7 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         Closing?.Invoke();
+        Chat.Stop();
         Settings.PropertyChanged -= OnSetting;
         Store.Save();
         Host.Dispose();

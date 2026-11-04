@@ -112,6 +112,7 @@ public sealed partial class Sidebar : Grid
         foreach (var c in list)
         {
             if (!chatRows.TryGetValue(c.Id, out var row)) continue;
+            if (row.Title.Text != c.DisplayTitle) Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(row.Button, c.DisplayTitle);
             row.Title.SetIfChanged(c.DisplayTitle);
             row.Time.SetIfChanged(Ago(c.Updated));
         }

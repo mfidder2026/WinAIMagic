@@ -210,6 +210,9 @@ public sealed partial class ShellWindow : Window
     /// --dialog=settings:Chat|settings:Engine[:scroll]|license:id|delete:id|folder:path.</summary>
     private void RunTestHooks()
     {
+#if DEBUG
+        RunChatHooks();
+#endif
         if (double.TryParse(Arg("tokens"), out var rate))
         {
             tokenTimer = DispatcherQueue.CreateTimer();
@@ -235,6 +238,62 @@ public sealed partial class ShellWindow : Window
         };
         hookTimer.Start();
     }
+
+#if DEBUG
+    /// <summary>Hidden, debug builds: --fake-engine (a scripted stream), --fake-state=starting|failed, --attach=file;file,
+    /// --paste=file:path|bitmap:path|textbitmap:path (the paste logic on a local data package), --folder=path, --lag-log=file (the
+    /// longest wait of the UI thread per second).</summary>
+    private void RunChatHooks()
+    {
+        if (args.Contains("--fake-engine")) app.TestUrl = FakeEngine.Start();
+        app.TestState = Arg("fake-state") switch
+        {
+            "starting" => Engine.EngineState.Starting(L("Model laden…")),
+            "failed" => Engine.EngineState.Failed(L($"Engine gestopt (code {1}): {"fake"}")),
+            _ => args.Contains("--fake-engine") ? Engine.EngineState.Running : null,
+        };
+        if (args.Contains("--fake-engine")) app.Host.Metrics.Fast = true;
+        if (Arg("lag-log") is { } lagFile)
+        {
+            var tick = DispatcherQueue.CreateTimer();
+            tick.Interval = TimeSpan.FromMilliseconds(16);
+            long last = Environment.TickCount64, nextWrite = last + 1000, worst = 0;
+            tick.Tick += (_, _) =>
+            {
+                long now = Environment.TickCount64;
+                worst = Math.Max(worst, now - last);
+                last = now;
+                if (now < nextWrite) return;
+                File.AppendAllText(lagFile, $"{DateTime.Now:HH:mm:ss} worst {worst} ms\n");
+                worst = 0;
+                nextWrite = now + 1000;
+            };
+            tick.Start();
+            tokenTimer = tick;
+        }
+        var hook = DispatcherQueue.CreateTimer();
+        hook.IsRepeating = false;
+        hook.Interval = TimeSpan.FromSeconds(1);
+        hook.Tick += async (_, _) =>
+        {
+            if (pages.GetValueOrDefault(PaneKind.Chat) is not ChatPage chat) return;
+            if (Arg("folder") is { } folder) chat.Composer.SetFolder(folder);
+            foreach (var file in Arg("attach")?.Split(';') ?? []) await chat.Composer.Add(file);
+            if (Arg("paste")?.Split(':', 2) is [var kind, var path])
+            {
+                var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                if (kind == "file") package.SetStorageItems([await Windows.Storage.StorageFile.GetFileFromPathAsync(path)]);
+                else
+                {
+                    package.SetBitmap(Windows.Storage.Streams.RandomAccessStreamReference.CreateFromFile(await Windows.Storage.StorageFile.GetFileFromPathAsync(path)));
+                    if (kind == "textbitmap") package.SetText("tekst wint");
+                }
+                File.AppendAllText(Path.Combine(Paths.AppData, "paste.log"), $"{kind}: took={await chat.Composer.TakeImages(package.GetView())}\n");
+            }
+        };
+        hook.Start();
+    }
+#endif
 
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hwnd);

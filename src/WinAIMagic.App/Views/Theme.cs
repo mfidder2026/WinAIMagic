@@ -9,7 +9,7 @@ namespace WinAIMagic.App.Views;
 public static class Theme
 {
     public static readonly Color Accent = Rgb(0x5C, 0x7A, 0xFF), Violet = Rgb(0x9E, 0x5C, 0xFF), Cyan = Rgb(0x33, 0xDB, 0xF2),
-        Pink = Rgb(0xFF, 0x5C, 0xAD), Mint = Rgb(0x4D, 0xF2, 0x9E), Amber = Rgb(0xFF, 0xB8, 0x40), Night = Rgb(0x09, 0x0A, 0x17);
+        Pink = Rgb(0xFF, 0x5C, 0xAD), Mint = Rgb(0x4D, 0xF2, 0x9E), Amber = Rgb(0xFF, 0xB8, 0x40), Night = Rgb(0x09, 0x0A, 0x17), Red = Rgb(0xFF, 0x45, 0x3A);
 
     public const double CardRadius = 18, CardPadding = 18, PagePadding = 28, SectionSpacing = 18;
 
@@ -66,4 +66,6 @@ public static class Glyph
         Copy = "", Folder = "", Warning = "", Error = "", Done = "", Fixed = "", Add = "", Drive = "",
         Memory = "", Cpu = "", Bolt = "", Network = "", Refresh = "", Eye = "", Fast = "", Speed = "",
         Heat = "", Star = "", Chat = "", ChevronDown = "", ChevronUp = "", Key = "";
+    public const string Think = "\uEA80", Globe = "\uE774", Image = "\uEB9F", Up = "\uE74A", Bullets = "\uE8FD", Blocked = "\uE733", Power = "\uE7E8",
+        Clock = "\uE823", Compress = "\uE73F", ChevronRight = "\uE76C", Close = "\uE711", Terminal = "\uE756", Code = "\uE943";
 }
