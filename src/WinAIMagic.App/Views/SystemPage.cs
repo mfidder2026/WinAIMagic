@@ -40,8 +40,8 @@ public sealed class SystemPage : IPage
             : check.NeedsAttention ? L("Er is iets dat de app tegenhoudt; zie hieronder.")
             : check.Items.Any(i => i.State == State.Todo) ? L("Alles is in orde; alleen een model ontbreekt nog.")
             : L("Alles wat WinAIMagic nodig heeft is aanwezig."));
-        restart.SetIfChanged(check.RestartNeeded ? L("Het wisselbestand is ingesteld. Het telt na een herstart van de pc.") : "");
-        restart.Show(check.RestartNeeded);
+        restart.SetIfChanged(check.RestartNeeded ? L("Het wisselbestand is ingesteld. Het telt na een herstart van de pc.") : check.PageFileProblem ?? "");
+        restart.Show(check.RestartNeeded || check.PageFileProblem != null);
         card.BorderBrush = Ui.CardEdge(check.NeedsAttention ? Theme.Amber : Theme.Mint);
 
         var key = string.Join("|", check.Items.Select(i => i.Id + i.Detail + i.State + i.ActionLabel));

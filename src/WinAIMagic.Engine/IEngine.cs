@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using WinAIMagic.Core.Support;
 using static WinAIMagic.Core.Support.Lang;
 
@@ -38,7 +39,10 @@ public sealed record EngineActivity
 
 public sealed record EngineStart(ModelInfo Model, IReadOnlyList<string> Shards, MemoryPlan Plan, IGpuBackend Backend)
 {
+    /// <summary>The image file; on the main engine the first of its files, for GLM the encoder's mmproj.</summary>
     public string? Vision { get; init; }
+    /// <summary>GLM on the main engine: the vocabulary the encoder reads its markers with.</summary>
+    public string? VisionVocab { get; init; }
     public string? Draft { get; init; }
     public string? Rpc { get; init; }
 }
@@ -89,6 +93,8 @@ public abstract class EngineBase : IEngine
     private volatile bool stopRequested;
     private EngineState state = EngineState.Stopped;
     private double loadProgress;
+    private bool startedWithVision;
+    private bool? reportedVision;
 
     /// <summary>A second engine next to the app's own: its own port, only reachable from this PC, and its own log.</summary>
     protected EngineBase(int? port, string? logFile)
@@ -99,6 +105,8 @@ public abstract class EngineBase : IEngine
 
     public abstract EngineKind Kind { get; }
     public abstract EngineCapabilities Capabilities { get; }
+    /// <summary>Started with images, and the engine itself does not say otherwise once it answers: an image part that did not load says no.</summary>
+    protected bool ReadsImages => startedWithVision && reportedVision != false;
     public event Action<EngineState>? StateChanged;
     public event Action? Changed;
     public ModelInfo? Model { get; private set; }
@@ -169,6 +177,8 @@ public abstract class EngineBase : IEngine
             OnExit = Terminated,
         };
         Model = s.Model;
+        startedWithVision = s.Vision != null;
+        reportedVision = null;
         stopRequested = false;
         try
         {
@@ -333,6 +343,7 @@ public abstract class EngineBase : IEngine
                     if ((int)response.StatusCode == 200)
                     {
                         SetProgress(1);
+                        reportedVision = ParseVisionModality(await GetJson("props"));
                         if (state.Status == EngineStatus.Starting) State = EngineState.Running;
                         return;
                     }
@@ -344,6 +355,20 @@ public abstract class EngineBase : IEngine
     }
 
     public abstract Task<EngineActivity?> PollActivity();
+
+    /// <summary>modalities.vision in /props, the same on both engines; null when it does not say.</summary>
+    internal static bool? ParseVisionModality(string? json)
+    {
+        if (json == null) return null;
+        try
+        {
+            using var d = JsonDocument.Parse(json);
+            return d.RootElement.ValueKind == JsonValueKind.Object && d.RootElement.TryGetProperty("modalities", out var m)
+                && m.ValueKind == JsonValueKind.Object && m.TryGetProperty("vision", out var v) && v.ValueKind is JsonValueKind.True or JsonValueKind.False
+                ? v.GetBoolean() : null;
+        }
+        catch (JsonException) { return null; }
+    }
 
     /// <summary>GET at the engine, with the key when one is set; null when it does not answer.</summary>
     protected async Task<string?> GetJson(string path)

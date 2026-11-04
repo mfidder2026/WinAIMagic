@@ -41,6 +41,7 @@ public sealed class EngineHost : IDisposable
         Backend = Choice.Backend;
         System = SystemInfo.Current(Backend);
         Store = store ?? new ModelStore();
+        Store.EngineOf = m => MemoryPlanner.EngineFor(m, System);
         Cluster = cluster ?? new ClusterController(Backend);
         Metrics = new LiveMetrics(() => Engine, Backend.Adapters.FirstOrDefault()?.Luid ?? 0, Backend.VramTotal);
         Bench = new BenchmarkRunner();
@@ -112,10 +113,38 @@ public sealed class EngineHost : IDisposable
     public bool UseVision(GGUFIndex index)
     {
         var kind = EngineForSelected ?? EngineKind.Llama;
-        // the main engine's own vision path is not wired up yet: its capabilities say so
-        if (kind == EngineKind.Tiered) return false;
-        bool wanted = Settings.Shared.Vision && SelectedModel is { } m && Store.VisionPath(m) != null;
+        bool wanted = Settings.Shared.Vision && SelectedModel is { } m && Store.VisionPaths(m).Count > 0 && VisionPartReady(m);
         return MemoryPlanner.UseVision(index, System, wanted, kind, Helpers.Count > 0);
+    }
+
+    /// <summary>Beside the files, on the main engine: GLM's encoder, and for the others a tower their pack could take.</summary>
+    private bool VisionPartReady(ModelInfo m) =>
+        MemoryPlanner.EngineFor(m, System) != EngineKind.Tiered
+        || (m.Family == "glm" ? File.Exists(TieredEngine.EncoderExe) : !PackBuilder.TowerRefused(m));
+
+    /// <summary>Why the composer cannot take images now, in words; null when it can. A running engine answers for itself.</summary>
+    public string? WhyNoImages
+    {
+        get
+        {
+            if (!Settings.Shared.Vision) return L("Afbeeldingen staan uit in de instellingen.");
+            bool running = Engine?.State.IsRunning == true && Engine.Model != null;
+            if (running && Engine!.Capabilities.Vision) return null;
+            var m = running ? Engine!.Model : SelectedModel;
+            if (m == null) return L("Dit model staat niet in de catalogus.");
+            var files = Store.VisionStatus(m);
+            if (files.Count == 0) return L($"{m.ShortName} kan op deze engine geen afbeeldingen lezen.");
+            if (files.Any(f => !f.Complete))
+            {
+                ulong missing = files.Aggregate(0UL, (n, f) => n + (f.Expected > f.Have ? f.Expected - f.Have : 0));
+                return L($"De afbeeldingsbestanden van {m.ShortName} ontbreken nog ({missing.GbShort()}). Download ze op de modelkaart.");
+            }
+            if (!VisionPartReady(m))
+                return m.Family == "glm" ? L("De afbeeldingsencoder ontbreekt. Installeer WinAIMagic opnieuw.") : L($"Het pack van {m.ShortName} kon de afbeeldingsbestanden niet opnemen; zie het logboek.");
+            if (m.Id == SelectedModelId && Index != null && !UseVision(Index))
+                return L("Afbeeldingen blijven uit: ze zouden het model uit het geheugen duwen.");
+            return running ? L("De engine draait zonder afbeeldingen. Start hem opnieuw; blijft dit zo, kijk dan in het logboek.") : null;
+        }
     }
 
     public bool CanStart
@@ -216,9 +245,11 @@ public sealed class EngineHost : IDisposable
         };
         engine.Changed += () => Changed?.Invoke();
         Engine = engine;
+        var vision = plan.Vision ? Store.VisionPaths(m) : Array.Empty<string>();
         engine.Start(new EngineStart(m, Store.ShardPaths(m), plan, Backend)
         {
-            Vision = plan.Vision ? Store.VisionPath(m) : null,
+            Vision = vision.FirstOrDefault(),
+            VisionVocab = vision.ElementAtOrDefault(1),
             Draft = Store.DraftPath(m),
             Rpc = ClusterApplies ? Cluster.RpcArgument : null,
         });

@@ -404,6 +404,45 @@ public class TieredEngineTests : EngineTest
     private static readonly ModelInfo Glm = ModelCatalog.Shared.Model("glm-5.3-flash-compact-24")!;
     private static readonly FakeGpuBackend Card = FakeGpuBackend.Nvidia(16);
 
+    /// <summary>GLM reads images through the encoder, in the server's "vision" entry, as the setup writes it; no files, no entry.</summary>
+    [Fact]
+    public void GlmsConfigNamesTheEncoderWhenItHasTheFiles()
+    {
+        Assert.Null(new TieredEngine(1).Config(Start(), "log")["vision"]);
+        var vision = new TieredEngine(1).Config(Start() with { Vision = @"C:\v\encoder.gguf", VisionVocab = @"C:\v\vocab.gguf" }, "log")["vision"]!;
+        Assert.Equal(TieredEngine.EncoderExe, vision["exe"]!.GetValue<string>());
+        Assert.Equal("wam-vision.exe", Path.GetFileName(TieredEngine.EncoderExe));
+        Assert.Equal(@"C:\v\encoder.gguf", vision["mmproj"]!.GetValue<string>());
+        Assert.Equal(@"C:\v\vocab.gguf", vision["model"]!.GetValue<string>());
+        Assert.True(vision["gpu"]!.GetValue<bool>());
+    }
+
+    /// <summary>DeepSeek and MiniMax run their tower in the engine: a flag, no encoder.</summary>
+    [Fact]
+    public void DeepSeekAndMiniMaxTurnTheirTowerOnWithTheFiles()
+    {
+        var ds = ModelCatalog.Shared.Model("deepseek-v4.1-flash-compact");
+        var mm = ModelCatalog.Shared.Model("minimax-m3.1-flash-compact");
+        Assert.DoesNotContain("--vision", TieredEngine.EngineArguments(Start(ds) with { Vision = "x" }, 0));
+        Assert.Null(new TieredEngine(1).Config(Start(ds) with { Vision = "x" }, "log")["vision"]);
+        Assert.DoesNotContain("--vision", TieredEngine.EngineArguments(Start(mm), 0));
+        var on = TieredEngine.EngineArguments(Start(mm) with { Vision = "x" }, 0);
+        Assert.Equal("on", on[on.IndexOf("--vision") + 1]);
+    }
+
+    /// <summary>What the engine says about itself: both engines' /props have it, and a tower that did not load says no.</summary>
+    [Fact]
+    public void ModalitiesAreRead()
+    {
+        Assert.True(EngineBase.ParseVisionModality("{\"modalities\":{\"vision\":true,\"audio\":false}}"));
+        Assert.False(EngineBase.ParseVisionModality("{\"modalities\":{\"vision\":false}}"));
+        Assert.Null(EngineBase.ParseVisionModality("{\"modalities\":{}}"));
+        Assert.Null(EngineBase.ParseVisionModality("{}"));
+        Assert.Null(EngineBase.ParseVisionModality("[]"));
+        Assert.Null(EngineBase.ParseVisionModality("not json"));
+        Assert.Null(EngineBase.ParseVisionModality(null));
+    }
+
     private static EngineStart Start(ModelInfo? model = null, int context = 65_536)
     {
         var m = model ?? Glm;

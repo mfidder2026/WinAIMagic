@@ -105,6 +105,7 @@
       "name": "MiniMax-M3.1-Flash Compact",
       "family": "minimax",
       "summary": "experts 1,6 bit · 93 GB in het geheugen · eigen licentie",
+      "vision": "minimax-m3.1",
       "files": [
         {
           "local": "minimax-m3.1-flash-compact-00001-of-00002.gguf",
@@ -395,6 +396,59 @@
       "dense": 2678180352,
       "engine": "llama",
       "license": "qwen-community"
+    }
+  ],
+  "tieredVision": [
+    {
+      "id": "glm-5.3",
+      "files": [
+        {
+          "local": "encoder.gguf",
+          "size": 1128046944,
+          "sha256": "3627575df16bd152db0f3fd7e488d270b33f3a9e6c7fa3b1b8ac381faafde882",
+          "url": "https://huggingface.co/peasantsmith/GLM-5.3-Flash-Maya-GGUF/resolve/a1c2a554ea72a7e8e66cc28b3eaf5036c9313860/vision/mmproj-GLM-5.3-Flash-F16.gguf"
+        },
+        {
+          "local": "vocab.gguf",
+          "size": 9426880,
+          "sha256": "8f53cb1bd2e631c14ef413e3284735d9e53f3c508d07a6f609e705b487105912",
+          "url": "https://huggingface.co/peasantsmith/GLM-5.3-Flash-Maya-GGUF/resolve/a1c2a554ea72a7e8e66cc28b3eaf5036c9313860/vision/GLM-5.3-Flash-vocab.gguf"
+        }
+      ]
+    },
+    {
+      "id": "deepseek-v4.1",
+      "files": [
+        {
+          "local": "mmproj-BF16.gguf",
+          "size": 972208288,
+          "sha256": "9a1ef7c40d0d702c7ed8c5f863f60abae64091387ba3fce0ad19ce9beeda3bf9",
+          "url": "https://huggingface.co/unsloth/DeepSeek-V4.1-Flash-1017-GGUF/resolve/8a6ec9cf118e785a362ea94ee123c61c70553be6/mmproj-BF16.gguf"
+        }
+      ]
+    },
+    {
+      "id": "minimax-m3.1",
+      "files": [
+        {
+          "local": "config.json",
+          "size": 5369,
+          "sha256": "9e3f335dbc8a84ebf3d15ab895e70d4b5e4a01f833f2c03956972953d562d158",
+          "url": "https://huggingface.co/Mia-AiLab/MiniMax-M3.1-Flash-EXL3-EAQ-v1-3.5-bpw/resolve/fe796c40546d8b28340c5ed85b892e181ee21dec/config.json"
+        },
+        {
+          "local": "preprocessor_config.json",
+          "size": 772,
+          "sha256": "36785da1dc7a00324048bd7c537c24247fca97c626884818257fd0b92287de31",
+          "url": "https://huggingface.co/Mia-AiLab/MiniMax-M3.1-Flash-EXL3-EAQ-v1-3.5-bpw/resolve/fe796c40546d8b28340c5ed85b892e181ee21dec/preprocessor_config.json"
+        },
+        {
+          "local": "model-vision-00001-of-00001.safetensors",
+          "size": 1734216664,
+          "sha256": "1872050f5b0439bfb42303bd22f8522f1788219444b0b6cb32e755f096aa2d3a",
+          "url": "https://huggingface.co/Mia-AiLab/MiniMax-M3.1-Flash-EXL3-EAQ-v1-3.5-bpw/resolve/fe796c40546d8b28340c5ed85b892e181ee21dec/model-vision-00001-of-00001.safetensors"
+        }
+      ]
     }
   ],
   "vision": [

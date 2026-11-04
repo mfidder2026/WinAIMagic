@@ -41,5 +41,5 @@ Op jouw pc kan dat flink anders zijn. Meet het zelf onder **Vergelijken**. De ov
 Zie [PARITY.md](PARITY.md) voor de hele lijst. De belangrijkste punten:
 
 - AMD-kaarten gebruiken alleen de tweede engine via Vulkan.
-- Afbeeldingen werken nog niet op de hoofdengine (GLM, DeepSeek, MiniMax).
+- Afbeeldingen zijn getest op GLM (hoofdengine) en Qwen3.6 (tweede engine). Op DeepSeek en MiniMax zijn ze aangesloten, maar nog niet met een echte afbeelding gedraaid. Elk model haalt zijn afbeeldingsbestanden apart op (ongeveer 1 tot 1,7 GB).
 - De setup is nog niet ondertekend en nog niet getest op een schone pc.

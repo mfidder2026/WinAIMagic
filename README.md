@@ -20,7 +20,7 @@ WinAIMagic is the Windows version of [MacAIMagic](https://github.com/mfidder2026
 
 ## What it does
 
-- **Chat** with thinking limits, images, web search, and a context meter that summarizes before the model runs out of room.
+- **Chat** with thinking limits, images, web search, and a context meter that summarizes before the model runs out of room. Images have been run on GLM and Qwen3.6; DeepSeek and MiniMax are wired but not yet run with a real image, and each model fetches its image files separately (about 1 to 1.7 GB).
 - **Work in a folder.** The model reads and writes files and runs commands there, with your approval per kind of action (read, write, run). It keeps going until the job is done and remembers what it learned.
 - **Documents.** Turn notes and attachments into a Word file in your own house style, section by section, with sources. You review the draft before the `.docx` is written.
 - **Compare** models with the same measurement on your own PC, and export the results.
@@ -99,6 +99,7 @@ You need Visual Studio 2022 Build Tools with C++, the CUDA Toolkit, CMake, Ninja
 sh scripts/fetch-llama-tiered.sh
 sh scripts/fetch-llama-engine.sh
 scripts\build-tiered-cuda.bat "75;80;86;89;120"
+scripts\build-vision-cuda.bat "75;80;86;89;120"
 scripts\build-llama.bat cuda
 scripts\build-llama.bat vulkan
 scripts\build-llama.bat cpu

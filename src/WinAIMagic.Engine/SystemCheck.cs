@@ -235,8 +235,12 @@ public sealed class SystemCheck
                 open(action);
                 break;
             case CheckAction.SetPageFile:
-                if (SetPageFile(host.Backend.RequiredPageFile(host.System.RamTotal) >> 20, Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\"))
-                    RestartNeeded = true;
+                PageFileProblem = null;
+                switch (SetPageFile(host.Backend.RequiredPageFile(host.System.RamTotal) >> 20, Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\"))
+                {
+                    case PageFileResult.Done: RestartNeeded = true; break;
+                    case PageFileResult.Failed: PageFileProblem = L("Het wisselbestand instellen is mislukt. Stel het in via Systeem > Info > Geavanceerde systeeminstellingen > Prestaties > Virtueel geheugen."); break;
+                }
                 _ = Run(host);
                 break;
             case CheckAction.OpenDefender:
@@ -252,8 +256,13 @@ public sealed class SystemCheck
     /// <summary>The page file was changed: the app tells the user that it counts after a restart.</summary>
     public bool RestartNeeded { get; private set; }
 
-    /// <summary>A fixed page file on `drive`. Windows' UAC prompt asks the user; false when they decline.</summary>
-    public static bool SetPageFile(ulong sizeMb, string drive)
+    /// <summary>Windows would not change it, although the user agreed; null otherwise.</summary>
+    public string? PageFileProblem { get; private set; }
+
+    public enum PageFileResult { Done, Declined, Failed }
+
+    /// <summary>A fixed page file on `drive`. Windows' UAC prompt asks the user.</summary>
+    public static PageFileResult SetPageFile(ulong sizeMb, string drive)
     {
         var bytes = Encoding.Unicode.GetBytes(PageFileScript(sizeMb, drive));
         try
@@ -265,9 +274,9 @@ public sealed class SystemCheck
                 WindowStyle = ProcessWindowStyle.Hidden,
             });
             p?.WaitForExit();
-            return p?.ExitCode == 0;
+            return p?.ExitCode == 0 ? PageFileResult.Done : PageFileResult.Failed;
         }
-        catch (Win32Exception) { return false; }   // the prompt was declined
+        catch (Win32Exception) { return PageFileResult.Declined; }   // the prompt was declined
     }
 
     internal static string PageFileScript(ulong sizeMb, string drive)

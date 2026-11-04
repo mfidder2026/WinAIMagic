@@ -160,11 +160,7 @@ internal static class DocUi
     {
         try
         {
-            var picker = new FileOpenPicker();
-            foreach (var e in extensions) picker.FileTypeFilter.Add(e);
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(app.Window));
-            if (many) return (await picker.PickMultipleFilesAsync()).Select(f => f.Path).ToList();
-            return await picker.PickSingleFileAsync() is { } file ? [file.Path] : [];
+            return await Task.FromResult(NativePickers.Files(WinRT.Interop.WindowNative.GetWindowHandle(app.Window), many, extensions));
         }
         catch (Exception e) when (e is System.Runtime.InteropServices.COMException or InvalidOperationException)
         {
@@ -356,10 +352,7 @@ internal sealed class DocumentSidePanel
     {
         try
         {
-            var picker = new FolderPicker();
-            picker.FileTypeFilter.Add("*");
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(app.Window));
-            if (await picker.PickSingleFolderAsync() is { } picked) studio.Choose(picked.Path);
+            if (NativePickers.Folder(WinRT.Interop.WindowNative.GetWindowHandle(app.Window)) is { } picked) studio.Choose(picked);
         }
         catch (Exception e) when (e is System.Runtime.InteropServices.COMException or InvalidOperationException) { App.Log(e); }
     }

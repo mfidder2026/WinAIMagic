@@ -171,6 +171,26 @@ public class CatalogTests : EngineTest
                 Assert.DoesNotContain("maya", f.Local, StringComparison.OrdinalIgnoreCase);
         }
         foreach (var v in C.Vision) Assert.DoesNotContain("maya", v.Local, StringComparison.OrdinalIgnoreCase);
+        foreach (var f in C.TieredVision.SelectMany(v => v.Files)) Assert.DoesNotContain("maya", f.Local, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Every model on the main engine has image files of its own there, pinned on a revision and a sha256.</summary>
+    [Fact]
+    public void TheMainEnginesImageFilesArePinned()
+    {
+        foreach (var m in C.Models.Where(m => m.Engine == "tiered"))
+            Assert.NotNull(C.TieredVisionFor(m));
+        Assert.Null(C.VisionFor(C.Model("minimax-m3.1-flash-compact")!));
+        foreach (var f in C.TieredVision.SelectMany(v => v.Files))
+        {
+            Assert.Matches("^[0-9a-f]{64}$", Assert.Single(f.Sha256));
+            Assert.Matches("/resolve/[0-9a-f]{40}/", f.Url);
+            Assert.True(f.Size > 0);
+        }
+        // GLM: the encoder's mmproj first, the vocabulary after it (the order EngineStart reads them in)
+        var glm = C.TieredVisionFor(C.Model("glm-5.3-flash-compact-24")!)!;
+        Assert.Equal(new[] { "encoder.gguf", "vocab.gguf" }, glm.Files.Select(f => f.Local));
+        Assert.Equal(1_137_473_824UL, glm.TotalSize);
     }
 
     [Fact]

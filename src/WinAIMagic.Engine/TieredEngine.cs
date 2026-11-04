@@ -28,9 +28,11 @@ public sealed class TieredEngine : EngineBase
     public TieredEngine(int? port = null, string? logFile = null) : base(port, logFile) { }
 
     public override EngineKind Kind => EngineKind.Tiered;
-    public override EngineCapabilities Capabilities => new(Vision: false, Cluster: false, ExpertTiers: true);
+    public override EngineCapabilities Capabilities => new(Vision: ReadsImages, Cluster: false, ExpertTiers: true);
 
     public static string Root => Path.Combine(Paths.EngineRoot, "tiered");
+    /// <summary>GLM's image encoder: a process of its own, started when a picture arrives. DeepSeek and MiniMax run their tower in the engine.</summary>
+    public static string EncoderExe => Path.Combine(Root, "bin", "wam-vision.exe");
 
     protected override string? Missing(EngineStart s)
     {
@@ -55,12 +57,15 @@ public sealed class TieredEngine : EngineBase
             case "deepseek":
                 args.AddRange(new[] { "--pack", pack, "--max-context", context, "--tp", Math.Min(2, s.Backend.Adapters.Count).ToString(CultureInfo.InvariantCulture) });
                 if (s.Backend.Adapters.Count <= 1) args.AddRange(new[] { "--threads", "on" });
-                args.AddRange(new[] { "--dspark", "none", "--vision", "off", "--reserve-mib", reserveMib });
+                args.AddRange(new[] { "--dspark", "none" });
+                if (s.Vision == null) args.AddRange(new[] { "--vision", "off" });
+                args.AddRange(new[] { "--reserve-mib", reserveMib });
                 break;
             case "minimax":
                 args.AddRange(new[] { "--pack", pack, "--max-context", context });
                 var profile = Path.Combine(Root, "data", "expert-profile-mm3.bin");
                 if (File.Exists(profile)) args.AddRange(new[] { "--profile", profile });
+                if (s.Vision != null) args.AddRange(new[] { "--vision", "on" });
                 args.AddRange(new[] { "--kv-streaming", "on",
                                       "--reserve-gb", (vramReserve / (double)(1UL << 30)).ToString("0.0", CultureInfo.InvariantCulture) });
                 break;
@@ -100,6 +105,9 @@ public sealed class TieredEngine : EngineBase
             ["thinking_budget"] = 0,
         };
         foreach (var (k, v) in s.Backend.TieredConfig) cfg[k] = v;
+        // the server starts the encoder per request with pictures, in GPU memory the model lends it, and measures once how much that is
+        if (s.Vision != null && s.VisionVocab != null)
+            cfg["vision"] = new JsonObject { ["exe"] = EncoderExe, ["mmproj"] = s.Vision, ["model"] = s.VisionVocab, ["gpu"] = true };
         if (!string.IsNullOrEmpty(settings.ApiKey)) cfg["api_key"] = settings.ApiKey;
         return cfg;
     }
@@ -184,7 +192,8 @@ public sealed class TieredEngine : EngineBase
     /// <summary>The server's progress messages, on stdout.</summary>
     protected override void ConsumeLine(string line)
     {
-        if (line.Contains("reading the model's weights")) Say(L("Gewichten laden…"));
+        if (line.Contains("measuring the vision encoder")) Say(L("Afbeeldingsencoder meten…"));
+        else if (line.Contains("reading the model's weights")) Say(L("Gewichten laden…"));
         else if (line.Contains("loading the experts into RAM")) { Say(L("Experts in het RAM laden…")); SetProgress(0.2); }
         else if (line.Contains("experts loaded")) SetProgress(0.6);
         else if (line.Contains("filling the GPU's expert cache")) { Say(L("Expert-cache vullen…")); SetProgress(0.7); }

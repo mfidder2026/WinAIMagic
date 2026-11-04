@@ -494,6 +494,108 @@ public class HostTests : EngineTest
         return (store, model);
     }
 
+    /// <summary>A GLM on the main engine with its image files named, none of them here yet.</summary>
+    private static (ModelStore Store, ModelInfo Model, TieredVisionInfo Vision) GlmStore()
+    {
+        var bytes = TestModels.TinyModel();
+        var model = new ModelInfo
+        {
+            Id = "tiny", Name = "Tiny", Family = "glm", Summary = "s", Engine = "tiered", Vision = "vv", Pack = new PackInfo("glm"),
+            Tier = new TierInfo { Exe = "wam-glm.exe" },
+            Files = new[] { new ModelFile { Local = "tiny.gguf", Size = (ulong)bytes.Length, Sha256 = new[] { TestModels.Sha(bytes) }, Url = "https://x.test/a" } },
+            Memory = (ulong)bytes.Length, Dense = (ulong)bytes.Length / 3,
+        };
+        var vision = new TieredVisionInfo
+        {
+            Id = "vv",
+            Files = new[]
+            {
+                new ModelFile { Local = "encoder.gguf", Size = 4, Sha256 = new[] { "" }, Url = "https://x.test/e" },
+                new ModelFile { Local = "vocab.gguf", Size = 2, Sha256 = new[] { "" }, Url = "https://x.test/w" },
+            },
+        };
+        Directory.CreateDirectory(Paths.ModelDir(model.Id));
+        File.WriteAllBytes(Path.Combine(Paths.ModelDir(model.Id), "tiny.gguf"), bytes);
+        var catalog = new ModelCatalog { Models = new[] { model }, TieredVision = new[] { vision } };
+        return (new ModelStore(catalog, new HttpClient(new FakeServer()), timer: false), model, vision);
+    }
+
+    /// <summary>The composer's reasons, in the order someone would fix them; none left, and the plan has vision.</summary>
+    [Fact]
+    public void TheHostSaysWhyThereAreNoImages()
+    {
+        var (store, _, vision) = GlmStore();
+        using var host = Host(store, FakeGpuBackend.Nvidia(16));
+        Assert.Equal(EngineKind.Tiered, host.EngineForSelected);
+        Settings.Shared.Vision = false;
+        Assert.Contains("instellingen", host.WhyNoImages);
+        Settings.Shared.Vision = true;
+        // a model without them still starts
+        Assert.Contains("ontbreken", host.WhyNoImages);
+        Assert.True(host.CanStart);
+        Assert.False(host.Plan!.Vision);
+
+        Directory.CreateDirectory(vision.Folder);
+        File.WriteAllBytes(Path.Combine(vision.Folder, "encoder.gguf"), new byte[4]);
+        store.Refresh();
+        Assert.Contains("ontbreken", host.WhyNoImages);
+        File.WriteAllBytes(Path.Combine(vision.Folder, "vocab.gguf"), new byte[2]);
+        store.Refresh();
+        Assert.Contains("encoder", host.WhyNoImages);
+        Assert.False(host.Plan!.Vision);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(TieredEngine.EncoderExe)!);
+        File.WriteAllBytes(TieredEngine.EncoderExe, new byte[1]);
+        try
+        {
+            Assert.Null(host.WhyNoImages);
+            Assert.True(host.Plan!.Vision);
+        }
+        finally { File.Delete(TieredEngine.EncoderExe); }
+    }
+
+    [Fact]
+    public void AModelWithoutImageFilesOnThisEngineSaysSo()
+    {
+        var (store, _) = TinyStore(TestModels.TinyModel());
+        using var host = Host(store, FakeGpuBackend.Nvidia(16));
+        Assert.Contains("geen afbeeldingen", host.WhyNoImages);
+    }
+
+    /// <summary>A running engine answers for itself: started without the files it has no images, whatever the disk holds now.</summary>
+    [Fact]
+    public async Task ARunningEngineWithoutImagesAsksForARestart()
+    {
+        Settings.Shared.Port = FreePort();
+        var bytes = TestModels.TinyModel();
+        var (_, model) = TinyStore(bytes);
+        var with = model with { Vision = "vv" };
+        var catalog = new ModelCatalog
+        {
+            Models = new[] { with },
+            Vision = new[] { new VisionInfo { Id = "vv", Local = "v.gguf", Size = 3, Sha256 = new[] { "" }, Url = "https://x.test/v" } },
+        };
+        using var store = new ModelStore(catalog, new HttpClient(new FakeServer()), timer: false);
+        using var host = Host(store, FakeGpuBackend.Nvidia(16));
+        host.StartEngine();
+        Assert.True(WaitUntil(() => host.Engine!.State.IsRunning), host.Engine!.State.ToString());
+        Assert.False(host.Engine!.Capabilities.Vision);
+        Assert.Contains("ontbreken", host.WhyNoImages);
+
+        Directory.CreateDirectory(Paths.VisionDir);
+        File.WriteAllBytes(Path.Combine(Paths.VisionDir, "v.gguf"), new byte[3]);
+        store.Refresh();
+        Assert.Contains("opnieuw", host.WhyNoImages);
+        await host.Engine.StopAndWait();
+
+        Assert.Null(host.WhyNoImages);
+        host.StartEngine();
+        Assert.True(WaitUntil(() => host.Engine!.State.IsRunning), host.Engine!.State.ToString());
+        Assert.True(host.Engine!.Capabilities.Vision);
+        Assert.Null(host.WhyNoImages);
+        await host.Engine.StopAndWait();
+    }
+
     /// <summary>The engine a host just made runs the fake process.</summary>
     public static void ToFake(IEngine engine, int port)
     {

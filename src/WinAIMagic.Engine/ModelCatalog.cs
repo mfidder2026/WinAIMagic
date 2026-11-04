@@ -69,11 +69,22 @@ public sealed record VisionInfo
     [JsonPropertyName("url")] public required string Url { get; init; }
 }
 
+/// <summary>What images need on the main engine, in a folder of their own under Paths.VisionDir; not the second engine's file, whose
+/// projector the encoder cannot read. GLM: the encoder's mmproj and then its vocabulary. DeepSeek and MiniMax: the tower their pack indexes.</summary>
+public sealed record TieredVisionInfo
+{
+    [JsonPropertyName("id")] public required string Id { get; init; }
+    [JsonPropertyName("files")] public required IReadOnlyList<ModelFile> Files { get; init; }
+    [JsonIgnore] public string Folder => Path.Combine(Paths.VisionDir, Id);
+    [JsonIgnore] public ulong TotalSize => Files.Aggregate(0UL, (n, f) => n + f.Size);
+}
+
 /// <summary>The models WinAIMagic knows, read from the embedded models.json. The order is the order of recommendation.</summary>
 public sealed record ModelCatalog
 {
     [JsonPropertyName("models")] public IReadOnlyList<ModelInfo> Models { get; init; } = Array.Empty<ModelInfo>();
     [JsonPropertyName("vision")] public IReadOnlyList<VisionInfo> Vision { get; init; } = Array.Empty<VisionInfo>();
+    [JsonPropertyName("tieredVision")] public IReadOnlyList<TieredVisionInfo> TieredVision { get; init; } = Array.Empty<TieredVisionInfo>();
 
     public static ModelCatalog Shared { get; } = Load();
 
@@ -85,6 +96,7 @@ public sealed record ModelCatalog
 
     public ModelInfo? Model(string id) => Models.FirstOrDefault(m => m.Id == id);
     public VisionInfo? VisionFor(ModelInfo model) => Vision.FirstOrDefault(v => v.Id == model.Vision);
+    public TieredVisionInfo? TieredVisionFor(ModelInfo model) => TieredVision.FirstOrDefault(v => v.Id == model.Vision);
 }
 
 internal sealed class OneOrManyConverter : JsonConverter<IReadOnlyList<string>>

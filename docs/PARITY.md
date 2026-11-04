@@ -53,7 +53,8 @@ The same gaps still exist in MacAIMagic.
 **Features**
 
 - **AMD:** no HIP engine ships, so AMD cards use the second engine through Vulkan (limited mode).
-- **Images on the main engine:** vision is not wired for GLM, DeepSeek and MiniMax on the main engine. The second engine has the path, not run with a real image.
+- **Images on DeepSeek and MiniMax:** wired (their vision tower goes into the pack, the engine runs it), but those models are not on the reference PC, so this has not run with a real image. GLM on the main engine and Qwen3.6 on the second engine have.
+- **GLM images on a 16 GB card:** the expert pool cannot lend the encoder its 2.8 GB, so the encoder stays loaded and runs on the CPU, about 15 s per new picture against 0.14 s on the GPU. Lending on a larger card has not been run; the GPU encoder has only run on its own, on an RTX 5060 Ti (sm_120a), the other architectures are built but not run.
 - **NVIDIA below RTX 20:** the toolkit used here (CUDA 13) cannot build Volta or Pascal.
 - **Two heavy-and-fast models:** the heavy engine is not restarted with a lower RAM tier to make room. If the fast model does not fit beside it, one model does everything.
 - **Idle unload** of the model has no setting yet.

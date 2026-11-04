@@ -11,7 +11,7 @@ public sealed class LlamaEngine : EngineBase
     public LlamaEngine(int? port = null, string? logFile = null) : base(port, logFile) { }
 
     public override EngineKind Kind => EngineKind.Llama;
-    public override EngineCapabilities Capabilities => new(Vision: true, Cluster: true, ExpertTiers: false);
+    public override EngineCapabilities Capabilities => new(Vision: ReadsImages, Cluster: true, ExpertTiers: false);
 
     public static string Binary(IGpuBackend backend, string name = "llama-server.exe") =>
         Path.Combine(Paths.EngineRoot, backend.EngineFolder, name);

@@ -50,8 +50,30 @@ public static class PackBuilder
             var dirLine = File.ReadLines(geometry).FirstOrDefault(l => l.StartsWith("model_dir "));
             if (dirLine != null && !SamePath(dirLine["model_dir ".Length..].Trim(), Paths.ModelDir(model.Id)))
                 return L("Het pack hoort bij een andere map.");
+            if (TowerFolder(model) != null && !PackHasTower(model) && !TowerRefused(model))
+                return L("Het pack krijgt nog de afbeeldingsbestanden.");
         }
         return WhyStale(pack, shards);
+    }
+
+    /// <summary>Set in the pack when the tower could not go in, so that the model starts text only and the build does not repeat at every start.</summary>
+    private const string NoTowerMark = "no-vision-tower";
+
+    /// <summary>DeepSeek and MiniMax: the folder of their vision tower once all its files are here, else null.</summary>
+    internal static string? TowerFolder(ModelInfo model)
+    {
+        if (model.Pack?.Tool is not ("deepseek" or "minimax") || ModelCatalog.Shared.TieredVisionFor(model) is not { } v) return null;
+        return v.Files.All(f => ModelStore.FileSize(Path.Combine(v.Folder, f.Local)) == f.Size) ? v.Folder : null;
+    }
+
+    internal static bool TowerRefused(ModelInfo model) => File.Exists(Path.Combine(PackDir(model), NoTowerMark));
+
+    /// <summary>The tower's geometry in the pack, the lines the setup looks for too.</summary>
+    internal static bool PackHasTower(ModelInfo model)
+    {
+        var (file, key) = model.Pack?.Tool == "deepseek" ? ("ds4.txt", "vision.num_hidden_layers ") : ("mm3.txt", "vision.hidden_size");
+        try { return File.ReadLines(Path.Combine(PackDir(model), file)).Any(l => l.StartsWith(key, StringComparison.Ordinal)); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
     }
 
     private static bool SamePath(string a, string b) =>
@@ -96,32 +118,42 @@ public static class PackBuilder
     }
 
     /// <summary>The command per tool: the Python, its arguments and its environment.</summary>
-    public static ChildStart Command(ModelInfo model, Action<byte[], int>? onOutput = null)
+    public static ChildStart Command(ModelInfo model, Action<byte[], int>? onOutput = null, bool textOnly = false)
     {
         var dir = Paths.ModelDir(model.Id);
         var pack = PackDir(model);
         var first = Path.Combine(dir, model.Files[0].Local);
         var names = model.Files.Select(f => f.Local);
+        var tower = textOnly ? null : TowerFolder(model);
         IEnumerable<string> args = model.Pack?.Tool switch
         {
-            "deepseek" => new[] { Path.Combine(Tools, "ds4", "pack_gguf.py"), "--model", dir, "--out", pack, "--shards" }.Concat(names),
-            "minimax" => new[] { Path.Combine(Tools, "mm3", "pack_gguf.py"), "--model", dir, "--out", pack, "--text-only",
-                                 "--indexers", Path.Combine(dir, model.Extras![0].Local), "--shards" }.Concat(names),
+            "deepseek" => new[] { Path.Combine(Tools, "ds4", "pack_gguf.py"), "--model", dir, "--out", pack }
+                .Concat(tower != null && File.Exists(Path.Combine(tower, "vision.json")) ? new[] { "--vision", tower } : Array.Empty<string>())
+                .Append("--shards").Concat(names),
+            "minimax" => new[] { Path.Combine(Tools, "mm3", "pack_gguf.py"), "--model", dir, "--out", pack }
+                .Concat(tower != null ? new[] { "--companions", tower } : new[] { "--text-only" })
+                .Concat(new[] { "--indexers", Path.Combine(dir, model.Extras![0].Local), "--shards" }).Concat(names),
             _ => new[] { Path.Combine(Tools, "iq_pack.py"), "--gguf", first, "--out", pack, "--compat-bf16" },
         };
-        return new ChildStart(PythonExe, args.ToList())
-        {
-            Cwd = TieredRoot,
-            Env = new Dictionary<string, string?>
-            {
-                ["STRATA_GGUF_PY"] = Path.Combine(Tools, "gguf-py"),
-                ["PYTHONUTF8"] = "1",
-                ["PYTHONUNBUFFERED"] = "1",
-                ["PYTHONDONTWRITEBYTECODE"] = "1",
-            },
-            OnOutput = onOutput,
-        };
+        return Python(args.ToList(), onOutput);
     }
+
+    /// <summary>DeepSeek's tower as the one file its pack points at (vision.bin, vision.json), made from the downloaded mmproj.</summary>
+    internal static ChildStart TowerCommand(string tower, Action<byte[], int>? onOutput = null) =>
+        Python(new[] { Path.Combine(Tools, "ds4", "vision_pack.py"), "--dir", tower, "--mmproj", Path.Combine(tower, "mmproj-BF16.gguf") }, onOutput);
+
+    private static ChildStart Python(IReadOnlyList<string> args, Action<byte[], int>? onOutput) => new(PythonExe, args)
+    {
+        Cwd = TieredRoot,
+        Env = new Dictionary<string, string?>
+        {
+            ["STRATA_GGUF_PY"] = Path.Combine(Tools, "gguf-py"),
+            ["PYTHONUTF8"] = "1",
+            ["PYTHONUNBUFFERED"] = "1",
+            ["PYTHONDONTWRITEBYTECODE"] = "1",
+        },
+        OnOutput = onOutput,
+    };
 
     /// <summary>Builds the pack; on return null, or what went wrong. `progress`: how far (null: no figure) and the last line.</summary>
     public static async Task<string?> Build(ModelInfo model, Action<double?, string> progress, CancellationToken ct)
@@ -149,12 +181,23 @@ public static class PackBuilder
                 progress(parser.Consume(line), last);
             }
         }
+        async Task<int> Run(ChildStart command)
+        {
+            using var child = ChildProcess.Start(command);
+            using var reg = ct.Register(child.KillTree);
+            int exit = await child.Exited;
+            ct.ThrowIfCancellationRequested();
+            return exit;
+        }
         progress(0, L($"Pack bouwen: {model.Name}"));
-        using var child = ChildProcess.Start(Command(model, Output));
-        using var reg = ct.Register(child.KillTree);
-        int code = await child.Exited;
-        ct.ThrowIfCancellationRequested();
+        File.Delete(Path.Combine(pack, NoTowerMark));
+        // (a tower that cannot be made leaves the pack text only: images are extra, the model still starts)
+        if (model.Pack.Tool == "deepseek" && TowerFolder(model) is { } tower && !File.Exists(Path.Combine(tower, "vision.json")))
+            await Run(TowerCommand(tower, Output));
+        int code = await Run(Command(model, Output));
+        if (code != 0 && TowerFolder(model) != null) code = await Run(Command(model, Output, textOnly: true));
         if (code != 0) return L($"Het pack kon niet worden gebouwd (code {code}): {last}");
+        if (TowerFolder(model) != null && !PackHasTower(model)) File.WriteAllText(Path.Combine(pack, NoTowerMark), last);
         foreach (var f in NeededFiles(model.Pack.Tool))
             if (!File.Exists(Path.Combine(pack, f)) && f != "tokenizer/chat_template.jinja")
                 return L($"Het pack is niet compleet: {f} ontbreekt. {last}");

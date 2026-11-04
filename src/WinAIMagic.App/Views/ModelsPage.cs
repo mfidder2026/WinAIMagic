@@ -84,7 +84,7 @@ public sealed class ModelCard
     private readonly TextBlock message = Ui.Caption();
     private readonly TextBlock note = Ui.Caption(color: Theme.Solid(Theme.Amber));
     private readonly TextBlock error = Ui.Caption(color: Theme.Solid(Theme.Pink));
-    private readonly Button download, pause, delete, choose;
+    private readonly Button download, visionDownload, pause, delete, choose;
     private readonly UIElement chosen;
     private readonly Brush restEdge;
     private string badgeKey = "", noteKey = "";
@@ -106,11 +106,12 @@ public sealed class ModelCard
 
         progressPart = Ui.V(5, bar, progress, message);
         download = Ui.Btn(L("Download"), () => _ = Download(), Glyph.Download, family);
+        visionDownload = Ui.Btn(L("Afbeeldingsbestanden"), () => store.StartVisionDownload(model.Id), Glyph.Image);
         pause = Ui.Btn(L("Pauzeer"), () => store.StopDownload(model.Id), Glyph.Pause);
         delete = Ui.Btn(L("Verwijder model"), () => _ = ConfirmDelete(app, model), Glyph.Trash);
         choose = Ui.Btn(L("Kies"), () => app.Select(model.Id));
         chosen = Ui.H(6, Ui.Icon(Glyph.Done, 14, Theme.Solid(family)), Ui.Label(L("Gekozen"), 13, Theme.Solid(family)));
-        var left = Ui.H(8, download, pause, delete);
+        var left = Ui.H(8, download, visionDownload, pause, delete);
         var right = new Grid { VerticalAlignment = VerticalAlignment.Center, Children = { choose, chosen } };
         var foot = Ui.Row("*,auto", 8, left, right);
         foot.VerticalAlignment = VerticalAlignment.Bottom;
@@ -150,7 +151,9 @@ public sealed class ModelCard
         // badges: size, the plan's label, a measured speed or that it is not measured, what it can do
         var fit = host.FitOf(model);
         var bench = host.Bench.Results.LastOrDefault(r => r.ModelId == model.Id && r.DecodeTps > 0);
-        bool vision = st.Vision?.Complete == true;
+        var visionFiles = store.VisionStatus(model);
+        bool vision = store.VisionPaths(model).Count > 0;
+        bool gettingVision = downloading && st.IsComplete && !vision;
         bool recommended = host.Recommended?.Id == model.Id;
         var key = $"{fit}|{bench?.Id}|{vision}|{recommended}";
         if (key != badgeKey)
@@ -170,12 +173,19 @@ public sealed class ModelCard
         }
 
         // how far along, and what the download or the pack is doing
-        progressPart.Show(!st.IsComplete || building);
+        progressPart.Show(!st.IsComplete || building || gettingVision);
         if (building)
         {
             bar.IsIndeterminate = pack == null;
             bar.Value = pack ?? 0;
             progress.SetIfChanged(L("Pack bouwen…"));
+        }
+        else if (gettingVision)
+        {
+            ulong have = visionFiles.Aggregate(0UL, (n, f) => n + f.Have), expected = visionFiles.Aggregate(0UL, (n, f) => n + f.Expected);
+            bar.IsIndeterminate = false;
+            bar.Value = expected == 0 ? 0 : (double)have / expected;
+            progress.SetIfChanged(L($"Afbeeldingsbestanden: {have.GbShort()} van {expected.GbShort()}"));
         }
         else
         {
@@ -213,6 +223,14 @@ public sealed class ModelCard
         error.Show(err.Length > 0);
 
         download.Show(!st.IsComplete && !downloading);
+        // the model is here and images are wanted, but their files are not: a clear action of its own, the same pinned download
+        bool offerVision = st.IsComplete && !downloading && !building && !vision && visionFiles.Count > 0 && Settings.Shared.Vision;
+        visionDownload.Show(offerVision);
+        if (offerVision)
+        {
+            ulong size = visionFiles.Aggregate(0UL, (n, f) => n + f.Expected);
+            visionDownload.Tip(L($"Download wat dit model nodig heeft om afbeeldingen te lezen ({size.GbShort()})."));
+        }
         pause.Show(downloading);
         delete.Show(!downloading && !building && (st.Have > 0 || Directory.Exists(Paths.ModelDir(model.Id))));
         delete.IsEnabled = !inUse;
@@ -519,11 +537,7 @@ public sealed class FolderCard
 
     private async Task Choose()
     {
-        var picker = new Windows.Storage.Pickers.FolderPicker();
-        picker.FileTypeFilter.Add("*");
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(app.Window));
-        var folder = await picker.PickSingleFolderAsync();
-        if (folder != null) await Change(folder.Path);
+        if (NativePickers.Folder(WinRT.Interop.WindowNative.GetWindowHandle(app.Window)) is { } folder) await Change(folder);
     }
 
     public async Task Change(string to)

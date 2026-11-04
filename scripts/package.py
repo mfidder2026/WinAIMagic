@@ -58,6 +58,8 @@ def tiered():
     bin_dir.mkdir(parents=True, exist_ok=True)
     for name, target in ENGINE_NAMES.items():
         shutil.copy2(BUILD / "tiered-cuda" / f"{name}.exe", bin_dir / f"{target}.exe")
+    # GLM's image encoder (scripts/build-vision-cuda.bat)
+    shutil.copy2(BUILD / "vision-cuda" / "bin" / "wam-vision.exe", bin_dir / "wam-vision.exe")
     for dll in CUDA_DLLS:
         shutil.copy2(CUDA_BIN / dll, bin_dir / dll)
 

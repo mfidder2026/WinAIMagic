@@ -296,6 +296,90 @@ public class DownloaderTests : EngineTest
         Assert.Equal(Path.Combine(Dir("m"), "m-draft.gguf"), store.DraftPath(c.Models[0]));
     }
 
+    private static (ModelCatalog Catalog, byte[] Model, byte[] Second, byte[] Encoder, byte[] Vocab) WithTieredVision()
+    {
+        byte[] a = Data(100, 1), v = Data(50, 5), e = Data(70, 7), w = Data(30, 9);
+        return (new ModelCatalog
+        {
+            Models = new[]
+            {
+                new ModelInfo
+                {
+                    Id = "m", Name = "T", Family = "glm", Summary = "s", Vision = "vv", Engine = "tiered",
+                    Files = new[] { new ModelFile { Local = "m.gguf", Size = 100, Sha256 = new[] { TestModels.Sha(a) }, Url = "https://x.test/a" } },
+                },
+            },
+            Vision = new[] { new VisionInfo { Id = "vv", Local = "second.gguf", Size = 50, Sha256 = new[] { TestModels.Sha(v) }, Url = "https://x.test/v" } },
+            TieredVision = new[]
+            {
+                new TieredVisionInfo
+                {
+                    Id = "vv",
+                    Files = new[]
+                    {
+                        new ModelFile { Local = "encoder.gguf", Size = 70, Sha256 = new[] { TestModels.Sha(e) }, Url = "https://x.test/e" },
+                        new ModelFile { Local = "vocab.gguf", Size = 30, Sha256 = new[] { TestModels.Sha(w) }, Url = "https://x.test/w" },
+                    },
+                },
+            },
+        }, a, v, e, w);
+    }
+
+    /// <summary>The two engines read images from different files: a model downloads the ones of the engine that runs it here.</summary>
+    [Fact]
+    public async Task AModelFetchesTheImageFilesOfItsEngine()
+    {
+        var (c, a, v, e, w) = WithTieredVision();
+        server.Files["https://x.test/a"] = a;
+        server.Files["https://x.test/v"] = v;
+        server.Files["https://x.test/e"] = e;
+        server.Files["https://x.test/w"] = w;
+        using var store = Store(c);
+        store.EngineOf = _ => EngineKind.Tiered;
+        store.StartDownload("m");
+        await store.WaitForDownload("m");
+        store.Refresh();
+        Assert.Equal(3, server.Requests.Count);
+        Assert.False(store.StatusOf("m").Vision!.Verified);
+        var folder = Path.Combine(Paths.VisionDir, "vv");
+        Assert.Equal(new[] { Path.Combine(folder, "encoder.gguf"), Path.Combine(folder, "vocab.gguf") }, store.VisionPaths(c.Models[0]));
+
+        store.EngineOf = _ => EngineKind.Llama;
+        Assert.Empty(store.VisionPaths(c.Models[0]));
+        Assert.Equal("second.gguf", Assert.Single(store.VisionStatus(c.Models[0])).Name);
+    }
+
+    /// <summary>A model that is already here gets only its image files, with the same checks; a wrong file is no image file.</summary>
+    [Fact]
+    public async Task TheImageFilesCanComeLaterAndAreVerified()
+    {
+        var (c, a, _, e, w) = WithTieredVision();
+        Directory.CreateDirectory(Dir("m"));
+        File.WriteAllBytes(Path.Combine(Dir("m"), "m.gguf"), a);
+        server.Files["https://x.test/e"] = e;
+        server.Files["https://x.test/w"] = Data(30, 11);
+        using var store = Store(c);
+        store.EngineOf = _ => EngineKind.Tiered;
+        Assert.True(store.StatusOf("m").IsComplete);
+        Assert.Empty(store.VisionPaths(c.Models[0]));
+
+        store.StartVisionDownload("m");
+        await store.WaitForDownload("m");
+        store.Refresh();
+        Assert.DoesNotContain(server.Requests, r => r.Url.Contains("x.test/a"));
+        Assert.Contains("vocab.gguf", store.LastError["m"]);
+        Assert.False(store.StatusOf("m").TieredVision[1].Verified);
+        Assert.True(store.StatusOf("m").TieredVision[0].Verified);
+
+        File.Delete(Path.Combine(Paths.VisionDir, "vv", "vocab.gguf"));
+        server.Files["https://x.test/w"] = w;
+        store.StartVisionDownload("m");
+        await store.WaitForDownload("m");
+        store.Refresh();
+        Assert.Equal(2, store.VisionPaths(c.Models[0]).Count);
+        Assert.False(store.LastError.ContainsKey("m"));
+    }
+
     /// <summary>A hand-placed file of the right size counts, so models from a Mac need no new download.</summary>
     [Fact]
     public void HandPlacedFilesOfTheRightSizeCount()
@@ -551,6 +635,72 @@ public class PackBuilderTests : EngineTest
         Assert.EndsWith(Path.Combine("mm3", "pack_gguf.py"), mm.Args[0]);
         Assert.Contains("--text-only", mm.Args);
         Assert.Equal(Path.Combine(Paths.ModelDir("m"), "m-indexers.bin"), mm.Args[mm.Args.ToList().IndexOf("--indexers") + 1]);
+    }
+
+    private static ModelInfo WithTower(string tool, string vision) => Model(tool) with { Vision = vision };
+
+    private static string PlaceTower(string vision)
+    {
+        var v = ModelCatalog.Shared.TieredVision.First(t => t.Id == vision);
+        Directory.CreateDirectory(v.Folder);
+        foreach (var f in v.Files)
+        {
+            using var file = File.Create(Path.Combine(v.Folder, f.Local));
+            file.SetLength((long)f.Size);
+        }
+        return v.Folder;
+    }
+
+    /// <summary>MiniMax's pack takes the tower once its files are here; without them it stays text only.</summary>
+    [Fact]
+    public void TheMiniMaxPackTakesItsTower()
+    {
+        var m = WithTower("minimax", "minimax-m3.1");
+        Assert.Contains("--text-only", PackBuilder.Command(m).Args);
+        var folder = PlaceTower("minimax-m3.1");
+        var args = PackBuilder.Command(m).Args.ToList();
+        Assert.DoesNotContain("--text-only", args);
+        Assert.Equal(folder, args[args.IndexOf("--companions") + 1]);
+        Assert.True(args.IndexOf("--companions") < args.IndexOf("--shards"));
+        Assert.Contains("--text-only", PackBuilder.Command(m, textOnly: true).Args);
+    }
+
+    /// <summary>DeepSeek's: the mmproj becomes vision.bin first, and the pack points at that.</summary>
+    [Fact]
+    public void TheDeepSeekPackTakesItsTower()
+    {
+        var m = WithTower("deepseek", "deepseek-v4.1");
+        var folder = PlaceTower("deepseek-v4.1");
+        Assert.DoesNotContain("--vision", PackBuilder.Command(m).Args);
+        var made = PackBuilder.TowerCommand(folder);
+        Assert.EndsWith(Path.Combine("ds4", "vision_pack.py"), made.Args[0]);
+        Assert.Equal(Path.Combine(folder, "mmproj-BF16.gguf"), made.Args[made.Args.ToList().IndexOf("--mmproj") + 1]);
+        File.WriteAllText(Path.Combine(folder, "vision.json"), "{}");
+        var args = PackBuilder.Command(m).Args.ToList();
+        Assert.Equal(folder, args[args.IndexOf("--vision") + 1]);
+        Assert.True(args.IndexOf("--vision") < args.IndexOf("--shards"));
+    }
+
+    /// <summary>A pack without the tower is built again when the files arrive; when they cannot go in it stays usable, text only, without a build at every start.</summary>
+    [Fact]
+    public void APackIsBuiltAgainForItsTowerOnce()
+    {
+        var m = WithTower("deepseek", "deepseek-v4.1");
+        WholePack("deepseek");
+        var geometry = Path.Combine(PackBuilder.PackDir(m), "ds4.txt");
+        File.WriteAllText(geometry, "model_dir " + Paths.ModelDir("m") + "\n");
+        Assert.Null(PackBuilder.WhyNotReady(m));
+        PlaceTower("deepseek-v4.1");
+        Assert.Contains("afbeeldingsbestanden", PackBuilder.WhyNotReady(m));
+
+        File.WriteAllText(Path.Combine(PackBuilder.PackDir(m), "no-vision-tower"), "reason");
+        Assert.True(PackBuilder.TowerRefused(m));
+        Assert.Null(PackBuilder.WhyNotReady(m));
+        File.Delete(Path.Combine(PackBuilder.PackDir(m), "no-vision-tower"));
+
+        File.AppendAllText(geometry, "vision.num_hidden_layers 24\n");
+        Assert.True(PackBuilder.PackHasTower(m));
+        Assert.Null(PackBuilder.WhyNotReady(m));
     }
 
     private static void WholePack(string tool)

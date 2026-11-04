@@ -18,7 +18,10 @@ public sealed class ModelStore : IDisposable
     public sealed record ModelStatus
     {
         public IReadOnlyList<FileStatus> Files { get; init; } = Array.Empty<FileStatus>();
+        /// <summary>The second engine's image file.</summary>
         public FileStatus? Vision { get; init; }
+        /// <summary>The main engine's image files.</summary>
+        public IReadOnlyList<FileStatus> TieredVision { get; init; } = Array.Empty<FileStatus>();
         public FileStatus? Draft { get; init; }
         public IReadOnlyList<FileStatus> Extras { get; init; } = Array.Empty<FileStatus>();
         public ulong Have => Files.Aggregate(0UL, (n, f) => n + f.Have);
@@ -42,6 +45,8 @@ public sealed class ModelStore : IDisposable
     /// <summary>The pack being built: model id and how far (0..1, null: no figure known).</summary>
     public IReadOnlyDictionary<string, double?> PackProgress { get { lock (gate) return new Dictionary<string, double?>(packs); } }
     public event Action? Changed;
+    /// <summary>Which engine runs a model on this PC, for the image files that engine reads; the host sets it. Null: the second engine's.</summary>
+    public Func<ModelInfo, EngineKind?>? EngineOf { get; set; }
 
     private readonly object gate = new();
     private readonly Dictionary<string, (CancellationTokenSource Cts, Task Task)> downloads = new();
@@ -114,16 +119,18 @@ public sealed class ModelStore : IDisposable
                 return new FileStatus(name, size, FileSize(path), File.Exists(path + ".ok"));
             }
             var vision = Catalog.VisionFor(m);
+            var tiered = Catalog.TieredVisionFor(m);
             next[m.Id] = new ModelStatus
             {
                 Files = m.Files.Select(f => F(dir, f.Local, f.Size)).ToList(),
                 Extras = (m.Extras ?? Array.Empty<ModelFile>()).Select(f => F(dir, f.Local, f.Size)).ToList(),
                 Vision = vision == null ? null : F(Paths.VisionDir, vision.Local, vision.Size),
+                TieredVision = tiered == null ? Array.Empty<FileStatus>() : tiered.Files.Select(f => F(tiered.Folder, f.Local, f.Size)).ToList(),
                 Draft = m.Draft == null ? null : F(dir, m.Draft.Local, m.Draft.Size),
             };
         }
         Status = next;
-        ulong total = next.Values.Aggregate(0UL, (n, s) => n + s.Have + (s.Vision?.Have ?? 0));
+        ulong total = next.Values.Aggregate(0UL, (n, s) => n + s.Have + (s.Vision?.Have ?? 0) + s.TieredVision.Aggregate(0UL, (t, f) => t + f.Have));
         UpdateSpeed(total, DateTime.UtcNow);
         Changed?.Invoke();
     }
@@ -160,6 +167,33 @@ public sealed class ModelStore : IDisposable
     {
         var v = Catalog.VisionFor(model);
         return v == null || StatusOf(model.Id).Vision?.Complete != true ? null : Path.Combine(Paths.VisionDir, v.Local);
+    }
+
+    private bool OnMainEngine(ModelInfo model) => EngineOf?.Invoke(model) == EngineKind.Tiered;
+
+    /// <summary>The image files of the engine that runs this model here; empty: that engine has none for it.</summary>
+    public IReadOnlyList<FileStatus> VisionStatus(ModelInfo model)
+    {
+        var st = StatusOf(model.Id);
+        return OnMainEngine(model) ? st.TieredVision : st.Vision is { } v ? new[] { v } : Array.Empty<FileStatus>();
+    }
+
+    /// <summary>Their paths, in the catalog's order, once all of them are here; else empty.</summary>
+    public IReadOnlyList<string> VisionPaths(ModelInfo model)
+    {
+        var status = VisionStatus(model);
+        if (status.Count == 0 || status.Any(f => !f.Complete)) return Array.Empty<string>();
+        var folder = OnMainEngine(model) ? Catalog.TieredVisionFor(model)!.Folder : Paths.VisionDir;
+        return status.Select(f => Path.Combine(folder, f.Name)).ToList();
+    }
+
+    private IEnumerable<DownloadItem> VisionItems(ModelInfo model)
+    {
+        if (!OnMainEngine(model))
+            return Catalog.VisionFor(model) is { } v ? new[] { new DownloadItem(Paths.VisionDir, v.Local, v.Size, v.Sha256, v.Url, null) } : Array.Empty<DownloadItem>();
+        return Catalog.TieredVisionFor(model) is { } t
+            ? t.Files.Select(f => new DownloadItem(t.Folder, f.Local, f.Size, f.Sha256, f.Url, null))
+            : Array.Empty<DownloadItem>();
     }
 
     /// <summary>Files that came down under the name upstream gave them get their own name: never in a file name for the user
@@ -215,7 +249,12 @@ public sealed class ModelStore : IDisposable
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { }
     }
 
-    public void StartDownload(string id)
+    public void StartDownload(string id) => StartDownload(id, false);
+
+    /// <summary>Only the image files of a model that is already here, with the same pinned checks.</summary>
+    public void StartVisionDownload(string id) => StartDownload(id, true);
+
+    private void StartDownload(string id, bool visionOnly)
     {
         var model = Catalog.Model(id);
         if (model == null) return;
@@ -231,7 +270,7 @@ public sealed class ModelStore : IDisposable
             if (downloads.ContainsKey(id)) return;
             errors.Remove(id);
             if (!wanted.Contains(id)) wanted.Add(id);
-            downloads[id] = (cts, Task.Run(() => Run(model, cts.Token)));
+            downloads[id] = (cts, Task.Run(() => Run(model, visionOnly, cts.Token)));
         }
         SaveList();
         Changed?.Invoke();
@@ -268,15 +307,15 @@ public sealed class ModelStore : IDisposable
         Changed?.Invoke();
     }
 
-    private async Task Run(ModelInfo model, CancellationToken ct)
+    private async Task Run(ModelInfo model, bool visionOnly, CancellationToken ct)
     {
         try
         {
             var d = new Downloader(http) { RetryDelay = RetryDelay };
             var dir = Paths.ModelDir(model.Id);
             var items = new List<DownloadItem>();
-            foreach (var f in model.AllFiles) items.Add(new DownloadItem(dir, f.Local, f.Size, f.Sha256, f.Url, f.Stamp));
-            if (Catalog.VisionFor(model) is { } v) items.Add(new DownloadItem(Paths.VisionDir, v.Local, v.Size, v.Sha256, v.Url, null));
+            if (!visionOnly) foreach (var f in model.AllFiles) items.Add(new DownloadItem(dir, f.Local, f.Size, f.Sha256, f.Url, f.Stamp));
+            items.AddRange(VisionItems(model));
             var results = await Task.WhenAll(items.Select(item => d.Fetch(item, s => Say(model.Id, s), e => Fail(model.Id, e), ct)));
             if (ct.IsCancellationRequested) return;
             if (results.All(ok => ok))

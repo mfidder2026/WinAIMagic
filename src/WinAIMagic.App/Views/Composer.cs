@@ -36,6 +36,7 @@ public sealed partial class Composer : Grid
     };
     private readonly List<Attachment> attachments = [];
     private readonly StackPanel thumbs = Ui.H(8);
+    private readonly TextBlock imageNote = Ui.Caption(color: Theme.Solid(Theme.Amber));
     private readonly ScrollViewer thumbsHost;
     private readonly Border glass;
     private readonly Grid ringHost = new() { Visibility = Visibility.Collapsed, IsHitTestVisible = false };
@@ -45,8 +46,8 @@ public sealed partial class Composer : Grid
     private readonly TextBlock folderName = Ui.Label("", 12, null, FontWeights.Medium);
     private readonly RightsButton rights;
     private Guid? conversation;
-    private string? workspace;
-    private bool busy, target, updating;
+    private string? workspace, imageReason;
+    private bool busy, target, updating, triedImage;
 
     public Composer(AppState app, Action sent)
     {
@@ -104,7 +105,7 @@ public sealed partial class Composer : Grid
 
         var tools = Ui.H(6, image, Pair(think, ThinkMenu()), web, Pair(folder, FolderMenu()), rights);
         var sendHost = new Grid { Children = { send, stop } };
-        var content = Ui.V(8, thumbsHost, box, Ui.Row("*,auto", 8, tools, sendHost));
+        var content = Ui.V(8, thumbsHost, imageNote, box, Ui.Row("*,auto", 8, tools, sendHost));
 
         // a turning gradient edge while the model writes, a calm one otherwise: the storyboard only runs while it writes
         var rotate = new RotateTransform { CenterX = Ring / 2, CenterY = Ring / 2 };
@@ -160,10 +161,12 @@ public sealed partial class Composer : Grid
         conversation = id;
         box.Text = "";
         attachments.Clear();
+        triedImage = false;
         ShowAttachments();
     }
 
-    private bool CanSend => app.EngineState.IsRunning && !app.Chat.Busy && (box.Text.Trim().Length > 0 || attachments.Count > 0);
+    private bool CanSend => app.EngineState.IsRunning && !app.Chat.Busy && (box.Text.Trim().Length > 0 || attachments.Count > 0)
+        && (attachments.Count == 0 || app.Host.WhyNoImages == null);
 
     /// <summary>The state of the buttons.</summary>
     public void Refresh()
@@ -181,7 +184,17 @@ public sealed partial class Composer : Grid
         folder.Tip(workspace == null ? L("Kies een map waarin het model in dit gesprek bestanden mag lezen, maken en scripts mag starten") : L($"Het model werkt in {workspace} (rechten: knop L S U)"));
         rights.Refresh();
 
-        if (image.IsEnabled != s.Vision) image.IsEnabled = s.Vision;
+        // stays clickable: a disabled button shows no tip, and the click is what brings the reason into view
+        var noImages = app.Host.WhyNoImages;
+        if (noImages != imageReason)
+        {
+            imageReason = noImages;
+            image.Opacity = noImages == null ? 1 : 0.45;
+            image.Tip(noImages ?? L("Afbeelding toevoegen"));
+        }
+        bool tell = noImages != null && (triedImage || attachments.Count > 0);
+        imageNote.SetIfChanged(tell ? noImages! : "");
+        imageNote.Show(tell);
         bool working = app.Chat.Busy;
         send.Show(!working);
         stop.Show(working);
@@ -215,14 +228,20 @@ public sealed partial class Composer : Grid
 
     // MARK: - images
 
+    private bool RefuseImage()
+    {
+        if (app.Host.WhyNoImages == null) return false;
+        triedImage = true;
+        Refresh();
+        return true;
+    }
+
     private async Task PickImages()
     {
+        if (RefuseImage()) return;
         try
         {
-            var picker = new FileOpenPicker();
-            foreach (var e in ImageTypes) picker.FileTypeFilter.Add(e);
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(app.Window));
-            foreach (var file in await picker.PickMultipleFilesAsync()) await Add(file.Path);
+            foreach (var file in NativePickers.Files(WinRT.Interop.WindowNative.GetWindowHandle(app.Window), true, ImageTypes)) await Add(file);
         }
         catch (Exception e) when (e is COMException or InvalidOperationException) { App.Log(e); }
     }
@@ -236,6 +255,7 @@ public sealed partial class Composer : Grid
 
     private void Attach(Attachment a)
     {
+        if (RefuseImage()) return;
         attachments.Add(a);
         ShowAttachments();
         Refresh();
@@ -424,10 +444,7 @@ public sealed partial class Composer : Grid
     {
         try
         {
-            var picker = new FolderPicker();
-            picker.FileTypeFilter.Add("*");
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(app.Window));
-            if (await picker.PickSingleFolderAsync() is { } picked) SetFolder(picked.Path);
+            if (NativePickers.Folder(WinRT.Interop.WindowNative.GetWindowHandle(app.Window)) is { } picked) SetFolder(picked);
         }
         catch (Exception e) when (e is COMException or InvalidOperationException) { App.Log(e); }
         Refresh();

@@ -360,6 +360,23 @@ public class ThreeTierTests : EngineTest
         Assert.Equal(65_536, MemoryPlanner.ContextSize(open, s, 65_536, false, EngineKind.Llama));
     }
 
+    /// <summary>The main engine, the same rule (brief 6): vision stays on while it leaves the model 16K of context, and goes first when not.</summary>
+    [Fact]
+    public void TheMainEngineGivesUpVisionBeforeTheModelsRoom()
+    {
+        var glm = TestModels.IndexOf(ModelCatalog.Shared.Model("glm-5.3-flash-compact-24")!);
+        var card = FakeGpuBackend.Nvidia(16);
+        Assert.True(MemoryPlanner.UseVision(glm, SystemInfo.Simulated(card, 128, 10), true, EngineKind.Tiered));
+        Assert.False(MemoryPlanner.UseVision(glm, SystemInfo.Simulated(card, 128, 10), false, EngineKind.Tiered));
+        var tight = Enumerable.Range(64, 128).Select(gb => SystemInfo.Simulated(card, gb, 10))
+            .Where(s => MemoryPlanner.FitsWhole(glm, s, EngineKind.Tiered)).First();
+        Assert.True((MemoryPlanner.ContextRoom(glm, tight, true, EngineKind.Tiered) ?? 0) < MemoryPlanner.VisionMinimumContext);
+        Assert.False(MemoryPlanner.UseVision(glm, tight, true, EngineKind.Tiered));
+        // on that PC the model keeps its context; with vision on there is less of it
+        Assert.True(MemoryPlanner.ContextRoom(glm, tight, false, EngineKind.Tiered) >= MemoryPlanner.ContextRoom(glm, tight, true, EngineKind.Tiered));
+        Assert.Equal(16_384, MemoryPlanner.VisionMinimumContext);
+    }
+
     /// <summary>On little memory: a smaller context, no vision, the whole model in memory; a model that streams gets 32K (the Mac's rules).</summary>
     [Fact]
     public void SmallPcContextAndVision()
