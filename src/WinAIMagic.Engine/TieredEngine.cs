@@ -81,12 +81,21 @@ public sealed class TieredEngine : EngineBase
         return args;
     }
 
+    /// <summary>The engine's settings for Settings.SkipExperts. GLM only: measured on a card short of VRAM in docs/RESEARCH.md.</summary>
+    internal static IReadOnlyDictionary<string, string> SkipExpertsEnvironment(string family, string mode) => (family, mode) switch
+    {
+        ("glm", "light") => new Dictionary<string, string> { ["STRATA_GLM_TRUNK_KEEP_MAP"] = "8888888888888888888888855555554444444444444448" },
+        ("glm", "strong") => new Dictionary<string, string> { ["STRATA_GLM_MISS_SKIP_W"] = "0.14", ["STRATA_GLM_MISS_SKIP_FROM"] = "23" },
+        _ => new Dictionary<string, string>(),
+    };
+
     /// <summary>The config for serve.server.</summary>
     public JsonObject Config(EngineStart s, string logPath)
     {
         var settings = Settings.Shared;
         var engineEnv = new JsonObject();
         foreach (var (k, v) in s.Backend.Environment) engineEnv[k] = v;
+        foreach (var (k, v) in SkipExpertsEnvironment(s.Model.Family, settings.SkipExperts)) engineEnv[k] = v;
         var cfg = new JsonObject
         {
             ["exe"] = Path.Combine(Root, "bin", s.Model.Tier?.Exe ?? ""),

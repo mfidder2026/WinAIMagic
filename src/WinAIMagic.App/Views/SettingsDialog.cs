@@ -134,6 +134,8 @@ public static class SettingsDialog
                 Note(L("Meer context kost geheugen (KV-cache): bij 1M ~6 GB voor DeepSeek, ~20 GB voor GLM. Qwen gaat tot 256K. Een vol gesprek wordt automatisch samengevat.")),
                 Toggle(L("Afbeeldingen (vision, 1 GB extra)"), s.Vision, v => s.Vision = v),
                 Toggle(L("Sneller schrijven met MTP (GLM en Qwen)"), s.Mtp, v => s.Mtp = v),
+                Row(L("Experts overslaan (GLM)"), Pick([(L("Uit: het volledige model"), "off"), (L("Licht"), "light"), (L("Sterk"), "strong")], s.SkipExperts, v => s.SkipExperts = v)),
+                Note(L("Laat experts weg die niet in het VRAM staan en weinig meetellen. GLM schrijft dan sneller, maar de antwoorden wijken iets af van het volledige model. Geldt na het herstarten van de engine.")),
                 Toggle(L("Engine starten bij openen app"), s.AutoStart, v => s.AutoStart = v),
                 Toggle(L("Bewegende achtergrond"), s.AnimatedBackground, v => s.AnimatedBackground = v)),
             Section(L("Videokaart"),

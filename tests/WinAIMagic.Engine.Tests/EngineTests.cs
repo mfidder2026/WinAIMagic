@@ -516,6 +516,24 @@ public class TieredEngineTests : EngineTest
         Assert.DoesNotContain(cfg["args"]!.AsArray().Select(a => a!.GetValue<string>()), a => a.Contains("the-key"));
     }
 
+    [Fact]
+    public void SkippingExpertsIsAChoiceAndOnlyForGlm()
+    {
+        var off = new TieredEngine(1).Config(Start(), "log")["env"]!.AsObject();
+        Assert.False(off.ContainsKey("STRATA_GLM_TRUNK_KEEP_MAP"));
+        Assert.False(off.ContainsKey("STRATA_GLM_MISS_SKIP_W"));
+        Settings.Shared.SkipExperts = "light";
+        var light = new TieredEngine(1).Config(Start(), "log")["env"]!.AsObject();
+        Assert.Equal(46, light["STRATA_GLM_TRUNK_KEEP_MAP"]!.GetValue<string>().Length);
+        Assert.False(light.ContainsKey("STRATA_GLM_MISS_SKIP_W"));
+        Settings.Shared.SkipExperts = "strong";
+        var strong = new TieredEngine(1).Config(Start(), "log")["env"]!.AsObject();
+        Assert.Equal("0.14", strong["STRATA_GLM_MISS_SKIP_W"]!.GetValue<string>());
+        Assert.Equal("23", strong["STRATA_GLM_MISS_SKIP_FROM"]!.GetValue<string>());
+        Assert.Empty(TieredEngine.SkipExpertsEnvironment("deepseek", "strong"));
+        Assert.Empty(TieredEngine.SkipExpertsEnvironment("minimax", "light"));
+    }
+
     private TieredEngine Fake(string marker, params string[] extra)
     {
         int port = FreePort();
