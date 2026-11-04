@@ -245,11 +245,11 @@ public sealed partial class ShellWindow : Window
     /// longest wait of the UI thread per second).</summary>
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? chatHook, documentHook;
 
-    /// <summary>Hidden: --project, --huisstijl, --attach-doc, --doc=busy (see DocumentHooks), --export=file (Vergelijken), --sim-nvidia=VRAM in GB
+    /// <summary>Hidden: --project, --huisstijl, --attach-doc, --doc=busy (see DocumentHooks), --export=file (Vergelijken), --sim-gpu=VRAM in GB
     /// (a PC with the main engine, for the cluster screen).</summary>
     private void RunDocumentHooks()
     {
-        if (int.TryParse(Arg("sim-nvidia"), out var vram)) app.Host.SimulatedSystem = Engine.SystemInfo.Simulated(Engine.FakeGpuBackend.Nvidia(vram), 128);
+        if (int.TryParse(Arg("sim-gpu"), out var vram)) app.Host.SimulatedSystem = Engine.SystemInfo.Simulated(Engine.GpuProfiles.SimulatedMainEngineCard(vram), 128);
         if (Arg("project") is { } folder) app.Studio.Choose(folder);
         if (args.Contains("--fake-engine")) DocumentHooks.Offline(app.Studio);
         if (Arg("huisstijl") is { } style) app.Studio.UseHouseStyle(style);

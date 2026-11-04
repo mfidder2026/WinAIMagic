@@ -74,6 +74,12 @@ public sealed record GpuProfile(string Key, string Backend, string EngineFolder,
 /// <summary>Reads gpu-profiles.json (embedded in Core).</summary>
 public static class GpuProfiles
 {
+    /// <summary>The backends a user can pick under Settings: label, id.</summary>
+    public static readonly (string Label, string Id)[] Choices = [("CUDA", "cuda"), ("HIP", "hip"), ("Vulkan", "vulkan"), ("CPU", "cpu")];
+
+    /// <summary>Test flag: a PC with a card that runs the main engine.</summary>
+    public static IGpuBackend SimulatedMainEngineCard(int vramGb) => FakeGpuBackend.Nvidia(vramGb);
+
     private static readonly Lazy<JsonObject> Table = new(() =>
     {
         using var s = typeof(Paths).Assembly.GetManifestResourceStream("Resources.gpu-profiles.json")

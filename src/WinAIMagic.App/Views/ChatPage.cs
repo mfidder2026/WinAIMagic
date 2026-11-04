@@ -308,7 +308,7 @@ public sealed class ChatPage : IPage
         engineBanner.Show(!s.IsRunning);
         if (s.IsRunning) return;
         bool can = app.Host.CanStart;
-        var key = $"{s.Status}|{s.Message}|{can}|{Settings.Shared.Language}";
+        var key = $"{s.Status}|{s.Message}|{can}|{app.Host.WhyNotStartable}|{Settings.Shared.Language}";
         if (key == bannerKey) return;
         bannerKey = key;
         UIElement content;
@@ -326,7 +326,7 @@ public sealed class ChatPage : IPage
                 var start = Ui.Btn(L("Start engine"), app.StartEngine, null, Theme.Accent);
                 start.IsEnabled = can;
                 start.Tip(can ? null : app.Host.WhyNotStartable);
-                content = Ui.Row("auto,*,auto", 8, Ui.Icon(Glyph.Power, 14, Theme.Secondary), Ui.Caption(can ? L("De engine staat uit.") : L("Model of engine nog niet klaar: zie Modellen."), Theme.Primary, 13), start);
+                content = Ui.Row("auto,*,auto", 8, Ui.Icon(Glyph.Power, 14, Theme.Secondary), Ui.Caption(can ? L("De engine staat uit.") : app.Host.WhyNotStartable ?? L("Model of engine nog niet klaar: zie Modellen."), Theme.Primary, 13), start);
                 break;
         }
         ((FrameworkElement)content).Margin = new Thickness(16, 7, 16, 7);

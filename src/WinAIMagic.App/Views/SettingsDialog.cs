@@ -140,7 +140,7 @@ public static class SettingsDialog
                 Row(L("VRAM-reserve"), Pick(reserves, s.VramReserveMib, v => s.VramReserveMib = v)),
                 Note(L("Een volle kaart geeft op Windows geen fout, maar de snelheid zakt dan naar enkele tokens per seconde. Deze ruimte blijft vrij naast de engine.")),
                 Stacked(L("Wisselbestand"), pageFile),
-                Row(L("Engine-backend"), Pick([(L("Automatisch"), ""), ("CUDA", "cuda"), ("HIP", "hip"), ("Vulkan", "vulkan"), ("CPU", "cpu")], s.GpuBackendOverride, v => s.GpuBackendOverride = v)),
+                Row(L("Engine-backend"), Pick([(L("Automatisch"), ""), .. Engine.GpuProfiles.Choices.Select(c => (c.Label, c.Id))], s.GpuBackendOverride, v => s.GpuBackendOverride = v)),
                 Note(app.Host.Choice.Reason + " " + L("Een andere keuze geldt na het herstarten van de app."))),
             Section(L("Server"),
                 Row(L("Adres"), host),

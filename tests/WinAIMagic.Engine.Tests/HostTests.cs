@@ -566,12 +566,12 @@ public class HostTests : EngineTest
     }
 
     [Fact]
-    public void TheMainEngineNeedsItsPackAndTheLimitedCardDoesNot()
+    public void TheMainEngineBuildsItsPackAtTheStartAndTheLimitedCardNeedsNone()
     {
         var (store, _) = TinyStore(TestModels.TinyModel(), "tiered");
         using var host = Host(store, FakeGpuBackend.Nvidia(16));
         Assert.Equal(EngineKind.Tiered, host.EngineForSelected);
-        Assert.False(host.CanStart);
+        Assert.True(host.CanStart);
         Assert.False(host.ClusterApplies);
         Assert.Empty(host.ClusterModels);
 

@@ -123,9 +123,8 @@ public sealed class EngineHost : IDisposable
         get
         {
             var m = SelectedModel;
-            if (m == null || !Store.StatusOf(m.Id).IsComplete || Plan == null || Blocked != null) return false;
-            if (EngineForSelected == EngineKind.Tiered && PackBuilder.WhyNotReady(m) != null) return false;
-            return true;
+            // (a missing or out of date pack is no reason: StartEngine builds it first)
+            return m != null && !buildingPack && Store.StatusOf(m.Id).IsComplete && Plan != null && Blocked == null;
         }
     }
 
@@ -140,7 +139,7 @@ public sealed class EngineHost : IDisposable
             if (Blocked is { } blocked) return blocked;
             if (!Store.StatusOf(m.Id).IsComplete) return L($"{m.Name} is nog niet helemaal gedownload.");
             if (Index == null) return IndexError ?? L($"De headers van {m.Name} zijn nog niet gelezen.");
-            return EngineForSelected == EngineKind.Tiered ? PackBuilder.WhyNotReady(m) : null;
+            return buildingPack ? L($"Pack bouwen: {m.Name}") : null;
         }
     }
 
@@ -178,10 +177,29 @@ public sealed class EngineHost : IDisposable
         Changed?.Invoke();
     }
 
+    private bool buildingPack;
+
+    /// <summary>The pack of a moved, renamed or new model is built first, with its progress on the model's card; then the engine starts.</summary>
+    private async Task BuildPackThenStart()
+    {
+        buildingPack = true;
+        Changed?.Invoke();
+        string? error;
+        try { error = await BuildPack(); }
+        finally { buildingPack = false; }
+        Changed?.Invoke();
+        if (error == null) StartEngine();
+    }
+
     public void StartEngine()
     {
         if (Index == null) LoadIndex();
-        if (Engine?.State.IsActive == true) return;
+        if (Engine?.State.IsActive == true || buildingPack) return;
+        if (EngineForSelected == EngineKind.Tiered && SelectedModel is { } needing && PackBuilder.WhyNotReady(needing) != null)
+        {
+            _ = BuildPackThenStart();
+            return;
+        }
         if (simulated == null) RefreshSystem();
         var m = SelectedModel;
         var plan = Plan;
