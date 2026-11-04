@@ -212,7 +212,7 @@ internal sealed class DocumentSidePanel
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(projectButton, L("Project"));
         var projectPart = Ui.V(3, Ui.Label(L("Project"), 12, Theme.Secondary), projectButton);
 
-        makeButton = DocUi.Action(L("Maak een document"), () => studio.Page = StudioPage.NewDocument, Glyph.Star);
+        makeButton = DocUi.Action(L("Document voorbereiden"), () => studio.Page = StudioPage.NewDocument, Glyph.Star);
         makeButton.HorizontalAlignment = HorizontalAlignment.Stretch;
         projectPage = DocUi.Side(L("Bijlagen, huisstijl en gegevens"), Glyph.Folder, () => studio.Page = StudioPage.Project);
 
