@@ -48,6 +48,7 @@ public sealed class EngineHost : IDisposable
         Check = new SystemCheck();
         Store.Changed += () => Changed?.Invoke();
         Images.Changed += () => Changed?.Invoke();
+        Images.OnRate = rate => Metrics.ImageRate = rate;
         Cluster.Changed += () => Changed?.Invoke();
         LoadIndex();
     }
@@ -269,20 +270,21 @@ public sealed class EngineHost : IDisposable
 
     /// <summary>What makes images. Next to a chat model there is rarely room, so an engine that runs stops first.</summary>
     public ImageMaker Images { get; } = new();
-    public ModelInfo? ImageModel => Store.Catalog.Images.FirstOrDefault();
+    /// <summary>The model that makes images: chosen under Modellen, else the first.</summary>
+    public ModelInfo? ImageModel => Store.Catalog.Images.FirstOrDefault(m => m.Id == Settings.Shared.ImageModel) ?? Store.Catalog.Images.FirstOrDefault();
 
     /// <summary>The plan for this size on this PC, for the page.</summary>
     public ImagePlan ImagePlanFor(ImageSize size) => ImagePlanner.For(size, System);
 
     /// <summary>One image; on return `Images` says what came of it. `busy`: what else keeps the memory, in words (the documents module); null: nothing.</summary>
-    public Task<ImageResult?> MakeImage(string prompt, ImageSize size, Func<Task<string?>>? busy = null)
+    public Task<ImageResult?> MakeImage(string prompt, ImageSize size, Func<Task<string?>>? busy = null, long? seed = null, bool measuring = false)
     {
         var m = ImageModel;
         var files = m == null ? Array.Empty<string>() : Store.ShardPaths(m);
-        return Images.Make(prompt, size, System, Backend, files, null, async () =>
+        return Images.Make(prompt, size, System, Backend, files, seed, async () =>
         {
             if (m == null || !Store.StatusOf(m.Id).IsComplete) return L("De bestanden voor afbeeldingen zijn er nog niet helemaal.");
-            if (Bench.Running != null) return L("Er loopt een meting. Wacht tot die klaar is.");
+            if (!measuring && Bench.Running != null) return L("Er loopt een meting. Wacht tot die klaar is.");
             if (busy != null && await busy() is { } why) return why;
             if (Engine is { } engine && engine.State.IsActive)
             {

@@ -64,6 +64,8 @@ FLUX.2 Klein 4B maakt afbeeldingen op het scherm **Beeld**. De download is 5,3 G
 | Geen videokaart, 4 processorthreads | 1024 x 1024 | **9 min** | 7,5 GB eigen geheugen |
 | Geen videokaart, 4 threads, laatste stap in delen | 1024 x 1024 | **12 min** | 1,4 GB eigen geheugen |
 
+FLUX staat ook op het scherm Modellen (**Kies voor afbeeldingen**) en bij **Vergelijken**, dat op elke pc dezelfde afbeelding van 1024 x 1024 maakt: 10 s met laden op de test-pc, ongeveer 5.000 beeldtokens per seconde. Terwijl het tekent, telt de snelheidsmeter die beeldtokens. Een Engelse beschrijving werkt het best.
+
 Naast het eigen geheugen leest de engine de modelbestanden van schijf; 512 x 512 duurde even lang toen hij maar 2,5 GB in het geheugen mocht houden. De processor en SSD van een echte laptop wijken af. De app kiest een grootte en werkwijze die bij de pc passen, en de chatengine stopt zolang er een afbeelding wordt gemaakt: voor allebei is meestal geen ruimte.
 
 ## Wat nog niet werkt

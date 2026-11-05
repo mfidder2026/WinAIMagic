@@ -64,6 +64,9 @@ public static class ImagePlanner
         return limit >= LargeCard || (limit >= SmallCard && size.Megapixels <= SmallCardMegapixels);
     }
 
+    /// <summary>The image model works on the picture as tokens of 16 x 16 pixels, all of them in every step.</summary>
+    public static int TokensPerStep(ImageSize size) => size.Width / 16 * (size.Height / 16);
+
     /// <summary>Own memory of the last stage on the processor, a line through the three measurements.</summary>
     public static ulong DecoderBytes(ImageSize size) => 400_000_000 + (ulong)(size.Megapixels * 6_840_000_000);
 
@@ -124,8 +127,23 @@ public sealed class ImageProgress
     private int step;
 
     public string? LastError { get; private set; }
+    /// <summary>Seconds per step, as the engine's progress bar says; null before the first step.</summary>
+    public double? SecondsPerStep { get; private set; }
+    public bool IsDrawing => stage == Stage.Drawing;
 
     public static string Clean(string line) => Ansi.Replace(line, "").Trim();
+
+    private static readonly Regex SecondsPerIt = new(@"([0-9.]+)s/it", RegexOptions.Compiled), ItPerSecond = new(@"([0-9.]+)it/s", RegexOptions.Compiled);
+
+    /// <summary>"8.49s/it" or "1.08it/s" in a progress bar.</summary>
+    public static double? StepSeconds(string line)
+    {
+        var m = SecondsPerIt.Match(line);
+        if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var s)) return s;
+        m = ItPerSecond.Match(line);
+        if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var n) && n > 0) return 1 / n;
+        return null;
+    }
 
     /// <summary>One line of output; true when what the page shows changed.</summary>
     public bool Read(string raw)
@@ -147,6 +165,7 @@ public sealed class ImageProgress
             if (m.Success && m.Groups[2].Value == Steps.ToString(CultureInfo.InvariantCulture) && int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) is var n && n != step)
             {
                 step = n;
+                SecondsPerStep = StepSeconds(line) ?? SecondsPerStep;
                 return true;
             }
         }
@@ -178,6 +197,8 @@ public sealed record ImageResult
     public double Seconds { get; init; }
     public bool OnCard { get; init; }
     public DateTime Created { get; init; }
+    /// <summary>Image tokens the model drew per second, over the steps.</summary>
+    public double? TokensPerSecond { get; init; }
     [System.Text.Json.Serialization.JsonIgnore] public string Path { get; init; } = "";
 }
 
@@ -187,6 +208,8 @@ public sealed class ImageMaker
     public const string ExeName = "wam-image.exe";
 
     public event Action? Changed;
+    /// <summary>Image tokens per second while the model draws, for the live meters; null once no image is being made.</summary>
+    public Action<double?>? OnRate { get; set; }
 
     /// <summary>A test copy of the app stays inside its data folder; null: Pictures\WinAIMagic.</summary>
     public string? Root { get; set; }
@@ -227,6 +250,7 @@ public sealed class ImageMaker
         Status = L("Voorbereiden…");
         Started = DateTime.Now;
         Notify();
+        OnRate?.Invoke(0);
         using var awake = SleepGuard.Hold();
         try
         {
@@ -267,6 +291,7 @@ public sealed class ImageMaker
             {
                 Prompt = prompt, Width = size.Width, Height = size.Height, Seed = chosen, Seconds = clock.Elapsed.TotalSeconds,
                 OnCard = plan.OnCard, Created = DateTime.Now, Path = output,
+                TokensPerSecond = outcome.SecondsPerStep is double perStep && perStep > 0 ? ImagePlanner.TokensPerStep(size) / perStep : null,
             };
             try { File.WriteAllText(Path.ChangeExtension(output, ".json"), JsonSerializer.Serialize(result)); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }   // the image itself is there
@@ -282,13 +307,15 @@ public sealed class ImageMaker
         {
             lock (gate) Busy = false;
             Status = "";
+            OnRate?.Invoke(null);
             Notify();
         }
     }
 
-    private async Task<(bool Failed, string? Reason)> Run(string exe, ImagePlan plan, IReadOnlyList<string> files, string prompt, long seed, string output)
+    private async Task<(bool Failed, string? Reason, double? SecondsPerStep)> Run(string exe, ImagePlan plan, IReadOnlyList<string> files, string prompt, long seed, string output)
     {
         var progress = new ImageProgress();
+        double tokens = ImagePlanner.TokensPerStep(plan.Size);
         var tail = new StringBuilder();
         using var log = new StreamWriter(Paths.ImageLog, append: Note != null, new UTF8Encoding(false));
         var args = ImagePlanner.Arguments(plan, files, prompt, seed, output);
@@ -310,6 +337,8 @@ public sealed class ImageMaker
                     {
                         Fraction = progress.Fraction;
                         Status = progress.Status;
+                        // the steps draw image tokens; reading the text and finishing the image do not
+                        OnRate?.Invoke(progress.IsDrawing && progress.SecondsPerStep is double perStep && perStep > 0 ? tokens / perStep : 0);
                         Notify();
                     }
                 }
@@ -327,7 +356,7 @@ public sealed class ImageMaker
         bool made = code == 0 && File.Exists(output);
         if (!made && !stopped)
             log.WriteLine($"exit {code}");
-        return (!made, progress.LastError);
+        return (!made, progress.LastError, progress.SecondsPerStep);
     }
 
     /// <summary>Stops the image being made; what the engine had done is gone.</summary>

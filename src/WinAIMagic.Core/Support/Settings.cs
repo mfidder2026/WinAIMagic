@@ -44,6 +44,8 @@ public sealed class Settings : INotifyPropertyChanged
     public bool Vision { get => Get(true); set => Set(value); }
     /// <summary>The size chosen on the image page, "768x768"; empty: what suits this PC.</summary>
     public string ImageSize { get => Get(""); set => Set(value); }
+    /// <summary>The model that makes images (Modellen, Kies voor afbeeldingen); empty: the first in the catalog.</summary>
+    public string ImageModel { get => Get(""); set => Set(value); }
     public bool Thinking { get => Get(true); set => Set(value); }
     public string ReasoningEffort { get => Get("high"); set => Set(value); }
     /// <summary>At most this many tokens of thinking, then the model writes its answer (0: no limit).</summary>

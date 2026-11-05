@@ -184,8 +184,23 @@ public sealed partial class GaugeRing : Grid
 {
     private readonly Path[] parts;
     private readonly TextBlock number;
-    private readonly double maximum;
+    private readonly TextBlock? labelBlock;
+    private double maximum, last;
     private int shown;
+
+    /// <summary>The top of the scale; image tokens come far faster than words.</summary>
+    public double Maximum
+    {
+        get => maximum;
+        set
+        {
+            if (maximum == value) return;
+            maximum = value;
+            Set(last);
+        }
+    }
+
+    public void SetLabel(string text) => labelBlock?.SetIfChanged(text);
 
     public GaugeRing(double maximum, string label, string unit, double size)
     {
@@ -226,6 +241,7 @@ public sealed partial class GaugeRing : Grid
         below.VerticalAlignment = VerticalAlignment.Top;
         below.Margin = new Thickness(0, size / 2 + big * 0.64, 0, 0);
         Children.Add(below);
+        labelBlock = below.Children.Count > 1 ? below.Children[1] as TextBlock : null;
         Set(0);
     }
 
@@ -236,6 +252,7 @@ public sealed partial class GaugeRing : Grid
 
     public void Set(double value)
     {
+        last = value;
         number.SetIfChanged(value.ToString("0.0", AppLanguages.Current.Culture()));
         int n = (int)Math.Round(Math.Clamp(value / maximum, 0, 1) * parts.Length);
         if (n == shown) return;

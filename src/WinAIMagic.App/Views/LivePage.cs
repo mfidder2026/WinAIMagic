@@ -100,6 +100,9 @@ public sealed class LivePage : IPage
         var now = samples.Count > 0 ? samples[^1] : null;
         double rate = now?.TokensPerSec ?? 0;
         mark.Active = rate > 0;
+        // while an image is made the gauge counts its image tokens, on a scale that grows with them
+        gauge.Maximum = app.Host.Metrics.Scale(30);
+        gauge.SetLabel(app.Host.Metrics.MakingImage ? L("BEELDTOKENS") : L("SCHRIJFSNELHEID"));
         gauge.Set(rate);
         gpu.SetIfChanged($"{now?.Gpu ?? 0:0}");
         cpu.SetIfChanged($"{now?.Cpu ?? 0:0}");
@@ -116,7 +119,7 @@ public sealed class LivePage : IPage
         ramValue.SetIfChanged($"{F((now?.RamUsedGB ?? 0) * k, "0")} / {F((now?.RamTotalGB ?? 0) * k, "0")} GB");
         diskValue.SetIfChanged(MiniDashboard.Disk(now?.SsdMBs ?? 0));
 
-        tokens.Set(samples, 30);
+        tokens.Set(samples, app.Host.Metrics.Scale(30));
         load.Set(samples, 100);
         double vramTotal = (now?.VramTotalGB ?? 0) * k, ramTotal = (now?.RamTotalGB ?? 0) * k;
         vram.Set(samples, vramTotal > 0 ? vramTotal * 1.08 : null, vramTotal > 0 ? (vramTotal, $"{vramTotal:0} GB") : null);

@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.9.6
+# Parity with MacAIMagic 1.9.7
 
-How this version relates to MacAIMagic at commit `da25656`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `93853bc`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -22,6 +22,14 @@ How this version relates to MacAIMagic at commit `da25656`, the last Mac commit 
 | `Views/*` | `App/Views/*` | Done, in code rather than XAML |
 
 ## Taken over since the first port
+
+### Up to `93853bc` (1.9.7): images among the models, and on the meters
+
+Measured on the test PC (RTX 5060 Ti 16 GB): Compare makes the same image as on the Mac (a lighthouse, number 7, 1024 x 1024, with loading) in 10 s, about 5,000 image tokens per second. The Mac's figures (46 s, 450 per second on an M3 Max) are not measured here.
+
+- **Taken over:** FLUX on the Models page with an "Afbeeldingen" badge and **Kies voor afbeeldingen**, chosen apart from the chat model; the page Beeld uses that choice. Compare lists FLUX and measures it by making that image, in charts of its own, with "–" in the text columns. The speed gauge, the mini dashboard and the token chart count image tokens (16 x 16 pixels, all of them in every step) while the model draws, and their scale grows with them. The page says that the model follows an English description best (`02e74f3`).
+- **Not taken over:** working in parts only where memory is short. On the Mac that saves a third of the time; on a card here it costs about a second (8 s against 9 s at 1024 x 1024) and halves what the card holds, so the card keeps working in parts.
+- **Does not apply:** the Mac's own commits for 1.9.7 and its README, the Mac's measurements, and `3060ea3`, which took Windows over to the Mac. Its note about Qwen3.8 is only for colleagues who kept the old files; the Windows catalog follows the new ones.
 
 ### `da25656` (1.9.6): a Mac with 16 GB can use Qwen3.6
 

@@ -29,6 +29,11 @@ public sealed record BenchResult
     [JsonPropertyName("expertCacheGB")] public double? ExpertCacheGb { get; init; }
     /// <summary>What the engine skipped: off, light or strong. A measurement from before this choice is of the full model.</summary>
     [JsonPropertyName("skipExperts")] public string SkipExperts { get; init; } = "off";
+    /// <summary>A model that makes images: the seconds for one image of `ImageSize`, with loading; its image tokens per second are in
+    /// DecodeTps. Null for a model that chats.</summary>
+    [JsonPropertyName("imageSeconds")] public double? ImageSeconds { get; init; }
+    [JsonPropertyName("imageSize")] public string? ImageSize { get; init; }
+    [JsonIgnore] public bool MakesImage => ImageSeconds != null;
 }
 
 /// <summary>Runs the same measurement on each model in turn: start it, read a ~2.5K-token prompt, write 300 tokens.</summary>
@@ -60,7 +65,7 @@ public sealed class BenchmarkRunner
     {
         string[] order = ["off", "light", "strong"];
         lock (gate)
-            return catalog.Models
+            return catalog.All
                 .SelectMany(m => results.Where(r => r.ModelId == m.Id).GroupBy(r => r.SkipExperts).OrderBy(g => Array.IndexOf(order, g.Key)).Select(g => g.Last()))
                 .ToList();
     }
@@ -72,6 +77,11 @@ public sealed class BenchmarkRunner
             var model = host.Store.Catalog.Model(id);
             if (model == null || !host.Store.StatusOf(id).IsComplete) continue;
             Running = model.Name;
+            if (host.Store.Catalog.Images.Contains(model))
+            {
+                await MeasureImage(model, host);
+                continue;
+            }
             SetStep("Engine starten…");
             var started = DateTime.UtcNow;
             // an engine started with another choice of what to skip would measure that choice instead
@@ -126,6 +136,51 @@ public sealed class BenchmarkRunner
         }
         Running = null;
         SetStep("");
+    }
+
+    /// <summary>The same image on every PC: a fixed description and number, with loading. The chat engine stops first, as on the page.</summary>
+    public const string ImagePrompt = "a lighthouse on a rocky coast at dusk, waves, photo";
+    public static readonly ImageSize ImageSize = new(1024, 1024);
+
+    private async Task MeasureImage(ModelInfo model, EngineHost host)
+    {
+        SetStep("Afbeelding maken…");
+        string saved = Settings.Shared.ImageModel;
+        string? root = host.Images.Root;
+        Settings.Shared.ImageModel = model.Id;
+        host.Images.Root = Path.Combine(Path.GetTempPath(), "winaimagic-measure");
+        var t0 = DateTime.UtcNow;
+        try
+        {
+            var r = await host.MakeImage(ImagePrompt, ImageSize, seed: 7, measuring: true);
+            if (r == null)
+            {
+                SetStep("Fout: " + (host.Images.Error ?? ""));
+                return;
+            }
+            foreach (var f in new[] { r.Path, Path.ChangeExtension(r.Path, ".json") })
+                try { File.Delete(f); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+            var during = host.Metrics.Samples.Where(s => s.T >= t0).ToList();
+            lock (gate)
+                results.Add(new BenchResult
+                {
+                    ModelId = model.Id,
+                    ModelName = model.Name,
+                    DecodeTps = r.TokensPerSecond ?? 0,
+                    DecodeTokens = ImagePlanner.TokensPerStep(ImageSize) * 4,
+                    SsdMBs = during.Count == 0 ? 0 : during.Average(s => s.SsdMBs),
+                    VramGb = during.Count == 0 ? 0 : during.Max(s => s.VramUsedGB),
+                    RamGb = during.Count == 0 ? 0 : during.Max(s => s.RamUsedGB),
+                    ImageSeconds = r.Seconds,
+                    ImageSize = ImageSize.Key,
+                });
+            Save();
+        }
+        finally
+        {
+            Settings.Shared.ImageModel = saved;
+            host.Images.Root = root;
+        }
     }
 
     private void SetStep(string text)

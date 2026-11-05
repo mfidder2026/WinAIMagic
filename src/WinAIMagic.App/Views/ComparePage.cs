@@ -25,7 +25,8 @@ public sealed class ComparePage : IPage
     private readonly FrameworkElement idle, working;
     private readonly ProgressRing ring = new() { Width = 16, Height = 16 };
     private readonly TextBlock step = Ui.Label("", 14, Theme.Secondary), saved = Ui.Caption();
-    private readonly BarChart write, read, load, ssd;
+    private readonly BarChart write, read, load, ssd, imageTime, imageTokens;
+    private readonly List<FrameworkElement> textCards = new(), imageCards = new();
     private readonly FrameworkElement results;
     private readonly Grid table = new() { ColumnSpacing = 18, RowSpacing = 8 };
     private string shownReady = "?", shownResults = "?";
@@ -57,6 +58,14 @@ public sealed class ComparePage : IPage
         charts.Children.Add(Ui.Card(read, L("Prompt lezen"), Glyph.Eye).At(0, 1));
         charts.Children.Add(Ui.Card(load, L("Laadtijd"), Glyph.Clock).At(1, 0));
         charts.Children.Add(Ui.Card(ssd, L("SSD tijdens schrijven"), Glyph.Drive).At(1, 1));
+        textCards.AddRange(charts.Children.Cast<FrameworkElement>());
+        // a model that makes images is measured by one image: charts of its own, the text charts do not fit it
+        imageTime = new BarChart(L("seconden"));
+        imageTokens = new BarChart("tokens/s");
+        charts.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        imageCards.Add(Ui.Card(imageTime, L("Afbeelding van 1024 × 1024, met laden"), Glyph.Image).At(2, 0));
+        imageCards.Add(Ui.Card(imageTokens, L("Beeldtokens"), Glyph.Bolt).At(2, 1));
+        foreach (var c in imageCards) charts.Children.Add(c);
 
         var tableScroll = new ScrollViewer
         {
@@ -70,13 +79,13 @@ public sealed class ComparePage : IPage
         results = Ui.V(Theme.SectionSpacing, charts, Ui.Card(tableScroll, L("Alle cijfers"), Glyph.Bullets, Theme.Cyan));
 
         View = Ui.Page(
-            Ui.PageHead(Ui.PageIcon(Glyph.Compare), L("Vergelijken"), Ui.Label(L("Dezelfde meting op elk model: een prompt van ~2.500 tokens lezen en 300 tokens schrijven."), 14, Theme.Secondary, wrap: true)),
+            Ui.PageHead(Ui.PageIcon(Glyph.Compare), L("Vergelijken"), Ui.Label(L("Dezelfde meting op elk model: een prompt van ~2.500 tokens lezen en 300 tokens schrijven, of een afbeelding van 1024 × 1024 maken."), 14, Theme.Secondary, wrap: true)),
             measure, results);
         app.Watch(View, Refresh);
         View.Loaded += (_, _) => Task.Run(app.Host.Store.Refresh);
     }
 
-    private IReadOnlyList<ModelInfo> Ready => app.Host.Store.Catalog.Models.Where(m => app.Host.Store.StatusOf(m.Id).IsComplete).ToList();
+    private IReadOnlyList<ModelInfo> Ready => app.Host.Store.Catalog.All.Where(m => app.Host.Store.StatusOf(m.Id).IsComplete).ToList();
 
     private void Refresh()
     {
@@ -110,11 +119,17 @@ public sealed class ComparePage : IPage
         if (seen == shownResults) return;
         shownResults = seen;
         string Family(BenchResult r) => app.Host.Store.Catalog.Model(r.ModelId)?.Family ?? "deepseek";
-        void Fill(BarChart c, Func<BenchResult, double> value) => c.Set(latest.Select(r => (Name(r), value(r), Family(r))).ToList());
-        Fill(write, r => r.DecodeTps);
-        Fill(read, r => r.PromptTps);
-        Fill(load, r => r.LoadSeconds);
-        Fill(ssd, r => r.SsdMBs);
+        var text = latest.Where(r => !r.MakesImage).ToList();
+        var images = latest.Where(r => r.MakesImage).ToList();
+        void Fill(BarChart c, IReadOnlyList<BenchResult> list, Func<BenchResult, double> value) => c.Set(list.Select(r => (Name(r), value(r), Family(r))).ToList());
+        Fill(write, text, r => r.DecodeTps);
+        Fill(read, text, r => r.PromptTps);
+        Fill(load, text, r => r.LoadSeconds);
+        Fill(ssd, text, r => r.SsdMBs);
+        Fill(imageTime, images, r => r.ImageSeconds ?? 0);
+        Fill(imageTokens, images, r => r.DecodeTps);
+        foreach (var c in textCards) c.Show(text.Count > 0);
+        foreach (var c in imageCards) c.Show(images.Count > 0);
         BuildTable(latest);
     }
 
@@ -135,7 +150,7 @@ public sealed class ComparePage : IPage
     private void Run()
     {
         var bench = app.Host.Bench;
-        var ids = app.Host.Store.Catalog.Models.Select(m => m.Id).Where(selection.Contains).ToList();
+        var ids = app.Host.Store.Catalog.All.Select(m => m.Id).Where(selection.Contains).ToList();
         Task.Run(() => bench.Run(ids, app.Host));
     }
 
@@ -147,7 +162,7 @@ public sealed class ComparePage : IPage
         var culture = AppLanguages.Current.Culture();
         string N(double v, string format) => v.ToString(format, culture);
         double k = ByteFormat.GibPerGb;
-        string[] heads = [L("Model"), L("Schrijven"), L("Lezen"), L("Laden"), "SSD", "VRAM", "RAM", L("Experts"), L("Gemeten")];
+        string[] heads = [L("Model"), L("Schrijven"), L("Lezen"), L("Laden"), "SSD", "VRAM", "RAM", L("Experts"), L("Afbeelding"), L("Gemeten")];
         for (int c = 0; c < heads.Length; c++)
             table.ColumnDefinitions.Add(new ColumnDefinition { Width = c == 0 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
         void Row(int r, IEnumerable<FrameworkElement> cells)
@@ -167,12 +182,13 @@ public sealed class ComparePage : IPage
             [
                 Ui.Label(Name(r), 13, null, FontWeights.Medium),
                 Cell($"{N(r.DecodeTps, "0.0")} tok/s"),
-                Cell($"{N(r.PromptTps, "0")} tok/s"),
-                Cell($"{N(r.LoadSeconds, "0")} s"),
+                Cell(r.MakesImage ? "–" : $"{N(r.PromptTps, "0")} tok/s"),
+                Cell(r.MakesImage ? "–" : $"{N(r.LoadSeconds, "0")} s"),
                 Cell($"{N(r.SsdMBs, "0")} MB/s"),
                 Cell($"{N(r.VramGb * k, "0.0")} GB"),
                 Cell($"{N(r.RamGb * k, "0")} GB"),
-                Cell(Experts(r)),
+                Cell(r.MakesImage ? "–" : Experts(r)),
+                Cell(r.ImageSeconds is double seconds ? $"{N(seconds, "0")} s" : "–"),
                 Ui.Label(r.Date.ToLocalTime().ToString("d MMM yyyy", culture), 13, Theme.Secondary),
             ]);
         }

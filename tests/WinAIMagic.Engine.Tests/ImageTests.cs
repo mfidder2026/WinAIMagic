@@ -187,6 +187,20 @@ public class ImageProgressTests : EngineTest
         Assert.Equal(0.85, p.Fraction);
     }
 
+    /// <summary>A token is a patch of 16 x 16 pixels; the bar says the seconds per step either way round.</summary>
+    [Fact]
+    public void ImageTokens()
+    {
+        Assert.Equal(4096, ImagePlanner.TokensPerStep(new ImageSize(1024, 1024)));
+        Assert.Equal(8.62, ImageProgress.StepSeconds("|====|  2/4 -   8.62s/it - ETA 00:17"));
+        Assert.Equal(0.5, ImageProgress.StepSeconds("|=| 1/4 - 2.00it/s"));
+        var p = new ImageProgress();
+        p.Read("[I] sampling using Euler method --- request.cpp:477");
+        p.Read("  |============>                                     | 1/4 -   8.49s/it");
+        Assert.Equal(8.49, p.SecondsPerStep);
+        Assert.True(p.IsDrawing);
+    }
+
     /// <summary>The words, not the place in the source.</summary>
     [Fact]
     public void AnErrorIsKept()
@@ -244,6 +258,24 @@ public class ImageMakerTests : EngineTest
     }
 
     /// <summary>A card that refuses costs seconds; the processor always works, and the page says what happened.</summary>
+    /// <summary>The meters count image tokens while the model draws, and let go when it is done: 1024 tokens a step at 512, 4.48 steps a second.</summary>
+    [Fact]
+    public async Task TheMetersFollowTheImageTokens()
+    {
+        var m = Maker();
+        var rates = new List<double?>();
+        m.OnRate = r => { lock (rates) rates.Add(r); };
+        var made = await m.Make("een vos", Size, OnCard, Card, Files);
+        lock (rates)
+        {
+            Assert.Equal(0, rates[0]);
+            Assert.Contains(rates, r => r is double v && Math.Abs(v - 1024 * 4.48) < 0.01);
+            Assert.Null(rates[^1]);
+        }
+        Assert.Equal(1024 * 4.48, made!.TokensPerSecond!.Value, 2);
+        Assert.Equal(1024 * 4.48, Assert.Single(m.History()).TokensPerSecond!.Value, 2);
+    }
+
     [Fact]
     public async Task ACardThatRefusesLeavesItToTheProcessor()
     {
@@ -455,6 +487,34 @@ public class ImageHostTests : EngineTest
         using var host = Host();
         Assert.Null(await host.MakeImage("een vos", Size, () => Task.FromResult<string?>("de documenten")));
         Assert.Equal("de documenten", host.Images.Error);
+    }
+
+    /// <summary>Compare measures the image model by making the same image, and keeps it apart from the text figures.</summary>
+    [Fact]
+    public async Task CompareMeasuresTheImageModel()
+    {
+        using var host = Host();
+        await host.Bench.Run(new[] { "flux" }, host);
+        var r = Assert.Single(host.Bench.Results);
+        Assert.True(r.MakesImage);
+        Assert.Equal("1024x1024", r.ImageSize);
+        Assert.True(r.ImageSeconds > 0);
+        Assert.True(r.DecodeTps > 0);
+        Assert.Empty(host.Images.History());       // the measured image does not stay among the user's images
+        Assert.Equal("", Settings.Shared.ImageModel);
+        Assert.Contains(r, host.Bench.Latest(host.Store.Catalog));
+    }
+
+    /// <summary>The model chosen under Modellen makes the images; an unknown choice falls back to the first.</summary>
+    [Fact]
+    public void TheChosenImageModel()
+    {
+        using var host = Host();
+        Settings.Shared.ImageModel = "weg";
+        Assert.Equal("flux", host.ImageModel!.Id);
+        Settings.Shared.ImageModel = "flux";
+        Assert.Equal("flux", host.ImageModel!.Id);
+        Assert.Equal("tiny", host.SelectedModelId);
     }
 
     /// <summary>The image model is not one the chat can choose, and it still has a status and a download.</summary>

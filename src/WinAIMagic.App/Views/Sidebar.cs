@@ -198,6 +198,7 @@ public sealed partial class MiniDashboard : Grid
         var all = app.Host.Metrics.Samples;
         var recent = all.Skip(Math.Max(all.Count - 80, 0)).ToList();
         var now = recent.LastOrDefault();
+        gauge.Maximum = app.Host.Metrics.Scale(60);
         gauge.Set(now?.TokensPerSec ?? 0);
         speed.Set(recent.Select(s => s.TokensPerSec).ToList(), null);
         Row(0, recent.Select(s => s.Gpu), 100, $"{now?.Gpu ?? 0:0}%");

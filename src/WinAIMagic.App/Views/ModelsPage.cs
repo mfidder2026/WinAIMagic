@@ -27,7 +27,7 @@ public sealed class ModelsPage : IPage
     public ModelsPage(AppState app)
     {
         this.app = app;
-        cards = app.Host.Store.Catalog.Models.Select(m => new ModelCard(app, m)).ToList();
+        cards = app.Host.Store.Catalog.All.Select(m => new ModelCard(app, m)).ToList();
         var grid = new Grid { ColumnSpacing = Theme.SectionSpacing, RowSpacing = Theme.SectionSpacing };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition());
@@ -78,6 +78,7 @@ public sealed class ModelCard
     private readonly TextBlock active;
     private readonly Border activeBadge;
     private readonly WrapPanel badges = new();
+    private readonly bool makesImages;
     private readonly ProgressBar bar = new() { Minimum = 0, Maximum = 1 };
     private readonly TextBlock progress = Ui.Caption();
     private readonly StackPanel progressPart;
@@ -109,8 +110,12 @@ public sealed class ModelCard
         visionDownload = Ui.Btn(L("Afbeeldingsbestanden"), () => store.StartVisionDownload(model.Id), Glyph.Image);
         pause = Ui.Btn(L("Pauzeer"), () => store.StopDownload(model.Id), Glyph.Pause);
         delete = Ui.Btn(L("Verwijder model"), () => _ = ConfirmDelete(app, model), Glyph.Trash);
-        choose = Ui.Btn(L("Kies"), () => app.Select(model.Id));
-        chosen = Ui.H(6, Ui.Icon(Glyph.Done, 14, Theme.Solid(family)), Ui.Label(L("Gekozen"), 13, Theme.Solid(family)));
+        makesImages = app.Host.Store.Catalog.Images.Contains(model);
+        // a model that makes images is chosen apart, for the page Beeld; the chat keeps its own
+        choose = makesImages
+            ? Ui.Btn(L("Kies voor afbeeldingen"), () => { app.Settings.ImageModel = model.Id; app.Notify(); })
+            : Ui.Btn(L("Kies"), () => app.Select(model.Id));
+        chosen = Ui.H(6, Ui.Icon(Glyph.Done, 14, Theme.Solid(family)), Ui.Label(makesImages ? L("Gekozen voor afbeeldingen") : L("Gekozen"), 13, Theme.Solid(family)));
         var left = Ui.H(8, download, visionDownload, pause, delete);
         var right = new Grid { VerticalAlignment = VerticalAlignment.Center, Children = { choose, chosen } };
         var foot = Ui.Row("*,auto", 8, left, right);
@@ -135,9 +140,9 @@ public sealed class ModelCard
         var st = store.StatusOf(model.Id);
         var host = app.Host;
         bool downloading = store.Downloading.Contains(model.Id);
-        bool selected = host.SelectedModelId == model.Id;
-        bool running = host.Engine?.Model?.Id == model.Id && app.EngineState.IsRunning;
-        bool inUse = host.Engine?.Model?.Id == model.Id && app.EngineState.IsActive;
+        bool selected = makesImages ? host.ImageModel?.Id == model.Id : host.SelectedModelId == model.Id;
+        bool running = !makesImages && host.Engine?.Model?.Id == model.Id && app.EngineState.IsRunning;
+        bool inUse = makesImages ? host.Images.Busy : host.Engine?.Model?.Id == model.Id && app.EngineState.IsActive;
         var pack = store.PackProgress.TryGetValue(model.Id, out var p) ? p : -1;
         bool building = pack != -1;
 
@@ -162,10 +167,15 @@ public sealed class ModelCard
             badgeKey = key;
             badges.Children.Clear();
             badges.Children.Add(Ui.Badge(model.TotalSize.GbShort(), Glyph.Drive));
-            badges.Children.Add(fit == MemoryPlanner.Fit.Fits
+            if (makesImages) badges.Children.Add(Ui.Badge(L("Afbeeldingen"), Glyph.Image, Theme.Violet));
+            else badges.Children.Add(fit == MemoryPlanner.Fit.Fits
                 ? Ui.Badge(L("Past in VRAM + RAM"), Glyph.Memory, Theme.Mint)
                 : Ui.Badge(L("Streamt van SSD"), Glyph.Bolt, Theme.Amber));
-            badges.Children.Add(bench != null
+            if (makesImages)
+                badges.Children.Add(bench?.ImageSeconds is double seconds
+                    ? Ui.Badge(L($"{seconds:0} s per afbeelding gemeten op deze pc"), Glyph.Speed, Theme.Mint)
+                    : Ui.Badge(L("Niet gemeten"), Glyph.Speed));
+            else badges.Children.Add(bench != null
                 ? Ui.Badge(L($"{bench.DecodeTps:0.0} tok/s gemeten op deze pc"), Glyph.Speed, fit == MemoryPlanner.Fit.Fits ? Theme.Mint : Theme.Amber)
                 : fit == MemoryPlanner.Fit.Streams && MemoryPlanner.IsSmallPc(host.System)
                     ? Ui.Badge(L($"Op {host.System.RamTotal.Gib()} GB niet gemeten, kan traag zijn"), Glyph.Speed, Theme.Amber)
@@ -237,10 +247,10 @@ public sealed class ModelCard
         pause.Show(downloading);
         delete.Show(!downloading && !building && (st.Have > 0 || Directory.Exists(Paths.ModelDir(model.Id))));
         delete.IsEnabled = !inUse;
-        delete.Tip(inUse ? L("Stop eerst de engine.") : null);
+        delete.Tip(inUse ? (makesImages ? L("Wacht tot de afbeelding klaar is.") : L("Stop eerst de engine.")) : null);
         chosen.Show(selected);
         choose.Show(!selected);
-        choose.IsEnabled = st.HeadersAvailable;
+        choose.IsEnabled = makesImages ? st.IsComplete : st.HeadersAvailable;
     }
 
     private async Task Download()

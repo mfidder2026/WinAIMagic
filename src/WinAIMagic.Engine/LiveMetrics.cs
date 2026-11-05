@@ -69,9 +69,41 @@ public sealed class LiveMetrics : IDisposable
         {
             if (fast == value) return;
             fast = value;
-            var interval = value ? ActiveInterval : IdleInterval;
-            timer.Change(interval, interval);
+            Retime();
         }
+    }
+
+    private double? imageRate;
+
+    /// <summary>Image tokens per second while an image is made (the image engine has no /slots); null otherwise.</summary>
+    public double? ImageRate
+    {
+        get => imageRate;
+        set
+        {
+            bool changed = (imageRate == null) != (value == null);
+            imageRate = value;
+            if (changed) Retime();
+        }
+    }
+
+    public bool MakingImage => imageRate != null;
+
+    private void Retime()
+    {
+        var interval = fast || imageRate != null ? ActiveInterval : IdleInterval;
+        timer.Change(interval, interval);
+    }
+
+    /// <summary>The top of a speed scale: `base` for text, a round number above the speeds of the last minutes otherwise.</summary>
+    public double Scale(double @base)
+    {
+        double top;
+        lock (gate) top = samples.Count == 0 ? 0 : samples.Max(s => s.TokensPerSec);
+        if (top <= @base * 0.95) return @base;
+        foreach (var x in new[] { 100.0, 250, 500, 1000, 2500, 5000 })
+            if (top <= x * 0.95) return x;
+        return 10000;
     }
 
     /// <summary>Tokens this app streamed; used when the engine gives no count of its own.</summary>
@@ -105,8 +137,8 @@ public sealed class LiveMetrics : IDisposable
             if (fast) PollEngine(dt);
             int streamed = Interlocked.Exchange(ref tokenCount, 0);
             // the engine's own count when it answers (any client: this app, the API, tools), else the tokens this app streamed
-            double inst = engineRate ?? streamed / dt;
-            bool idle = engineRate is double r ? r == 0 : (now - lastStream).TotalSeconds > 1.5;
+            double inst = imageRate ?? engineRate ?? streamed / dt;
+            bool idle = imageRate is double ir ? ir == 0 : engineRate is double r ? r == 0 : (now - lastStream).TotalSeconds > 1.5;
             // smooth the token rate a little; drop to zero shortly after the stream stops
             lastTokenRate = idle ? 0 : lastTokenRate * 0.6 + inst * 0.4;
 

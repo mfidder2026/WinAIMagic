@@ -21,11 +21,13 @@ public sealed class ImagePage : IPage
 
     public FrameworkElement View { get; }
     private readonly AppState app;
-    private readonly ModelInfo? model;
+    /// <summary>The model chosen under Modellen, else the first.</summary>
+    private ModelInfo? model => app.Host.ImageModel;
 
     private readonly StackPanel body;
     private readonly Border modelCard;
     private readonly StackPanel modelPart = Ui.V(10);
+    private readonly TextBlock modelName = Ui.Label("", 18, null, FontWeights.Bold, display: true), modelSummary = Ui.Caption();
     private readonly ProgressBar downloadBar = new() { Minimum = 0, Maximum = 1 };
     private readonly TextBlock downloadText = Ui.Caption(), diskNote = Ui.Caption("", Theme.Solid(Theme.Amber)), downloadError = Ui.Caption("", Theme.Solid(Theme.Pink));
     private readonly Button download, pause, deleteModel;
@@ -53,13 +55,12 @@ public sealed class ImagePage : IPage
     public ImagePage(AppState app)
     {
         this.app = app;
-        model = app.Host.ImageModel;
 
         var store = app.Host.Store;
         download = Ui.Btn(L("Download"), () => { if (model != null) store.StartDownload(model.Id); }, Glyph.Download, Theme.Violet);
         pause = Ui.Btn(L("Pauzeer"), () => { if (model != null) store.StopDownload(model.Id); }, Glyph.Pause);
         deleteModel = Ui.Btn(L("Verwijder model"), () => { if (model != null) _ = ModelCard.ConfirmDelete(app, model); }, Glyph.Trash);
-        var modelHead = Ui.V(3, Ui.Label(model?.Name ?? "", 18, null, FontWeights.Bold, display: true), Ui.Caption(model == null ? "" : LKey(model.Summary)));
+        var modelHead = Ui.V(3, modelName, modelSummary);
         modelPart.Children.Add(modelHead);
         modelPart.Children.Add(Ui.V(5, downloadBar, downloadText));
         modelPart.Children.Add(diskNote);
@@ -84,6 +85,7 @@ public sealed class ImagePage : IPage
         ((FrameworkElement)((Grid)makePart.Children[1]).Children[0]).VerticalAlignment = VerticalAlignment.Center;
         makePart.Children.Add(working);
         makePart.Children.Add(planNote);
+        makePart.Children.Add(Ui.Caption(L("Het model volgt een beschrijving in het Engels het best: in het Nederlands mist het soms waar het om gaat.")));
         makePart.Children.Add(engineNote);
         makePart.Children.Add(note);
         makePart.Children.Add(error);
@@ -119,7 +121,9 @@ public sealed class ImagePage : IPage
 
     private void Update()
     {
-        if (model == null) return;
+        if (this.model is not { } model) return;
+        modelName.SetIfChanged(model.Name);
+        modelSummary.SetIfChanged(LKey(model.Summary));
         var host = app.Host;
         var images = host.Images;
         var store = host.Store;
