@@ -55,6 +55,7 @@ All numbers here are computed by the planner for Qwen3.6-35B-A3B. None has been 
 
 | Mac behaviour | Here |
 |---|---|
+| A catalog address follows the newest version, so a file the maker replaces only fails once it has come down | Every address names one commit; the size is checked before a byte is written, and the model's download stops at once |
 | A `&` process keeps the pipe open past the timeout | The timeout always works; detached programs keep running |
 | Stop leaves a running command going | Stop ends the process tree |
 | A `tool_call` without a result after Stop | Result "gestopt door de gebruiker" |

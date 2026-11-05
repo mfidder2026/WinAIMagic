@@ -174,6 +174,18 @@ public class CatalogTests : EngineTest
         foreach (var f in C.TieredVision.SelectMany(v => v.Files)) Assert.DoesNotContain("maya", f.Local, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>A sha256 belongs to one version of a file: an address that follows the newest version breaks when the maker replaces it.</summary>
+    [Fact]
+    public void EveryDownloadAddressNamesOneVersion()
+    {
+        var urls = C.Models.SelectMany(m => m.AllFiles).Select(f => f.Url)
+            .Concat(C.Vision.Select(v => v.Url))
+            .Concat(C.TieredVision.SelectMany(v => v.Files).Select(f => f.Url))
+            .ToList();
+        Assert.NotEmpty(urls);
+        foreach (var url in urls) Assert.Matches("/resolve/[0-9a-f]{40}/", url);
+    }
+
     /// <summary>Every model on the main engine has image files of its own there, pinned on a revision and a sha256.</summary>
     [Fact]
     public void TheMainEnginesImageFilesArePinned()

@@ -301,9 +301,10 @@ public sealed class ModelStore : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>Only the error: the card shows it once, in its own colour, and not again as the progress line.</summary>
     private void Fail(string id, string text)
     {
-        lock (gate) { messages[id] = text; errors[id] = text; }
+        lock (gate) errors[id] = text;
         Changed?.Invoke();
     }
 
@@ -311,12 +312,13 @@ public sealed class ModelStore : IDisposable
     {
         try
         {
-            var d = new Downloader(http) { RetryDelay = RetryDelay };
+            using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var d = new Downloader(http) { RetryDelay = RetryDelay, Replaced = stop.Cancel };
             var dir = Paths.ModelDir(model.Id);
             var items = new List<DownloadItem>();
             if (!visionOnly) foreach (var f in model.AllFiles) items.Add(new DownloadItem(dir, f.Local, f.Size, f.Sha256, f.Url, f.Stamp));
             items.AddRange(VisionItems(model));
-            var results = await Task.WhenAll(items.Select(item => d.Fetch(item, s => Say(model.Id, s), e => Fail(model.Id, e), ct)));
+            var results = await Task.WhenAll(items.Select(item => d.Fetch(item, s => Say(model.Id, s), e => Fail(model.Id, e), stop.Token)));
             if (ct.IsCancellationRequested) return;
             if (results.All(ok => ok))
             {

@@ -29,7 +29,13 @@ public sealed class FakeServer : HttpMessageHandler
         var body = partial ? bytes[(int)from!.Value..] : bytes;
         var code = partial ? HttpStatusCode.PartialContent : HttpStatusCode.OK;
         int cut = Interlocked.Exchange(ref BreakAfter, 0);
-        if (cut > 0) return Task.FromResult(new HttpResponseMessage(code) { Content = new StreamContent(new BreakingStream(body[..cut])) });
+        if (cut > 0)
+        {
+            // a real server names the whole size, and only then does the connection break
+            var broken = new StreamContent(new BreakingStream(body[..cut]));
+            broken.Headers.ContentLength = body.Length;
+            return Task.FromResult(new HttpResponseMessage(code) { Content = broken });
+        }
         return Task.FromResult(new HttpResponseMessage(code) { Content = new ByteArrayContent(body) });
     }
 
@@ -230,6 +236,62 @@ public class DownloaderTests : EngineTest
         File.WriteAllBytes(Local, new byte[200]);
         using var store = await Download(c, "m");
         Assert.Contains("grootte 200", store.LastError["m"]);
+    }
+
+    /// <summary>Seen on a real model: the maker replaced its files, and 111 GB came down before the app said so.</summary>
+    [Fact]
+    public async Task AReplacedFileIsReportedBeforeAByteIsWritten()
+    {
+        var c = OneFile("m", Data(100));
+        server.Files[c.Models[0].Files[0].Url] = Data(200);
+        using var store = await Download(c, "m");
+        Assert.Contains("vervangen of verwijderd", store.LastError["m"]);
+        Assert.Single(server.Requests);
+        Assert.Equal(0UL, ModelStore.FileSize(Local));
+    }
+
+    [Fact]
+    public async Task AReplacedFileLeavesAPartialFileAlone()
+    {
+        var c = OneFile("m", Data(100));
+        server.Files[c.Models[0].Files[0].Url] = Data(200);
+        Directory.CreateDirectory(Dir("m"));
+        File.WriteAllBytes(Local, Data(50));
+        using var store = await Download(c, "m");
+        Assert.Contains("vervangen of verwijderd", store.LastError["m"]);
+        Assert.Equal(50UL, ModelStore.FileSize(Local));
+    }
+
+    [Fact]
+    public async Task ARemovedFileIsReportedAtOnce()
+    {
+        var c = OneFile("m", Data(100));
+        using var store = await Download(c, "m");
+        Assert.Contains("vervangen of verwijderd", store.LastError["m"]);
+        Assert.Single(server.Requests);
+    }
+
+    /// <summary>The first file is replaced, the second never answers: the download of the model ends anyway.</summary>
+    [Fact]
+    public async Task AReplacedFileStopsTheRestOfTheModel()
+    {
+        var first = new ModelFile { Local = "a.gguf", Size = 100, Sha256 = new[] { new string('0', 64) }, Url = "https://x.test/a" };
+        var second = new ModelFile { Local = "b.gguf", Size = 100, Sha256 = new[] { new string('0', 64) }, Url = "https://x.test/b" };
+        var c = new ModelCatalog { Models = new[] { new ModelInfo { Id = "m", Name = "T", Family = "qwen", Summary = "s", Files = new[] { first, second } } } };
+        using var store = new ModelStore(c, new HttpClient(new OneReplacedOneSilent()), timer: false) { RetryDelay = TimeSpan.Zero };
+        store.StartDownload("m");
+        await store.WaitForDownload("m").WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.Contains("vervangen of verwijderd", store.LastError["m"]);
+    }
+
+    private sealed class OneReplacedOneSilent : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            if (request.RequestUri!.ToString().EndsWith("/a")) return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(new byte[200]) };
+            await Task.Delay(Timeout.Infinite, ct);
+            throw new OperationCanceledException(ct);
+        }
     }
 
     /// <summary>The hash is of the file as published, the stamp comes after it.</summary>
@@ -599,6 +661,7 @@ public class DownloaderTests : EngineTest
         store.StartDownload("m");
         await store.WaitForDownload("m");
         Assert.Equal("kapot", store.LastError["m"]);
+        Assert.NotEqual("kapot", store.LastMessage.GetValueOrDefault("m"));
     }
 }
 

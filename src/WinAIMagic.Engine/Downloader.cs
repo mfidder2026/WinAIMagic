@@ -20,8 +20,13 @@ public sealed class Downloader
 
     private readonly HttpClient http;
     public TimeSpan RetryDelay { get; init; } = TimeSpan.FromSeconds(5);
+    /// <summary>The server no longer has a file the catalog names: the rest of that model need not come down either.</summary>
+    public Action? Replaced { get; init; }
 
     public Downloader(HttpClient http) { this.http = http; }
+
+    /// <summary>The server offers a file of another size than the catalog's: the maker replaced it, and no attempt changes that.</summary>
+    private sealed class FileReplacedException : Exception { }
 
     /// <summary>True when the file is verified. `say`: progress; `fail`: what went wrong, for the model card.</summary>
     public async Task<bool> Fetch(DownloadItem item, Action<string> say, Action<string> fail, CancellationToken ct)
@@ -44,6 +49,12 @@ public sealed class Downloader
                 break;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { return false; }
+            catch (Exception e) when (e is FileReplacedException or HttpRequestException { StatusCode: HttpStatusCode.NotFound or HttpStatusCode.Gone })
+            {
+                fail(L("De maker heeft dit model op de server vervangen of verwijderd, dus deze versie van WinAIMagic kan het niet meer downloaden. Kijk of er een nieuwere WinAIMagic is."));
+                Replaced?.Invoke();
+                return false;
+            }
             catch (Exception e) when (e is HttpRequestException or IOException or OperationCanceledException or UnauthorizedAccessException)
             {
                 lastError = Describe(e);
@@ -55,7 +66,7 @@ public sealed class Downloader
         ulong have = ModelStore.FileSize(path);
         if (have != item.Size)
         {
-            fail(lastError != null ? L($"{item.Name}: {lastError}") : L($"{item.Name}: grootte {have} in plaats van {item.Size}"));
+            fail(lastError != null ? L($"{item.Name}: {lastError}") : L($"{item.Name}: grootte {have} in plaats van {item.Size} bytes. Verwijder het model en download het opnieuw."));
             return false;
         }
         say(L($"{item.Name}: sha256 controleren"));
@@ -104,6 +115,10 @@ public sealed class Downloader
         if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable && have > 0) return;   // the size check decides
         response.EnsureSuccessStatusCode();
         bool resume = response.StatusCode == HttpStatusCode.PartialContent;
+        // the server names the size of the whole file before a byte is written: finding out after 111 GB helps nobody
+        var headers = response.Content.Headers;
+        long? whole = resume ? headers.ContentRange?.Length ?? have + headers.ContentLength : headers.ContentLength;
+        if (whole is long size && (ulong)size != item.Size) throw new FileReplacedException();
         // FileShare.Read: the plan reads the headers of a shard while it comes in
         using var file = new FileStream(path, resume ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.Read | FileShare.Delete, Chunk);
         await using var body = await response.Content.ReadAsStreamAsync(ct);
