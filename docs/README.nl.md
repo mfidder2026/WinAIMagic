@@ -6,7 +6,7 @@ Dit is de Windows-versie van [MacAIMagic](https://github.com/mfidder2026/MacAIMa
 
 ## Installeren
 
-1. Download `WinAIMagic-Setup-*.exe` bij [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest) (ongeveer 1,6 GB).
+1. Download `WinAIMagic-Setup-*.exe` bij [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest) (ongeveer 1,8 GB).
 2. Start het bestand en kies een map voor de modellen, het liefst op een snelle NVMe-schijf. Beheerdersrechten zijn niet nodig.
 3. Windows SmartScreen kan waarschuwen, omdat de setup nog niet ondertekend is. Kies dan **Meer informatie** en **Toch uitvoeren**.
 4. Open in de app **Modellen**, download een model en druk op **Start engine**.
