@@ -79,6 +79,13 @@ public static class MemoryPlanner
     public const ulong RoomyMemory = 64UL << 30;
     /// <summary>The context of a model that streams on a PC with less than `RoomyMemory`.</summary>
     public const int SmallPcContext = 32_768;
+    /// <summary>Below this much RAM a model that still reads from the SSD also gives up context. A PC with 24 GB reports a little
+    /// under 24 GiB, and belongs with the larger ones. The figures for these PCs are estimates: not measured on a real one.</summary>
+    public const ulong SmallMemory = 23UL << 30;
+    /// <summary>The context of a model that still reads from the SSD on a PC with less than `SmallMemory`.</summary>
+    public const int TinyPcContext = 16_384;
+    /// <summary>The smallest expert cache worth recommending a model that streams for.</summary>
+    public const ulong SmallestCache = 2_000_000_000;
     public const int VisionMinimumContext = 16_384;
     public const ulong VisionBytes = 1_500_000_000;
     /// <summary>llama.cpp's compute buffers at ubatch 1024, measured on the large models, and on a model with small dense weights.</summary>
@@ -105,6 +112,8 @@ public static class MemoryPlanner
     public static ulong TieredVramLimit(SystemInfo s) => s.HasGpu ? Sub(s.VramTotal, s.VramReserve) : 0;
 
     public static ulong RamBudget(SystemInfo s) => Sub(s.RamTotal, s.RamMargin);
+
+    public static bool IsSmallPc(SystemInfo s) => s.RamTotal < SmallMemory;
 
     private static ulong Sub(ulong a, ulong b) => a > b ? a - b : 0;
 
@@ -142,16 +151,29 @@ public static class MemoryPlanner
     public static Fit FitFor(ModelInfo model, SystemInfo s)
     {
         ulong memory = model.Memory ?? model.TotalSize;
-        ulong vram = EngineFor(model, s) == EngineKind.Tiered ? TieredVramLimit(s) : LlamaVramLimit(s);
-        return memory + MinimumOverhead <= vram + RamBudget(s) ? Fit.Fits : Fit.Streams;
+        return memory + MinimumOverhead <= VramLimitFor(model, s) + RamBudget(s) ? Fit.Fits : Fit.Streams;
     }
 
-    /// <summary>The first model in the catalog that fits in this PC's VRAM + RAM; a larger card skips the models meant for small ones.</summary>
+    private static ulong VramLimitFor(ModelInfo model, SystemInfo s) =>
+        EngineFor(model, s) == EngineKind.Tiered ? TieredVramLimit(s) : LlamaVramLimit(s);
+
+    /// <summary>The first model in the catalog that fits in this PC's VRAM + RAM; a larger card skips the models meant for small ones.
+    /// If none fits, the smallest that streams, when this PC has room for what that has to hold. Otherwise none: a model still
+    /// starts, but this PC is better off as a helper in a cluster.</summary>
     public static ModelInfo? Recommended(IEnumerable<ModelInfo> models, SystemInfo s)
     {
+        var usable = models.Where(m => EngineFor(m, s) != null).ToList();
         double vramGb = s.VramTotal / (double)(1UL << 30);
-        return models.FirstOrDefault(m => EngineFor(m, s) != null && FitFor(m, s) == Fit.Fits
-                                          && (m.Tier?.RecommendMaxVramGb is not double max || !s.HasGpu || vramGb <= max));
+        return usable.FirstOrDefault(m => FitFor(m, s) == Fit.Fits
+                                          && (m.Tier?.RecommendMaxVramGb is not double max || !s.HasGpu || vramGb <= max))
+            ?? usable.Where(m => FitFor(m, s) == Fit.Streams && HasRoomToStream(m, s)).MinBy(m => m.TotalSize);
+    }
+
+    /// <summary>The dense weights, the buffers and a small expert cache, before anything comes from the SSD.</summary>
+    private static bool HasRoomToStream(ModelInfo model, SystemInfo s)
+    {
+        ulong dense = model.Dense ?? (model.Memory ?? model.TotalSize) / 10;
+        return dense + ComputeBuffers + SmallestCache <= VramLimitFor(model, s) + RamBudget(s);
     }
 
     /// <summary>Does the whole model stay in VRAM + RAM, with the smallest context?</summary>
@@ -162,7 +184,13 @@ public static class MemoryPlanner
     /// RAM, and on a small PC what leaves a model that streams its expert cache. Null: the setting decides.</summary>
     public static int? ContextRoom(GGUFIndex index, SystemInfo s, bool vision, EngineKind engine)
     {
-        if (!FitsWhole(index, s, engine)) return s.RamTotal < RoomyMemory ? SmallPcContext : null;
+        if (!FitsWhole(index, s, engine))
+        {
+            if (s.RamTotal >= RoomyMemory) return null;
+            // 16K gives experts about 0.26 GB on Qwen3.6, or four more layers on a 6 GB card. A PC that reads nothing from the SSD
+            // at 32K (a 16 GB card) would give up half its context for almost nothing.
+            return IsSmallPc(s) && !Plan(index, s, SmallPcContext, vision, engine).FitsInMemory ? TinyPcContext : SmallPcContext;
+        }
         ulong weights = index.DenseBytes + index.ExpertBytes;
         ulong visionBytes = vision ? VisionBytes : 0;
         if (engine == EngineKind.Tiered)

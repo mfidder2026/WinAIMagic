@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.9.5
+# Parity with MacAIMagic 1.9.6
 
-How this version relates to MacAIMagic at commit `9b3d166`. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `da25656`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -20,6 +20,26 @@ How this version relates to MacAIMagic at commit `9b3d166`. Test cases are liste
 | `Support/LiveMetrics`, `SystemInfo`, `SystemCheck` | `Engine/` same names, `Engine/Gpu/*` | Done; counters are locale independent |
 | `Support/Settings`, `Paths`, `Localization`, `Translations` | `Core/Support/*`, `Core/i18n/*.json` | Done |
 | `Views/*` | `App/Views/*` | Done, in code rather than XAML |
+
+## Taken over since the first port
+
+### `da25656` (1.9.6): a Mac with 16 GB can use Qwen3.6
+
+All numbers here are computed by the planner for Qwen3.6-35B-A3B. None has been measured on a real PC with 16 GB of RAM.
+
+- **Taken over:** when no model fits, the app recommends the smallest one that streams, if the dense weights, the buffers and a cache of 2 GB fit in VRAM + RAM. The system check says that it streams, has not been measured on so little memory and may be slow. The model card says so too.
+- **Adapted, the 16K context:** on the Mac every PC below 24 GB gets it. Here it goes only to a PC that still reads from the SSD at 32K. A PC with 24 GB reports a little under 24 GiB, so the limit is 23 GiB.
+
+| 16 GB RAM with | 32K context | 16K context |
+|---|---|---|
+| 16 GB card | nothing from the SSD; keeps 32K | one more layer's experts on the card |
+| 12 GB card | cache 4.5 GB, 4.4 GB from the SSD | cache 4.8 GB, 4.2 GB from the SSD |
+| 8 GB card | cache 0.2 GB, 8.7 GB from the SSD | cache 0.5 GB, 8.5 GB from the SSD |
+| 6 GB card | 11 layers on the card | 15 layers on the card |
+| No card | 6.1 GB of experts in RAM, 13.5 GB from the SSD | 6.4 GB in RAM, 13.3 GB from the SSD |
+
+- **Not taken over, the expert cache limit of 3 GB:** on the Mac it protects memory that cannot be reclaimed. A separate card's VRAM is not system memory, so the limit would only send more to the SSD (12 GB card: 5.9 GB instead of 4.4 GB at 32K). Graphics in the processor are not used here, except on a Halo APU, which comes with far more memory.
+- **Does not apply:** the wording of the label "too big" (there is no such label here), the smaller reserves on a small Mac (Windows keeps its fixed RAM margin, and there is no reserve for reading experts), the GPU limit row and the speed on 32 GB (neither exists here).
 
 ## Deliberate differences
 
@@ -65,6 +85,7 @@ The same gaps still exist in MacAIMagic.
 **Never run on real hardware**
 
 - A clean Windows 11 PC, and any PC other than the one test PC.
+- A PC with 16 GB of RAM: its plan and recommendation are computed only.
 - DeepSeek, MiniMax, Qwen3.8 and the larger GLM models.
 - The page file button: a dry run checked the commands, and the change itself needs someone to accept the UAC prompt.
 - A real move of models; downloading through the app beyond a short test.

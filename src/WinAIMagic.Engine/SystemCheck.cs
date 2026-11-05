@@ -159,6 +159,10 @@ public sealed class SystemCheck
             };
         bool downloading = models.Downloading.Contains(best.Id);
         string text = downloading ? L($"{best.Name} wordt gedownload.")
+            : host.FitOf(best) == MemoryPlanner.Fit.Streams
+                ? s.HasGpu
+                    ? L($"Nog geen model. Aanbevolen voor deze pc met {s.VramTotal.Gib()} GB VRAM en {s.RamTotal.Gib()} GB RAM: {best.Name} ({best.TotalSize.GbShort()}). Het streamt van de SSD; op zo weinig geheugen is dat nog niet gemeten en het kan traag zijn.")
+                    : L($"Nog geen model. Aanbevolen voor deze pc met {s.RamTotal.Gib()} GB RAM: {best.Name} ({best.TotalSize.GbShort()}). Het streamt van de SSD; op zo weinig geheugen is dat nog niet gemeten en het kan traag zijn.")
             : L($"Nog geen model. Aanbevolen voor deze pc met {s.VramTotal.Gib()} GB VRAM en {s.RamTotal.Gib()} GB RAM: {best.Name} ({best.TotalSize.GbShort()}), dat helemaal in VRAM en RAM past.")
               + (models.Catalog.Models.Any(m => host.FitOf(m) == MemoryPlanner.Fit.Streams) ? " " + L("De grotere modellen kun je ook gebruiken: die streamen van de SSD.") : "");
         var model = new Item("model", L("Model"), text, CheckState.Todo, downloading ? null : L("Naar Modellen"), downloading ? null : CheckAction.OpenModels);

@@ -248,12 +248,36 @@ public class SystemCheckTests : EngineTest
     public void ASmallPcIsToldItStreams()
     {
         var b = FakeGpuBackend.Amd(8);
-        using var host = Host(SystemInfo.Simulated(b, 32, 8), b);
+        using var host = Host(SystemInfo.Simulated(b, 16, 8), b);
         var model = SystemCheck.ModelItems(host).Single(i => i.Id == "model");
         Assert.Equal(SystemCheck.CheckState.Optional, model.State);
         Assert.Contains("streamen", model.Detail);
         Assert.DoesNotContain("te groot", model.Detail);
         Assert.Equal(SystemCheck.CheckAction.OpenCluster, model.Action);
+    }
+
+    /// <summary>The recommendation on a PC too small for any model says that it streams, and that this has not been measured.</summary>
+    [Fact]
+    public void ASmallPcIsRecommendedTheModelThatStreams()
+    {
+        var card = FakeGpuBackend.Nvidia(8);
+        using (var host = Host(SystemInfo.Simulated(card, 16, 8), card))
+        {
+            var model = SystemCheck.ModelItems(host).Single(i => i.Id == "model");
+            Assert.Equal(SystemCheck.CheckState.Todo, model.State);
+            Assert.Equal(SystemCheck.CheckAction.OpenModels, model.Action);
+            Assert.Contains("8 GB VRAM en 16 GB RAM: Qwen3.6", model.Detail);
+            Assert.Contains("nog niet gemeten", model.Detail);
+            Assert.DoesNotContain("helemaal", model.Detail);
+            Assert.Equal("qwen3.6-35b-a3b-q4", host.SelectedModelId);
+        }
+        var none = FakeGpuBackend.Cpu();
+        using (var host = Host(SystemInfo.Simulated(none, 16, 8), none))
+        {
+            var model = SystemCheck.ModelItems(host).Single(i => i.Id == "model");
+            Assert.Contains("deze pc met 16 GB RAM: Qwen3.6", model.Detail);
+            Assert.DoesNotContain("VRAM", model.Detail);
+        }
     }
 
     [Fact]

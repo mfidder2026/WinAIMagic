@@ -206,7 +206,7 @@ public class ThreeTierTests : EngineTest
     [InlineData(24, 64, "nvidia", "qwen3.6-35b-a3b-q4")]
     [InlineData(24, 192, "nvidia", "glm-5.3-flash-compact-24")]
     [InlineData(48, 256, "nvidia", "deepseek-v4.1-flash-compact")]
-    [InlineData(8, 32, "amd", null)]
+    [InlineData(8, 32, "amd", "qwen3.6-35b-a3b-q4")]
     [InlineData(12, 64, "amd", "qwen3.6-35b-a3b-q4")]
     [InlineData(16, 128, "amd", "glm-5.3-flash-compact-24")]
     [InlineData(24, 64, "amd", "qwen3.6-35b-a3b-q4")]
@@ -408,5 +408,113 @@ public class ThreeTierTests : EngineTest
         var idx = TestModels.Index("x", 1, 1, 1);
         Assert.Equal(4, MemoryPlanner.Plan(idx, SystemInfo.Simulated(FakeGpuBackend.Nvidia(8), 16, 2), 4096, false).Threads);
         Assert.Equal(12, MemoryPlanner.Plan(idx, SystemInfo.Simulated(FakeGpuBackend.Nvidia(8), 16, 12), 4096, false).Threads);
+    }
+}
+
+/// <summary>A PC with 16 GB of RAM: the numbers only. Its behaviour has not been measured on a real one.</summary>
+public class SmallPcTests : EngineTest
+{
+    private static readonly ModelInfo Qwen = ModelCatalog.Shared.Model("qwen3.6-35b-a3b-q4")!;
+    private static readonly GGUFIndex QwenIndex = TestModels.IndexOf(Qwen);
+
+    /// <summary>`vram` 0: no card, which is also what a laptop with only graphics in its processor gets.</summary>
+    private static SystemInfo Pc(int vram, int ram = 16) =>
+        SystemInfo.Simulated(vram == 0 ? FakeGpuBackend.Cpu() : FakeGpuBackend.Nvidia(vram), ram, 8);
+
+    private static MemoryPlan PlanAt(SystemInfo s, int context) => MemoryPlanner.Plan(QwenIndex, s, context, false);
+
+    [Theory]
+    [InlineData(16)]
+    [InlineData(12)]
+    [InlineData(8)]
+    [InlineData(6)]
+    [InlineData(0)]
+    public void Qwen36StreamsOn16GBAndIsRecommended(int vram)
+    {
+        var s = Pc(vram);
+        Assert.Equal(MemoryPlanner.Fit.Streams, MemoryPlanner.FitFor(Qwen, s));
+        Assert.Equal(Qwen.Id, MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s)?.Id);
+    }
+
+    /// <summary>Too little room for the dense weights, the buffers and a small cache: nothing is recommended, and the model still starts.</summary>
+    [Fact]
+    public void APcWithLessGetsNoRecommendationAndStillStarts()
+    {
+        foreach (var s in new[] { Pc(0, 8), Pc(0, 12), Pc(4, 8), SystemInfo.Simulated(FakeGpuBackend.Amd(8), 16, 8) })
+        {
+            Assert.Null(MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s));
+            Assert.Null(MemoryPlanner.Blocked(Qwen, s));
+            Assert.Equal(EngineKind.Llama, MemoryPlanner.EngineFor(Qwen, s));
+        }
+    }
+
+    [Fact]
+    public void LargerPcsKeepTheirPlan()
+    {
+        var large = TestModels.IndexOf(ModelCatalog.Shared.Model("deepseek-v4.1-flash-q4")!);
+        foreach (int gb in new[] { 24, 32 })
+        {
+            Assert.False(MemoryPlanner.IsSmallPc(Pc(8, gb)));
+            Assert.Equal(MemoryPlanner.SmallPcContext, MemoryPlanner.ContextRoom(large, Pc(8, gb), false, EngineKind.Llama));
+        }
+        foreach (int gb in new[] { 64, 128 })
+            Assert.Null(MemoryPlanner.ContextRoom(large, Pc(8, gb), false, EngineKind.Llama));
+        // what Windows reports for a PC sold with 24 GB
+        Assert.False(MemoryPlanner.IsSmallPc(Pc(8, 24) with { RamTotal = (ulong)(23.7 * (1UL << 30)) }));
+        Assert.True(MemoryPlanner.IsSmallPc(Pc(8, 16) with { RamTotal = (ulong)(15.7 * (1UL << 30)) }));
+    }
+
+    /// <summary>What goes on the card stays within its budget, and Windows keeps its margin of the RAM.</summary>
+    [Theory]
+    [InlineData(12)]
+    [InlineData(8)]
+    [InlineData(0)]
+    public void ThePlanOn16GBLeavesMemoryFree(int vram)
+    {
+        var s = Pc(vram);
+        var context = MemoryPlanner.ContextSize(QwenIndex, s, 65_536, false, EngineKind.Llama);
+        Assert.Equal(MemoryPlanner.TinyPcContext, context);
+        var plan = PlanAt(s, context);
+        Assert.False(plan.FitsInMemory);
+        Assert.True(plan.SsdExperts > 0);
+        Assert.True(plan.RamExperts <= MemoryPlanner.RamBudget(s));
+        Assert.True(s.RamTotal - MemoryPlanner.RamBudget(s) >= 6UL << 30);
+        if (vram > 0) Assert.True(plan.VramPredicted <= plan.VramBudget, $"{plan.VramPredicted} > {plan.VramBudget}");
+    }
+
+    /// <summary>A 16 GB card reads nothing from the SSD at 32K, so halving the context would gain almost nothing.</summary>
+    [Fact]
+    public void ACardThatHoldsTheRestKeeps32K()
+    {
+        var s = Pc(16);
+        Assert.Equal(MemoryPlanner.SmallPcContext, MemoryPlanner.ContextSize(QwenIndex, s, 65_536, false, EngineKind.Llama));
+        Assert.Equal(0UL, PlanAt(s, MemoryPlanner.SmallPcContext).SsdExperts);
+    }
+
+    /// <summary>Why 16K is worth half the context where the SSD is in use: the room goes to the experts.</summary>
+    [Fact]
+    public void A16KContextGivesTheExpertsMoreRoom()
+    {
+        (MemoryPlan Tiny, MemoryPlan Small) At(int vram) => (PlanAt(Pc(vram), MemoryPlanner.TinyPcContext), PlanAt(Pc(vram), MemoryPlanner.SmallPcContext));
+
+        foreach (int vram in new[] { 12, 8 })
+        {
+            var (tiny, small) = At(vram);
+            Assert.True(tiny.ExpertCache > small.ExpertCache);
+            Assert.True(tiny.SsdExperts < small.SsdExperts);
+        }
+        // the dense weights do not fit on this card: more of the layers do
+        var (tiny6, small6) = At(6);
+        Assert.True(tiny6.GpuLayers > small6.GpuLayers);
+        // no card: the context lives in RAM
+        var (tinyCpu, smallCpu) = At(0);
+        Assert.True(tinyCpu.RamExperts > smallCpu.RamExperts);
+    }
+
+    /// <summary>The Mac's limit of 3 GB protects memory the card here does not share with Windows; it would only send more to the SSD.</summary>
+    [Fact]
+    public void TheCacheIsNotLimitedOnASeparateCard()
+    {
+        Assert.True(PlanAt(Pc(12), MemoryPlanner.TinyPcContext).ExpertCache > 4_000_000_000);
     }
 }

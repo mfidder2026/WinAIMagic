@@ -167,7 +167,9 @@ public sealed class ModelCard
                 : Ui.Badge(L("Streamt van SSD"), Glyph.Bolt, Theme.Amber));
             badges.Children.Add(bench != null
                 ? Ui.Badge(L($"{bench.DecodeTps:0.0} tok/s gemeten op deze pc"), Glyph.Speed, fit == MemoryPlanner.Fit.Fits ? Theme.Mint : Theme.Amber)
-                : Ui.Badge(L("Niet gemeten"), Glyph.Speed));
+                : fit == MemoryPlanner.Fit.Streams && MemoryPlanner.IsSmallPc(host.System)
+                    ? Ui.Badge(L($"Op {host.System.RamTotal.Gib()} GB niet gemeten, kan traag zijn"), Glyph.Speed, Theme.Amber)
+                    : Ui.Badge(L("Niet gemeten"), Glyph.Speed));
             if (vision) badges.Children.Add(Ui.Badge(L("Vision"), Glyph.Eye));
             if (model.HasMtp) badges.Children.Add(Ui.Badge("MTP", Glyph.Fast, Theme.Violet));
             if (recommended) badges.Children.Add(Ui.Badge(L("Aanbevolen"), Glyph.Star, Theme.Cyan));
