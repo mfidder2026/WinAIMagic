@@ -179,12 +179,25 @@ public class CatalogTests : EngineTest
     [Fact]
     public void EveryDownloadAddressNamesOneVersion()
     {
-        var urls = C.Models.SelectMany(m => m.AllFiles).Select(f => f.Url)
+        var urls = C.All.SelectMany(m => m.AllFiles).Select(f => f.Url)
             .Concat(C.Vision.Select(v => v.Url))
             .Concat(C.TieredVision.SelectMany(v => v.Files).Select(f => f.Url))
             .ToList();
         Assert.NotEmpty(urls);
         foreach (var url in urls) Assert.Matches("/resolve/[0-9a-f]{40}/", url);
+    }
+
+    /// <summary>The model that makes images: its files in the order the engine takes them, under names of our own, apart from the chat's models.</summary>
+    [Fact]
+    public void TheImageModel()
+    {
+        var m = Assert.Single(C.Images);
+        Assert.Equal("FLUX.2 Klein 4B", m.Name);
+        Assert.Equal(m, C.Model(m.Id));
+        Assert.DoesNotContain(m, C.Models);
+        Assert.Equal(new[] { "flux-2-klein-4b-image.gguf", "flux-2-klein-4b-text.gguf", "flux-2-klein-4b-decoder.safetensors" }, m.Files.Select(f => f.Local));
+        Assert.Equal(5.27, m.TotalSize / 1e9, 2);
+        foreach (var f in m.Files) Assert.Matches("^[0-9a-f]{64}$", Assert.Single(f.Sha256));
     }
 
     /// <summary>Every model on the main engine has image files of its own there, pinned on a revision and a sha256.</summary>

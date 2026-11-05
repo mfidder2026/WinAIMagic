@@ -154,6 +154,7 @@ public sealed partial class ShellWindow : Window
             {
                 PaneKind.Live => new LivePage(app),
                 PaneKind.Documents => new DocumentsPage(app),
+                PaneKind.Images => new ImagePage(app),
                 PaneKind.Compare => new ComparePage(app),
                 PaneKind.Cluster => new ClusterPage(app),
                 PaneKind.System => new SystemPage(app),
@@ -178,7 +179,7 @@ public sealed partial class ShellWindow : Window
 
     private async Task StartUp()
     {
-        string? pageArg = Arg("page") switch { "Documenten" => "Documents", "Vergelijken" => "Compare", "Modellen" => "Models", "Systeem" => "System", var p => p };
+        string? pageArg = Arg("page") switch { "Documenten" => "Documents", "Beeld" => "Images", "Vergelijken" => "Compare", "Modellen" => "Models", "Systeem" => "System", var p => p };
         Pane? forced = Enum.TryParse<PaneKind>(pageArg, true, out var kind) ? new Pane(kind, kind == PaneKind.Chat ? app.Store.Selection : null) : null;
         // first run: the models until one is there
         bool ready = app.Host.Store.StatusOf(app.Host.SelectedModelId).IsComplete;

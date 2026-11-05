@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace WinAIMagic.Studio;
 
 /// FileManager.trashItem: what the user removes stays recoverable.
-internal static class RecycleBin
+public static class RecycleBin
 {
     private const uint Delete = 3;
     private const ushort Silent = 0x4, NoConfirmation = 0x10, AllowUndo = 0x40, NoErrorUi = 0x400;

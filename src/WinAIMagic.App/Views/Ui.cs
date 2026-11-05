@@ -233,6 +233,9 @@ public static class Ui
         ? L($"{Math.Floor(seconds / 3600):0} u {seconds % 3600 / 60:0} min")
         : L($"{seconds / 60:0} min");
 
+    /// <summary>A short time: 8 s, 2 min 31 s.</summary>
+    public static string Clock(double seconds) => seconds < 60 ? $"{seconds:0} s" : $"{(int)seconds / 60} min {(int)seconds % 60} s";
+
     public static void Copy(string text)
     {
         var p = new Windows.ApplicationModel.DataTransfer.DataPackage();

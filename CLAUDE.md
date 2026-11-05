@@ -49,6 +49,7 @@ The other test projects are `WinAIMagic.Chat.Tests`, `WinAIMagic.Studio.Tests` a
 
 - **Texts:** Dutch in the code is the key, through `L("...")`. Every new text needs a translation in `src/WinAIMagic.Core/i18n/{en,de,fr}.json`, with the keys sorted. Check with `python scripts/i18n_check.py`, and write "pc" rather than "Mac".
 - **Version:** `<Version>` in `Directory.Build.props`. The app shows it in the sidebar and on the System page.
+- **Image engine:** `scripts/fetch-image-engine.sh` fetches it into `engine/image-engine` at one commit, `scripts/build-image.bat cuda|vulkan|cpu` builds it into `build/image-<backend>`, and `scripts/package.py` puts it beside the second engine as `wam-image.exe`. Say "the image engine" in the app and the docs; its real name is only in the scripts and the licence notices.
 - **Release:** `scripts/package.py` builds the setup. Publish only when the owner asks.
 - **UI checks:** start the app with `--data=<dir>`, so the owner's settings and models stay out of it.
 - **Model files:** every address in `src/WinAIMagic.Core/Resources/models.json` names one commit, never `main`, because a sha256 belongs to one version of a file. Every Monday `.github/workflows/check-models.yml` runs `scripts/check_catalog.py` on GitHub's machines, and it reads headers only.

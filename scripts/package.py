@@ -27,6 +27,7 @@ CUDA_BIN = Path(os.environ.get("CUDA_PATH", r"C:\Program Files\NVIDIA GPU Comput
 CUDA_DLLS = ["cublas64_13.dll", "cublasLt64_13.dll"]
 ENGINE_NAMES = {"wam": "wam-glm", "wam-ds4": "wam-ds4", "wam-mm3": "wam-mm3"}
 LLAMA_EXES = ["llama-server.exe", "llama-bench.exe", "llama-perplexity.exe", "ggml-rpc-server.exe"]
+IMAGE_EXE = "wam-image.exe"
 ISCC = Path(os.environ["LOCALAPPDATA"]) / "Programs" / "Inno Setup 6" / "ISCC.exe"
 BUILD = ROOT / "build"
 
@@ -74,6 +75,8 @@ def llama():
         if backend == "cuda":
             for dll in CUDA_DLLS:
                 shutil.copy2(CUDA_BIN / dll, dst / dll)
+        # the image engine, per backend (scripts/build-image.bat)
+        shutil.copy2(BUILD / f"image-{backend}" / "bin" / "sd-cli.exe", dst / IMAGE_EXE)
 
 
 def python():
@@ -104,10 +107,19 @@ def notices():
                ("exllamav3", ROOT / "engine/tiered/third_party/exllamav3/LICENSE"),
                ("beellama.cpp", ROOT / "engine/tiered/third_party/beellama.cpp/LICENSE"),
                ("ggml (engine)", ROOT / "engine/tiered/third_party/ggml/LICENSE"),
+               ("stable-diffusion.cpp (image engine)", ROOT / "engine/image-engine/LICENSE"),
+               ("ggml (image engine)", ROOT / "engine/image-engine/ggml/LICENSE"),
                ("Python", ENGINE / "python/LICENSE.txt")]
     for name, path in sources:
         if path.exists():
             parts.append(f"\n## {name}\n\n```\n{path.read_text(encoding='utf-8', errors='replace').strip()}\n```\n")
+    # what the image engine links in: each under its own licence
+    third = ROOT / "engine/image-engine/thirdparty"
+    for name, rel in (("darts-clone", "LICENSE.darts_clone.txt"), ("Oniguruma", "oniguruma/COPYING"), ("libwebp", "libwebp/COPYING"),
+                      ("libwebm", "libwebm/LICENSE.TXT"), ("CUTLASS", "cutlass/LICENSE.txt")):
+        path = third / rel
+        if path.exists():
+            parts.append(f"\n## {name} (image engine)\n\n```\n{path.read_text(encoding='utf-8', errors='replace').strip()}\n```\n")
     parts.append("\n## NVIDIA CUDA Toolkit runtime libraries\n\ncuBLAS and cuBLASLt are redistributed under the NVIDIA CUDA Toolkit EULA "
                  "(Attachment A). They are used only by this application.\n")
     parts.append("\n## Python packages\n\nnumpy, jinja2, regex, pyyaml, pillow, psutil, jsonschema, tqdm, requests: "
@@ -133,7 +145,8 @@ def scan():
             data = p.read_bytes()
             for m in pattern.finditer(data):
                 ctx = data[max(0, m.start() - 14):m.end() + 6]
-                if b"Flash-Maya" not in ctx:
+                # the image engine carries a tokenizer's vocabulary, where it is an ordinary word (its pieces start with U+2581)
+                if b"Flash-Maya" not in ctx and b"\xe2\x96\x81" not in ctx:
                     hits.append(("text", p, ctx))
                     break
     for h in hits:

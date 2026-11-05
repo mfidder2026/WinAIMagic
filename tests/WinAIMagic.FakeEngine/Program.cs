@@ -12,6 +12,7 @@ using System.Text;
 //   --exit N            prints an error and exits with code N at once
 //   --ignore-break      a break does not stop it
 //   --delay-health MS   /health answers 503 for this long
+//   --idle              /slots says that nothing is being worked on
 //   --print-name        prints lines with the upstream project's name in them, as a real engine does
 
 string Arg(string name, string fallback = "")
@@ -34,6 +35,29 @@ if (Has("--exit"))
 if (Has("--sleep"))
 {
     Thread.Sleep(Timeout.Infinite);
+    return 0;
+}
+
+// The image engine: prints its stages like the real one and writes a PNG. The prompt decides what happens.
+if (Has("--diffusion-model"))
+{
+    string prompt = Arg("-p");
+    Console.WriteLine("[I] total params memory size = 5020.00MB --- x.cpp:1");
+    Console.WriteLine("  |##################                                | 107/298 -   2.45GB/s");
+    Console.WriteLine("[I] get_learned_condition completed, taking 0.10s --- image.cpp:627");
+    if (prompt == "kapot" || (prompt == "kaart stuk" && !Has("--backend")))
+    {
+        Console.WriteLine("[E] sampling for image 1/1 failed after 0.60s --- image.cpp:1008");
+        return 3;
+    }
+    Console.WriteLine("[I] sampling using Euler method --- request.cpp:477");
+    Console.Out.Flush();
+    if (prompt == "slaap") Thread.Sleep(Timeout.Infinite);
+    for (int step = 1; step <= 4; step++) Console.Write($"\r  |=====>    | {step}/4 -   4.48it/s\u001b[K");
+    Console.WriteLine();
+    Console.WriteLine("[I] sampling completed, taking 1.66s --- image.cpp:1000");
+    Console.WriteLine("[I] decode_first_stage completed, taking 0.54s --- image.cpp:722");
+    if (prompt != "geen bestand") File.WriteAllBytes(Arg("-o"), new byte[] { 0x89, 0x50, 0x4E, 0x47 });
     return 0;
 }
 
@@ -104,7 +128,7 @@ if (port > 0)
                     int status = 200;
                     string body = "{}";
                     if (path == "/health") { if (clock.ElapsedMilliseconds < delay) status = 503; else body = "{\"status\":\"ok\"}"; }
-                    else if (path == "/slots") body = "[{\"id\":0,\"is_processing\":true,\"next_token\":[{\"n_decoded\":" + Interlocked.Add(ref decoded, 10) + "}]}]";
+                    else if (path == "/slots") body = "[{\"id\":0,\"is_processing\":" + (Has("--idle") ? "false" : "true") + ",\"next_token\":[{\"n_decoded\":" + Interlocked.Add(ref decoded, 10) + "}]}]";
                     else if (path == "/metrics") body = "{\"live\":{\"state\":\"generating\",\"tok_s\":12.5},\"tiers\":{\"now\":{\"vram_hit\":0.8}},\"hardware\":{\"gpu\":{\"temp\":61}}}";
                     else if (path.StartsWith("/v1/chat/completions"))
                     {

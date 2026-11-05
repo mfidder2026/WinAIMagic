@@ -8,7 +8,7 @@ using WinAIMagic.Studio;
 
 namespace WinAIMagic.App;
 
-public enum PaneKind { Live, Models, Documents, Compare, Cluster, System, Chat }
+public enum PaneKind { Live, Models, Documents, Images, Compare, Cluster, System, Chat }
 
 public readonly record struct Pane(PaneKind Kind, Guid? Conversation = null);
 
@@ -45,6 +45,7 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     public AppState()
     {
         Host = new EngineHost();
+        Host.Images.Root = Program.TestData ? Path.Combine(Paths.AppData, "Afbeeldingen") : null;
         Chat.TokensStreamed += Host.Metrics.AddTokens;
         LocalModel.TokensStreamed += Host.Metrics.AddTokens;
         throttle = Ui.CreateTimer();
@@ -146,6 +147,14 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     public void StopEngine() => Task.Run(Host.StopEngine);
 
     public void Select(string id) => Task.Run(() => Host.Select(id));
+
+    /// <summary>One image; the documents module goes first when it is at work, and its fast model makes room when it is not.</summary>
+    public Task MakeImage(string prompt, ImageSize size) => Task.Run(() => Host.MakeImage(prompt, size, async () =>
+    {
+        if (studio?.Busy == true) return Lang.L("De documentmodule is bezig. Wacht tot die klaar is of stop hem.");
+        if (documentHost != null) await documentHost.StopFastAndWaitAsync();
+        return null;
+    }));
 
     /// <summary>A button of the system check. The page file waits for Windows' UAC prompt, so that goes off the UI thread.</summary>
     public void Perform(SystemCheck.CheckAction action)

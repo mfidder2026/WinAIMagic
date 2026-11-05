@@ -20,6 +20,7 @@ Het scherm **Systeem** laat zien wat je pc nog nodig heeft. Vaak is dat een grot
 - **Chatten** met een limiet op het denken, afbeeldingen, web zoeken en een contextmeter.
 - **Werken in een map:** het model leest en schrijft bestanden en voert commando's uit, met jouw toestemming per soort actie.
 - **Documenten:** van notities en bijlagen naar een Word-bestand in je eigen huisstijl.
+- **Beeld:** afbeeldingen maken van een beschrijving, op je eigen pc.
 - **Vergelijken:** dezelfde meting op elk model, op je eigen pc.
 - **Lokale API** op `http://127.0.0.1:8080`, voor OpenAI-, Anthropic- en Responses-clients.
 - **Modelmap kiezen en wijzigen,** ook met modellen erin, zonder opnieuw te downloaden.
@@ -49,6 +50,21 @@ Ministral-3-8B Q4 (5 GB) is het model voor een pc met 8 of 16 GB RAM. Gemeten op
 | Geen videokaart, 16 GB RAM: 4 processorthreads | 16K in de app | **5 tok/s** |
 
 Op 8 GB RAM zonder videokaart heeft het model ongeveer 5 GB vrij nodig. Met een limiet van 5 GB op wat het in het geheugen mag houden schrijft het nog 5 tok/s, met 4,5 GB zakt dat naar 0,7 tok/s, ook bij een kleinere context, en een echte SSD maakt dat nog erger. Sluit daar dus andere programma's.
+
+### Afbeeldingen maken
+
+FLUX.2 Klein 4B maakt afbeeldingen op het scherm **Beeld**. De download is 5,3 GB (het beeldmodel, een tekstmodel en een decoder). Gemeten op dezelfde pc met 4 stappen, met limieten die een kleinere pc nabootsen:
+
+| Bootst na | Afbeelding | Tijd | Geheugen |
+|---|---|---|---|
+| Een videokaart van 16 GB | 1024 x 1024 | **8 s** | 8,1 GB op de kaart |
+| Een videokaart van 8 GB | 1024 x 1024 | **9 s** | 3,9 GB op de kaart |
+| Geen videokaart, 4 processorthreads | 512 x 512 | **2,5 min** | 2,2 GB eigen geheugen |
+| Geen videokaart, 4 processorthreads | 768 x 768 | **5 min** | 4,4 GB eigen geheugen |
+| Geen videokaart, 4 processorthreads | 1024 x 1024 | **9 min** | 7,5 GB eigen geheugen |
+| Geen videokaart, 4 threads, laatste stap in delen | 1024 x 1024 | **12 min** | 1,4 GB eigen geheugen |
+
+Naast het eigen geheugen leest de engine de modelbestanden van schijf; 512 x 512 duurde even lang toen hij maar 2,5 GB in het geheugen mocht houden. De processor en SSD van een echte laptop wijken af. De app kiest een grootte en werkwijze die bij de pc passen, en de chatengine stopt zolang er een afbeelding wordt gemaakt: voor allebei is meestal geen ruimte.
 
 ## Wat nog niet werkt
 

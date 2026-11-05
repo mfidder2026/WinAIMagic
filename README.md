@@ -23,6 +23,7 @@ WinAIMagic is the Windows version of [MacAIMagic](https://github.com/mfidder2026
 - **Chat** with thinking limits, images, web search, and a context meter that summarizes before the model runs out of room. Images have been run on GLM and Qwen3.6; DeepSeek and MiniMax are wired but not yet run with a real image, and each model fetches its image files separately (about 1 to 1.7 GB).
 - **Work in a folder.** The model reads and writes files and runs commands there, with your approval per kind of action (read, write, run). It keeps going until the job is done and remembers what it learned.
 - **Documents.** Turn notes and attachments into a Word file in your own house style, section by section, with sources. You review the draft before the `.docx` is written.
+- **Images.** Make images from a description, on your own PC.
 - **Compare** models with the same measurement on your own PC, and export the results.
 - **A local API** on `http://127.0.0.1:8080`: OpenAI (`/v1`), Anthropic (`/v1/messages`) and Responses (`/v1/responses`), so other tools can use your model.
 - **Choose where models live**, on any drive, and move them later without downloading again.
@@ -86,11 +87,27 @@ Ministral-3-8B Q4 is the model for a PC with 8 or 16 GB of RAM. Measured on the 
 
 On 8 GB of RAM without a card the model needs about 5 GB free. With a limit of 5 GB on what it may keep in memory it still writes 5 tok/s; with 4.5 GB it drops to 0.7 tok/s, also at a smaller context, and a real SSD would make that worse. So close other programs there.
 
+### Making images
+
+FLUX.2 Klein 4B makes images on the **Images** page. It downloads 5.3 GB (the image model, a text model and a decoder). Measured on the same PC at 4 steps, with limits that stand in for a smaller PC:
+
+| Stands in for | Image | Time | Memory |
+|---|---|---|---|
+| A 16 GB card | 1024 x 1024 | **8 s** | 8.1 GB on the card |
+| An 8 GB card | 1024 x 1024 | **9 s** | 3.9 GB on the card |
+| No card, 4 processor threads | 512 x 512 | **2.5 min** | 2.2 GB of its own |
+| No card, 4 processor threads | 768 x 768 | **5 min** | 4.4 GB of its own |
+| No card, 4 processor threads | 1024 x 1024 | **9 min** | 7.5 GB of its own |
+| No card, 4 threads, last step in parts | 1024 x 1024 | **12 min** | 1.4 GB of its own |
+
+Beside what it holds of its own, the engine reads the model files from disk; 512 x 512 took the same time when it might keep only 2.5 GB in memory. A real laptop's processor and SSD will differ. The app picks a size and the way of working that suit the PC, and the chat engine stops while an image is made: there is rarely room for both.
+
 ## Models
 
 | Model | Download | Licence |
 |---|---|---|
 | Ministral-3-8B Q4 | 5 GB | Apache 2.0 |
+| FLUX.2 Klein 4B (images) | 5 GB | Apache 2.0 |
 | Qwen3.6-35B-A3B Q4 | 22 GB | Qwen community licence, shown before download |
 | GLM-5.3-Flash Compact 24 | 95 GB | MIT |
 | MiniMax-M3.1-Flash Compact | 93 GB | MiniMax community licence, shown before download |

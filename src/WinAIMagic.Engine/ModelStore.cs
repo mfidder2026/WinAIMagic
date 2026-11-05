@@ -110,7 +110,7 @@ public sealed class ModelStore : IDisposable
     public void Refresh()
     {
         var next = new Dictionary<string, ModelStatus>();
-        foreach (var m in Catalog.Models)
+        foreach (var m in Catalog.All)
         {
             var dir = Paths.ModelDir(m.Id);
             FileStatus F(string d, string name, ulong size)
@@ -200,7 +200,7 @@ public sealed class ModelStore : IDisposable
     /// (brief 2.2). Nothing is lost: a pack that named them is built again, its staleness check sees that.</summary>
     private void AdoptUpstreamNames()
     {
-        foreach (var m in Catalog.Models)
+        foreach (var m in Catalog.All)
         {
             var dir = Paths.ModelDir(m.Id);
             if (!Directory.Exists(dir)) continue;

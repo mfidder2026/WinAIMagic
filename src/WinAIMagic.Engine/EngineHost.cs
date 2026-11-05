@@ -47,6 +47,7 @@ public sealed class EngineHost : IDisposable
         Bench = new BenchmarkRunner();
         Check = new SystemCheck();
         Store.Changed += () => Changed?.Invoke();
+        Images.Changed += () => Changed?.Invoke();
         Cluster.Changed += () => Changed?.Invoke();
         LoadIndex();
     }
@@ -159,7 +160,7 @@ public sealed class EngineHost : IDisposable
         {
             var m = SelectedModel;
             // (a missing or out of date pack is no reason: StartEngine builds it first)
-            return m != null && !buildingPack && Store.StatusOf(m.Id).IsComplete && Plan != null && Blocked == null;
+            return m != null && !buildingPack && !Images.Busy && Store.StatusOf(m.Id).IsComplete && Plan != null && Blocked == null;
         }
     }
 
@@ -172,6 +173,7 @@ public sealed class EngineHost : IDisposable
             if (m == null) return L("Dit model staat niet in de catalogus.");
             if (ModelStore.FolderMissing) return ModelStore.FolderMissingMessage;
             if (Blocked is { } blocked) return blocked;
+            if (Images.Busy) return L("Er wordt een afbeelding gemaakt. Wacht tot die klaar is of stop hem.");
             if (!Store.StatusOf(m.Id).IsComplete) return L($"{m.Name} is nog niet helemaal gedownload.");
             if (Index == null) return IndexError ?? L($"De headers van {m.Name} zijn nog niet gelezen.");
             return buildingPack ? L($"Pack bouwen: {m.Name}") : null;
@@ -229,7 +231,7 @@ public sealed class EngineHost : IDisposable
     public void StartEngine()
     {
         if (Index == null) LoadIndex();
-        if (Engine?.State.IsActive == true || buildingPack) return;
+        if (Engine?.State.IsActive == true || buildingPack || Images.Busy) return;
         if (EngineForSelected == EngineKind.Tiered && SelectedModel is { } needing && PackBuilder.WhyNotReady(needing) != null)
         {
             _ = BuildPackThenStart();
@@ -262,6 +264,35 @@ public sealed class EngineHost : IDisposable
     }
 
     public void StopEngine() => Engine?.Stop();
+
+    // MARK: - images
+
+    /// <summary>What makes images. Next to a chat model there is rarely room, so an engine that runs stops first.</summary>
+    public ImageMaker Images { get; } = new();
+    public ModelInfo? ImageModel => Store.Catalog.Images.FirstOrDefault();
+
+    /// <summary>The plan for this size on this PC, for the page.</summary>
+    public ImagePlan ImagePlanFor(ImageSize size) => ImagePlanner.For(size, System);
+
+    /// <summary>One image; on return `Images` says what came of it. `busy`: what else keeps the memory, in words (the documents module); null: nothing.</summary>
+    public Task<ImageResult?> MakeImage(string prompt, ImageSize size, Func<Task<string?>>? busy = null)
+    {
+        var m = ImageModel;
+        var files = m == null ? Array.Empty<string>() : Store.ShardPaths(m);
+        return Images.Make(prompt, size, System, Backend, files, null, async () =>
+        {
+            if (m == null || !Store.StatusOf(m.Id).IsComplete) return L("De bestanden voor afbeeldingen zijn er nog niet helemaal.");
+            if (Bench.Running != null) return L("Er loopt een meting. Wacht tot die klaar is.");
+            if (busy != null && await busy() is { } why) return why;
+            if (Engine is { } engine && engine.State.IsActive)
+            {
+                if ((await engine.PollActivity())?.Busy == true) return L("De engine werkt aan een antwoord. Wacht tot dat klaar is of stop het.");
+                await engine.StopAndWait();
+                if (simulated == null) RefreshSystem();
+            }
+            return null;
+        });
+    }
 
     /// <summary>Switch to another model: stops the engine first when it runs a different one.</summary>
     public async Task Select(string id)

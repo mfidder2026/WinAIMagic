@@ -35,6 +35,7 @@ public static class Paths
     public static string BenchmarksFile => Path.Combine(AppData, "benchmarks.json");
     public static string EngineLog => Path.Combine(AppData, "engine.log");
     public static string EngineFastLog => Path.Combine(AppData, "engine-fast.log");
+    public static string ImageLog => Path.Combine(AppData, "image.log");
     public static string GeneralNotes => Path.Combine(AppData, "WINAIMAGIC.md");
 
     /// <summary>Documents\WinAIMagic, through the Known Folder API so a OneDrive redirection is followed.</summary>
@@ -48,6 +49,10 @@ public static class Paths
         }
     }
 
+    /// <summary>Pictures\WinAIMagic, where the images go; made when the first image is. A OneDrive redirection is followed here too.</summary>
+    public static string PicturesFolder =>
+        Path.Combine(Known(new Guid("33E28130-4E1E-4676-835A-98395C3BC3BB"), Environment.SpecialFolder.MyPictures), "WinAIMagic");
+
     /// <summary>The folder of the installed app: the engine folder lies beside WinAIMagic.exe.</summary>
     public static string AppRoot => AppContext.BaseDirectory;
 
@@ -57,15 +62,16 @@ public static class Paths
     /// <summary>The installation's engine folder: cuda\, vulkan\, cpu\, tiered\, python\ (installer\WinAIMagic.iss).</summary>
     public static string EngineRoot => Path.Combine(AppRoot, "engine");
 
-    private static string KnownDocuments()
+    private static string KnownDocuments() => Known(new Guid("FDD39AD0-238F-46AF-ADB4-6C85480369C7"), Environment.SpecialFolder.MyDocuments);
+
+    private static string Known(Guid folder, Environment.SpecialFolder otherwise)
     {
-        var folder = new Guid("FDD39AD0-238F-46AF-ADB4-6C85480369C7");
         if (SHGetKnownFolderPath(ref folder, 0, IntPtr.Zero, out var p) == 0)
         {
-            try { return Marshal.PtrToStringUni(p) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments); }
+            try { return Marshal.PtrToStringUni(p) ?? Environment.GetFolderPath(otherwise); }
             finally { Marshal.FreeCoTaskMem(p); }
         }
-        return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        return Environment.GetFolderPath(otherwise);
     }
 
     [DllImport("shell32.dll")]

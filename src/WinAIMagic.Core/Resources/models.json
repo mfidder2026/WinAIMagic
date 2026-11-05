@@ -417,6 +417,34 @@
       "recommendMaxVramGb": 8.5
     }
   ],
+  "images": [
+    {
+      "id": "flux-2-klein-4b",
+      "name": "FLUX.2 Klein 4B",
+      "family": "flux",
+      "summary": "4B · 4 bit · maakt afbeeldingen van een beschrijving · Apache 2.0",
+      "files": [
+        {
+          "local": "flux-2-klein-4b-image.gguf",
+          "size": 2604311104,
+          "sha256": "0b25d143c8469b342bc5af3bce92b783bf6b0636d285f7b2f75e38af63af9a15",
+          "url": "https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF/resolve/a09d5bb51ac4000ccd9643d10e9db3ed14200508/flux-2-klein-4b-Q4_K_M.gguf"
+        },
+        {
+          "local": "flux-2-klein-4b-text.gguf",
+          "size": 2497281312,
+          "sha256": "f6f851777709861056efcdad3af01da38b31223a3ba26e61a4f8bf3a2195813a",
+          "url": "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/22c9fc8a8c7700b76a1789366280a6a5a1ad1120/Qwen3-4B-Q4_K_M.gguf"
+        },
+        {
+          "local": "flux-2-klein-4b-decoder.safetensors",
+          "size": 168120878,
+          "sha256": "ca70d2202afe6415bdbcb8793ba8cd99fd159cfe6192381504d6c4d3036e0f04",
+          "url": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/resolve/e7b7dc27f91deacad38e78976d1f2b499d76a294/vae/diffusion_pytorch_model.safetensors"
+        }
+      ]
+    }
+  ],
   "tieredVision": [
     {
       "id": "glm-5.3",

@@ -45,6 +45,7 @@ public sealed partial class Sidebar : Grid
         foreach (var (kind, title, glyph) in new[]
         {
             (PaneKind.Live, L("Live"), Glyph.Live), (PaneKind.Models, L("Modellen"), Glyph.Models), (PaneKind.Documents, L("Documenten"), Glyph.Document),
+            (PaneKind.Images, L("Beeld"), Glyph.Image),
             (PaneKind.Compare, L("Vergelijken"), Glyph.Compare), (PaneKind.Cluster, L("Cluster"), Glyph.Cluster), (PaneKind.System, L("Systeem"), Glyph.System),
         })
         {

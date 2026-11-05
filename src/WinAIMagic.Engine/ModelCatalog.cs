@@ -89,6 +89,10 @@ public sealed record ModelCatalog
     [JsonPropertyName("models")] public IReadOnlyList<ModelInfo> Models { get; init; } = Array.Empty<ModelInfo>();
     [JsonPropertyName("vision")] public IReadOnlyList<VisionInfo> Vision { get; init; } = Array.Empty<VisionInfo>();
     [JsonPropertyName("tieredVision")] public IReadOnlyList<TieredVisionInfo> TieredVision { get; init; } = Array.Empty<TieredVisionInfo>();
+    /// <summary>The models that make images, on a page of their own: their files in the order the image engine takes them (the image model, the
+    /// text model, the decoder). `Models` is what can chat.</summary>
+    [JsonPropertyName("images")] public IReadOnlyList<ModelInfo> Images { get; init; } = Array.Empty<ModelInfo>();
+    [JsonIgnore] public IEnumerable<ModelInfo> All => Models.Concat(Images);
 
     public static ModelCatalog Shared { get; } = Load();
 
@@ -98,7 +102,7 @@ public sealed record ModelCatalog
         return s == null ? new ModelCatalog() : JsonSerializer.Deserialize<ModelCatalog>(s) ?? new ModelCatalog();
     }
 
-    public ModelInfo? Model(string id) => Models.FirstOrDefault(m => m.Id == id);
+    public ModelInfo? Model(string id) => All.FirstOrDefault(m => m.Id == id);
     public VisionInfo? VisionFor(ModelInfo model) => Vision.FirstOrDefault(v => v.Id == model.Vision);
     public TieredVisionInfo? TieredVisionFor(ModelInfo model) => TieredVision.FirstOrDefault(v => v.Id == model.Vision);
 }

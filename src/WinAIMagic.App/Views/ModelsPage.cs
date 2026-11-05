@@ -88,7 +88,7 @@ public sealed class ModelCard
     private readonly UIElement chosen;
     private readonly Brush restEdge;
     private string badgeKey = "", noteKey = "";
-    private static readonly Dictionary<string, string> DeleteErrors = new();
+    internal static readonly Dictionary<string, string> DeleteErrors = new();
 
     public ModelCard(AppState app, ModelInfo model)
     {
