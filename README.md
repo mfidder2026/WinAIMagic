@@ -100,7 +100,9 @@ FLUX.2 Klein 4B makes images on the **Images** page. It downloads 5.3 GB (the im
 | No card, 4 processor threads | 1024 x 1024 | **9 min** | 7.5 GB of its own |
 | No card, 4 threads, last step in parts | 1024 x 1024 | **12 min** | 1.4 GB of its own |
 
-FLUX also stands on the Models page (**Kies voor afbeeldingen**) and in **Compare**, which makes the same image of 1024 x 1024 on every PC: 10 s with loading on the test PC, about 5,000 image tokens per second. While it draws, the speed gauge counts those image tokens. The model follows an English description best.
+FLUX also stands on the Models page (**Kies voor afbeeldingen**) and in **Compare**, which makes the same image of 1024 x 1024 on every PC: 10 s with loading on the test PC, about 5,000 image tokens per second. While it draws, the speed gauge counts those image tokens. The model follows an English description best. **Improve with the web** lets the chosen chat model write that English description first, and look up on the web what something looks like; only the search and the pages it reads go out.
+
+Every model card has the same role buttons: **Zwaar** (the chat model), **Snel** (the documents module's fast model) and **Afbeeldingen**. Documents shows all three with a green dot while they run.
 
 Beside what it holds of its own, the engine reads the model files from disk; 512 x 512 took the same time when it might keep only 2.5 GB in memory. A real laptop's processor and SSD will differ. The app picks a size and the way of working that suit the PC, and the chat engine stops while an image is made: there is rarely room for both.
 

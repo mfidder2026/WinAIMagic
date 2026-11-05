@@ -82,6 +82,18 @@ public sealed class FastModelTests : StudioTest
         Assert.Null(DocumentModels.FastModel(null, [heavy, small], () => true));
     }
 
+    /// <summary>The fast model chosen under Modellen goes first, never the heavy one itself, and only where two fit.</summary>
+    [Fact]
+    public void TheChosenFastModelGoesFirst()
+    {
+        DocumentModel heavy = new("heavy", "H", 100), small = new("small", "S", 20), tiny = new("tiny", "T", 5);
+        Assert.Equal("tiny", DocumentModels.FastModel(heavy, [heavy, small, tiny], () => true)?.Id);
+        Assert.Equal("small", DocumentModels.FastModel(heavy, [heavy, small, tiny], () => true, "small")?.Id);
+        Assert.Equal("tiny", DocumentModels.FastModel(heavy, [heavy, small, tiny], () => true, "heavy")?.Id);
+        Assert.Equal("tiny", DocumentModels.FastModel(heavy, [heavy, small, tiny], () => true, "weg")?.Id);
+        Assert.Null(DocumentModels.FastModel(heavy, [heavy, small, tiny], () => false, "small"));
+    }
+
     [Fact]
     public async Task AFailureIsKeptAndNotTriedForEveryPage()
     {

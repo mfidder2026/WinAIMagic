@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.9.7
+# Parity with MacAIMagic 1.9.8
 
-How this version relates to MacAIMagic at commit `93853bc`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `6696609`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -22,6 +22,13 @@ How this version relates to MacAIMagic at commit `93853bc`, the last Mac commit 
 | `Views/*` | `App/Views/*` | Done, in code rather than XAML |
 
 ## Taken over since the first port
+
+### Up to `6696609` (1.9.8): a better description with the web, and one way to choose every role
+
+- **Taken over, `c954667`:** **Verbeteren met web** on Beeld. The chosen chat model writes a better English description first, with web_search and fetch_url (at most four rounds, the last may only answer), and what goes to the search engine is cleaned as in the documents module. The chat model starts for it when it does not run. The page shows the description the image model got and the pages it came from; the user's words stay the image's description. When it fails, the image is made from the user's own words and the page says why. Measured here with Ministral and "het Rijksmuseum in Amsterdam bij avondlicht, foto": it described red brick and symmetrical towers, and FLUX drew a building like the museum, 18 s in all.
+- **Not taken over:** a small chat model staying beside the image when the Mac has room. Here the chat model and FLUX share the card, so the chat engine still stops first.
+- **Taken over, `6696609`:** every model card has role buttons in one style: Zwaar and Snel for a model that chats, Afbeeldingen for one that draws. Snel is now the user's choice (choosing it again goes back to the automatic one), and the heavy model is never the fast one too. Documents shows three rows alike: Zwaar (now with Start nu and Stop), Snel, and Afbeeldingen with Stop while an image is made. The buttons' names for screen readers now follow their text.
+- **Does not apply:** `b8cbe33`, the Mac's own release.
 
 ### Up to `93853bc` (1.9.7): images among the models, and on the meters
 

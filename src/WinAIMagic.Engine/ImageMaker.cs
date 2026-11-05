@@ -187,6 +187,9 @@ public sealed class ImageProgress
     };
 }
 
+/// <summary>A page an improved description came from.</summary>
+public sealed record ImageSource(string Title, string Url);
+
 /// <summary>An image that was made; beside the PNG in a file of the same name.</summary>
 public sealed record ImageResult
 {
@@ -199,6 +202,8 @@ public sealed record ImageResult
     public DateTime Created { get; init; }
     /// <summary>Image tokens the model drew per second, over the steps.</summary>
     public double? TokensPerSecond { get; init; }
+    /// <summary>The description the image model got, when the chat model improved the user's; null: the user's own.</summary>
+    public string? UsedPrompt { get; init; }
     [System.Text.Json.Serialization.JsonIgnore] public string Path { get; init; } = "";
 }
 
@@ -223,6 +228,8 @@ public sealed class ImageMaker
     /// <summary>Something the user should know about the image that came out.</summary>
     public string? Note { get; private set; }
     public ImageResult? Last { get; private set; }
+    /// <summary>Where the improved description of the last image came from.</summary>
+    public IReadOnlyList<ImageSource> Sources { get; private set; } = Array.Empty<ImageSource>();
     public DateTime Started { get; private set; }
 
     private readonly object gate = new();
@@ -236,8 +243,11 @@ public sealed class ImageMaker
     private void Notify() => Changed?.Invoke();
 
     /// <summary>Makes the image. `prepare` runs first with this maker already busy, so nothing starts beside it; what it returns is why not to go on.
-    /// On return: the image, or null with the reason in `Error` (a stop leaves that empty).</summary>
-    public async Task<ImageResult?> Make(string prompt, ImageSize size, SystemInfo pc, IGpuBackend backend, IReadOnlyList<string> files, long? seed = null, Func<Task<string?>>? prepare = null)
+    /// On return: the image, or null with the reason in `Error` (a stop leaves that empty).
+    /// `improve` runs before that: it gives the description for the image model and where it came from, and names its steps; when it
+    /// fails, the image is made from the user's own description and `Note` says why.</summary>
+    public async Task<ImageResult?> Make(string prompt, ImageSize size, SystemInfo pc, IGpuBackend backend, IReadOnlyList<string> files, long? seed = null, Func<Task<string?>>? prepare = null,
+                                         Func<Action<string>, Task<(string Prompt, IReadOnlyList<ImageSource> Sources)>>? improve = null)
     {
         lock (gate)
         {
@@ -252,8 +262,26 @@ public sealed class ImageMaker
         Notify();
         OnRate?.Invoke(0);
         using var awake = SleepGuard.Hold();
+        Sources = Array.Empty<ImageSource>();
         try
         {
+            string drawn = prompt;
+            if (improve != null)
+            {
+                Status = L("Beschrijving verbeteren…");
+                Notify();
+                try
+                {
+                    var better = await improve(step => { Status = step; Notify(); });
+                    drawn = better.Prompt;
+                    Sources = better.Sources;
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    Note = L($"De beschrijving kon niet worden verbeterd ({LogFilter.Clean(e.Message)}); de afbeelding is met je eigen beschrijving gemaakt.");
+                }
+                if (stopped) return null;
+            }
             if (prepare != null && await prepare() is { } why)
             {
                 Error = why;
@@ -271,15 +299,15 @@ public sealed class ImageMaker
             var output = Path.Combine(Folder, $"{DateTime.Now:yyyyMMdd-HHmmss}-{chosen.ToString(CultureInfo.InvariantCulture)}.png");
 
             var plan = ImagePlanner.For(size, pc);
-            var outcome = await Run(exe, plan, files, prompt, chosen, output);
+            var outcome = await Run(exe, plan, files, drawn, chosen, output);
             // a card can refuse in ways no plan foresees: an older model, a driver, other programs on it. The processor always works
             if (outcome.Failed && plan.OnCard && !stopped)
             {
-                Note = L("De videokaart lukte niet, dus deze afbeelding is op de processor gemaakt. Dat duurt langer.");
+                Note = (Note == null ? "" : Note + " ") + L("De videokaart lukte niet, dus deze afbeelding is op de processor gemaakt. Dat duurt langer.");
                 Fraction = 0;
                 Notify();
                 plan = ImagePlanner.ForProcessor(size, pc);
-                outcome = await Run(exe, plan, files, prompt, chosen, output);
+                outcome = await Run(exe, plan, files, drawn, chosen, output);
             }
             if (stopped) return null;
             if (outcome.Failed)
@@ -292,6 +320,7 @@ public sealed class ImageMaker
                 Prompt = prompt, Width = size.Width, Height = size.Height, Seed = chosen, Seconds = clock.Elapsed.TotalSeconds,
                 OnCard = plan.OnCard, Created = DateTime.Now, Path = output,
                 TokensPerSecond = outcome.SecondsPerStep is double perStep && perStep > 0 ? ImagePlanner.TokensPerStep(size) / perStep : null,
+                UsedPrompt = drawn == prompt ? null : drawn,
             };
             try { File.WriteAllText(Path.ChangeExtension(output, ".json"), JsonSerializer.Serialize(result)); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }   // the image itself is there

@@ -276,6 +276,31 @@ public class ImageMakerTests : EngineTest
         Assert.Equal(1024 * 4.48, Assert.Single(m.History()).TokensPerSecond!.Value, 2);
     }
 
+    /// <summary>The improved description goes to the engine; the user's own stays the image's, and the pages are kept.</summary>
+    [Fact]
+    public async Task TheImprovedDescriptionGoesToTheEngineAndIsKept()
+    {
+        var m = Maker();
+        var r = await m.Make("kapot", Size, OnProcessor, None, Files,
+            improve: _ => Task.FromResult<(string, IReadOnlyList<ImageSource>)>(("a red fox", new[] { new ImageSource("Vos", "https://example.test/vos") })));
+        Assert.NotNull(r);                 // "kapot" would have failed: the engine got the improved one
+        Assert.Equal("kapot", r!.Prompt);
+        Assert.Equal("a red fox", r.UsedPrompt);
+        Assert.Single(m.Sources);
+        Assert.Equal("a red fox", Assert.Single(m.History()).UsedPrompt);
+        Assert.Contains("-p a red fox ", File.ReadAllText(Paths.ImageLog));
+    }
+
+    [Fact]
+    public async Task AFailedImprovementStillMakesTheImage()
+    {
+        var m = Maker();
+        var made = await m.Make("een vos", Size, OnCard, Card, Files, improve: _ => throw new InvalidOperationException("geen model"));
+        Assert.NotNull(made);
+        Assert.Null(made!.UsedPrompt);
+        Assert.Contains("geen model", m.Note);
+    }
+
     [Fact]
     public async Task ACardThatRefusesLeavesItToTheProcessor()
     {

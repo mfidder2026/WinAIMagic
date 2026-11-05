@@ -229,10 +229,11 @@ public sealed class EngineHost : IDisposable
         if (error == null) StartEngine();
     }
 
-    public void StartEngine()
+    /// <summary>`forImage`: the image being made needs the chat model first, to improve its description.</summary>
+    public void StartEngine(bool forImage = false)
     {
         if (Index == null) LoadIndex();
-        if (Engine?.State.IsActive == true || buildingPack || Images.Busy) return;
+        if (Engine?.State.IsActive == true || buildingPack || (Images.Busy && !forImage)) return;
         if (EngineForSelected == EngineKind.Tiered && SelectedModel is { } needing && PackBuilder.WhyNotReady(needing) != null)
         {
             _ = BuildPackThenStart();
@@ -277,7 +278,8 @@ public sealed class EngineHost : IDisposable
     public ImagePlan ImagePlanFor(ImageSize size) => ImagePlanner.For(size, System);
 
     /// <summary>One image; on return `Images` says what came of it. `busy`: what else keeps the memory, in words (the documents module); null: nothing.</summary>
-    public Task<ImageResult?> MakeImage(string prompt, ImageSize size, Func<Task<string?>>? busy = null, long? seed = null, bool measuring = false)
+    public Task<ImageResult?> MakeImage(string prompt, ImageSize size, Func<Task<string?>>? busy = null, long? seed = null, bool measuring = false,
+                                        Func<Action<string>, Task<(string Prompt, IReadOnlyList<ImageSource> Sources)>>? improve = null)
     {
         var m = ImageModel;
         var files = m == null ? Array.Empty<string>() : Store.ShardPaths(m);
@@ -288,13 +290,23 @@ public sealed class EngineHost : IDisposable
             if (busy != null && await busy() is { } why) return why;
             if (Engine is { } engine && engine.State.IsActive)
             {
-                if ((await engine.PollActivity())?.Busy == true) return L("De engine werkt aan een antwoord. Wacht tot dat klaar is of stop het.");
+                // the engine says it is done a moment after an answer came in, such as the improved description
+                bool busyNow = (await engine.PollActivity())?.Busy == true;
+                for (int i = 0; i < 8 && busyNow && improve != null; i++)
+                {
+                    await Task.Delay(500);
+                    busyNow = (await engine.PollActivity())?.Busy == true;
+                }
+                if (busyNow) return L("De engine werkt aan een antwoord. Wacht tot dat klaar is of stop het.");
                 await engine.StopAndWait();
                 if (simulated == null) RefreshSystem();
             }
             return null;
-        });
+        }, improve);
     }
+
+    /// <summary>The chosen chat model could start now: downloaded, planned, nothing in the way but an image.</summary>
+    public bool ChatModelReady => SelectedModel is { } m && !buildingPack && Store.StatusOf(m.Id).IsComplete && Plan != null && Blocked == null;
 
     /// <summary>Switch to another model: stops the engine first when it runs a different one.</summary>
     public async Task Select(string id)

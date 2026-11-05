@@ -182,9 +182,10 @@ internal sealed class DocumentSidePanel
     private readonly StackPanel drafts = Ui.V(3);
     private readonly TextBlock noDrafts = Ui.Label(L("Nog geen documenten."), 13, Theme.Secondary);
     private readonly TextBlock heavyName = Ui.Label("", 13, null, FontWeights.Medium), heavyLine = Line(), fastName = Ui.Label("", 13, null, FontWeights.Medium), fastLine = Line(), oneModel = Line();
-    private readonly Ellipse heavyDot = Dot(), fastDot = Dot();
+    private readonly Ellipse heavyDot = Dot(), fastDot = Dot(), imageDot = Dot();
     private readonly FrameworkElement fastRow;
-    private readonly Button fastButton;
+    private readonly Button fastButton, heavyButton, imageButton;
+    private readonly TextBlock imageName = Ui.Label("", 13, null, FontWeights.Medium), imageLine = Line();
     private IReadOnlyList<string>? shownDrafts;
     private string? shownSelected;
     private bool? shownBusy;
@@ -222,10 +223,18 @@ internal sealed class DocumentSidePanel
         fastButton = DocUi.Action(L("Start nu"), ToggleFast, null, false);
         fastButton.HorizontalAlignment = HorizontalAlignment.Left;
         fastButton.Margin = new Thickness(24, 2, 0, 0);
-        fastRow = Ui.V(3, ModelHead(Glyph.Bolt, L("Snel"), fastName, fastDot), fastLine, fastButton);
+        fastRow = Ui.V(3, ModelHead(Glyph.Bolt, L("Snel"), fastName, fastDot), fastLine, oneModel, fastButton);
+        // the same row for heavy, fast and images: role, model, a dot that is green while it runs, a line and a button
+        heavyButton = DocUi.Action(L("Start nu"), ToggleHeavy, null, false);
+        heavyButton.HorizontalAlignment = HorizontalAlignment.Left;
+        heavyButton.Margin = new Thickness(24, 2, 0, 0);
+        imageButton = DocUi.Action(L("Stop"), () => app.Host.Images.Stop(), null, false);
+        imageButton.HorizontalAlignment = HorizontalAlignment.Left;
+        imageButton.Margin = new Thickness(24, 2, 0, 0);
         var models = Ui.V(8, Ui.Label(L("Modellen"), 12, Theme.Secondary),
-            Ui.V(2, ModelHead(Glyph.Think, L("Zwaar"), heavyName, heavyDot), heavyLine), fastRow, oneModel);
-        oneModel.Margin = new Thickness(0);
+            Ui.V(3, ModelHead(Glyph.Think, L("Zwaar"), heavyName, heavyDot), heavyLine, heavyButton), fastRow,
+            Ui.V(3, ModelHead(Glyph.Image, L("Afbeeldingen"), imageName, imageDot), imageLine, imageButton));
+        oneModel.Margin = new Thickness(24, 0, 0, 0);
 
         var grid = new Grid { Padding = new Thickness(16, 4, 16, 16), RowSpacing = 14 };
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -293,18 +302,50 @@ internal sealed class DocumentSidePanel
         heavyName.SetIfChanged(app.Host.SelectedModel?.ShortName ?? L("Geen model"));
         heavyLine.SetIfChanged(engines.HeavyStatusLine);
         heavyDot.Fill = engines.HeavyIsRunning ? Theme.Solid(Theme.Mint) : Theme.Solid(Colors.White, 0.25);
+        var state = app.EngineState;
+        bool failed = state.Status == Engine.EngineStatus.Failed;
+        bool heavyStops = state.IsActive && !failed;
+        var heavyLabel = (TextBlock)((StackPanel)heavyButton.Content).Children[^1];
+        heavyLabel.SetIfChanged(heavyStops ? L("Stop") : failed ? L("Probeer opnieuw") : L("Start nu"));
+        // the name a screen reader says follows the label
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(heavyButton, heavyLabel.Text);
+        heavyButton.IsEnabled = heavyStops ? !studio.Busy : app.Host.CanStart;
+
+        var images = app.Host.Images;
+        var imageModel = app.Host.ImageModel;
+        bool imageReady = imageModel != null && app.Host.Store.StatusOf(imageModel.Id).IsComplete;
+        imageName.SetIfChanged(imageModel?.ShortName ?? L("Geen model"));
+        imageLine.SetIfChanged(images.Busy ? images.Status : imageReady ? L("Start vanzelf als er een afbeelding wordt gemaakt.") : L("Nog niet gedownload: zie Modellen."));
+        imageDot.Fill = images.Busy ? Theme.Solid(Theme.Mint) : Theme.Solid(Colors.White, 0.25);
+        imageButton.Show(images.Busy);
+
         var fast = engines.FastChoice;
-        fastRow.Show(fast != null);
         oneModel.Show(fast == null);
         oneModel.SetIfChanged(engines.OneModelLine);
-        if (fast == null) return;
+        fastLine.Show(fast != null);
+        fastButton.Show(fast != null);
+        if (fast == null)
+        {
+            // one model does everything: the fast row names it, as the Mac does
+            fastName.SetIfChanged(app.Host.SelectedModel?.ShortName ?? L("Geen model"));
+            fastDot.Fill = heavyDot.Fill;
+            return;
+        }
         fastName.SetIfChanged(fast.ShortName);
         fastLine.SetIfChanged(engines.FastStatusLine);
         fastLine.Foreground = engines.FastProblem != null ? Theme.Solid(Theme.Amber) : Theme.Secondary;
         fastDot.Fill = engines.FastIsRunning ? Theme.Solid(Theme.Mint) : Theme.Solid(Colors.White, 0.25);
         var label = (TextBlock)((StackPanel)fastButton.Content).Children[^1];
         label.SetIfChanged(engines.FastButtonTitle);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(fastButton, label.Text);
         fastButton.IsEnabled = !(engines.FastButtonStops && studio.Busy);
+    }
+
+    private void ToggleHeavy()
+    {
+        var state = app.EngineState;
+        if (state.IsActive && state.Status != Engine.EngineStatus.Failed) app.StopEngine();
+        else app.StartEngine();
     }
 
     private void ToggleFast()

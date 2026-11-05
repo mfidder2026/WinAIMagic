@@ -85,8 +85,10 @@ public sealed class ModelCard
     private readonly TextBlock message = Ui.Caption();
     private readonly TextBlock note = Ui.Caption(color: Theme.Solid(Theme.Amber));
     private readonly TextBlock error = Ui.Caption(color: Theme.Solid(Theme.Pink));
-    private readonly Button download, visionDownload, pause, delete, choose;
-    private readonly UIElement chosen;
+    private readonly Button download, visionDownload, pause, delete;
+    private readonly StackPanel roles = Ui.H(6);
+    private readonly Windows.UI.Color family;
+    private string rolesKey = "";
     private readonly Brush restEdge;
     private string badgeKey = "", noteKey = "";
     internal static readonly Dictionary<string, string> DeleteErrors = new();
@@ -96,7 +98,7 @@ public sealed class ModelCard
         this.app = app;
         this.model = model;
         store = app.Host.Store;
-        var family = Theme.Family(model.Family);
+        family = Theme.Family(model.Family);
         ring = new ArcRing(46, 5, Theme.FamilyGradient(model.Family), Theme.Solid(family));
         ring.VerticalAlignment = VerticalAlignment.Top;
         active = Ui.Label(L("ACTIEF"), 10, Theme.Solid(Theme.Mint), FontWeights.Black);
@@ -111,13 +113,10 @@ public sealed class ModelCard
         pause = Ui.Btn(L("Pauzeer"), () => store.StopDownload(model.Id), Glyph.Pause);
         delete = Ui.Btn(L("Verwijder model"), () => _ = ConfirmDelete(app, model), Glyph.Trash);
         makesImages = app.Host.Store.Catalog.Images.Contains(model);
-        // a model that makes images is chosen apart, for the page Beeld; the chat keeps its own
-        choose = makesImages
-            ? Ui.Btn(L("Kies voor afbeeldingen"), () => { app.Settings.ImageModel = model.Id; app.Notify(); })
-            : Ui.Btn(L("Kies"), () => app.Select(model.Id));
-        chosen = Ui.H(6, Ui.Icon(Glyph.Done, 14, Theme.Solid(family)), Ui.Label(makesImages ? L("Gekozen voor afbeeldingen") : L("Gekozen"), 13, Theme.Solid(family)));
-        var left = Ui.H(8, download, visionDownload, pause, delete);
-        var right = new Grid { VerticalAlignment = VerticalAlignment.Center, Children = { choose, chosen } };
+        // the buttons wrap to a second line rather than hide under the roles
+        var left = new WrapPanel { Gap = 8, RowGap = 6, Children = { download, visionDownload, pause, delete } };
+        roles.VerticalAlignment = VerticalAlignment.Center;
+        var right = roles;
         var foot = Ui.Row("*,auto", 8, left, right);
         foot.VerticalAlignment = VerticalAlignment.Bottom;
 
@@ -248,9 +247,42 @@ public sealed class ModelCard
         delete.Show(!downloading && !building && (st.Have > 0 || Directory.Exists(Paths.ModelDir(model.Id))));
         delete.IsEnabled = !inUse;
         delete.Tip(inUse ? (makesImages ? L("Wacht tot de afbeelding klaar is.") : L("Stop eerst de engine.")) : null);
-        chosen.Show(selected);
-        choose.Show(!selected);
-        choose.IsEnabled = makesImages ? st.IsComplete : st.HeadersAvailable;
+        Roles(selected, st);
+    }
+
+    /// <summary>The same three roles on every card: heavy and fast for a model that chats, images for one that draws. Filled in the
+    /// model's colour with a check when it has the role.</summary>
+    private void Roles(bool selected, ModelStore.ModelStatus st)
+    {
+        bool fast = !makesImages && app.DocumentEngines.FastChoice?.Id == model.Id;
+        var key = $"{selected}|{fast}|{st.IsComplete}|{st.HeadersAvailable}|{app.Settings.FastModel}";
+        if (key == rolesKey) return;
+        rolesKey = key;
+        roles.Children.Clear();
+        Button Role(string title, string icon, bool on, Action click) => on ? Ui.Btn(title, click, Glyph.Done, family) : Ui.Btn(title, click, icon);
+        if (makesImages)
+        {
+            var b = Role(L("Afbeeldingen"), Glyph.Image, selected, () => { app.Settings.ImageModel = model.Id; app.Notify(); });
+            b.IsEnabled = st.IsComplete || selected;
+            roles.Children.Add(b);
+            return;
+        }
+        var heavy = Role(L("Zwaar"), Glyph.Think, selected, () =>
+        {
+            if (app.Settings.FastModel == model.Id) app.Settings.FastModel = "";
+            app.Select(model.Id);
+        });
+        heavy.IsEnabled = st.HeadersAvailable || selected;
+        // the chosen one again: back to the automatic choice
+        var quick = Role(L("Snel"), Glyph.Bolt, fast, () =>
+        {
+            app.Settings.FastModel = fast && app.Settings.FastModel.Length > 0 ? "" : model.Id;
+            app.Notify();
+        });
+        quick.IsEnabled = !selected && st.IsComplete;
+        quick.Tip(selected ? L("Dit is het zware model.") : L("Het snelle model doet in Documenten het kleine werk: notities, spelling, korter maken."));
+        roles.Children.Add(heavy);
+        roles.Children.Add(quick);
     }
 
     private async Task Download()

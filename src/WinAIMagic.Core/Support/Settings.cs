@@ -46,6 +46,10 @@ public sealed class Settings : INotifyPropertyChanged
     public string ImageSize { get => Get(""); set => Set(value); }
     /// <summary>The model that makes images (Modellen, Kies voor afbeeldingen); empty: the first in the catalog.</summary>
     public string ImageModel { get => Get(""); set => Set(value); }
+    /// <summary>The chat model rewrites the description for the image model first, with the web when it needs it.</summary>
+    public bool ImageImprove { get => Get(false); set => Set(value); }
+    /// <summary>The fast model of the documents module (Modellen, Snel); empty: the smallest that fits beside the heavy one.</summary>
+    public string FastModel { get => Get(""); set => Set(value); }
     public bool Thinking { get => Get(true); set => Set(value); }
     public string ReasoningEffort { get => Get("high"); set => Set(value); }
     /// <summary>At most this many tokens of thinking, then the model writes its answer (0: no limit).</summary>

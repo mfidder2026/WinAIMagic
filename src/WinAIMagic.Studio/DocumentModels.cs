@@ -77,11 +77,14 @@ public static class DocumentModels
     /// The second engine takes the port after the app's own.
     public static int FastPort => Settings.Shared.Port + 1;
 
-    /// The smallest downloaded model next to `heavy`, when this PC can run both.
-    public static DocumentModel? FastModel(DocumentModel? heavy, IEnumerable<DocumentModel> downloaded, Func<bool> canRunBeside)
+    /// The smallest downloaded model next to `heavy`, when this PC can run both. `chosen`: the model the user chose under Modellen;
+    /// it goes first when it is downloaded and is not the heavy one, as long as it fits beside it.
+    public static DocumentModel? FastModel(DocumentModel? heavy, IEnumerable<DocumentModel> downloaded, Func<bool> canRunBeside, string chosen = "")
     {
         if (heavy == null) return null;
-        var small = downloaded.Where(m => m.Id != heavy.Id && m.Memory < heavy.Memory).MinBy(m => m.Memory);
+        var list = downloaded.ToList();
+        var small = list.FirstOrDefault(m => m.Id == chosen && m.Id != heavy.Id)
+                    ?? list.Where(m => m.Id != heavy.Id && m.Memory < heavy.Memory).MinBy(m => m.Memory);
         return small != null && canRunBeside() ? small : null;
     }
 }
@@ -117,7 +120,7 @@ public sealed class DocumentEngines : INotifyPropertyChanged
         }
     }
 
-    public DocumentModel? FastChoice => DocumentModels.FastModel(engines.HeavyModel, engines.DownloadedModels, engines.CanRunFastBeside);
+    public DocumentModel? FastChoice => DocumentModels.FastModel(engines.HeavyModel, engines.DownloadedModels, engines.CanRunFastBeside, Settings.Shared.FastModel);
 
     // The status lines and the button of the panel.
 

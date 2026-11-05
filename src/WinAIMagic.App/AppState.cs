@@ -141,7 +141,7 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     {
         if (Host.Plan is { } plan) Chat.ContextLimit = plan.ContextSize;
         if (Host.SelectedModel is { } m) Chat.ModelName = m.Name;
-        return Task.Run(Host.StartEngine);
+        return Task.Run(() => Host.StartEngine());
     }
 
     public void StopEngine() => Task.Run(Host.StopEngine);
@@ -154,7 +154,32 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
         if (studio?.Busy == true) return Lang.L("De documentmodule is bezig. Wacht tot die klaar is of stop hem.");
         if (documentHost != null) await documentHost.StopFastAndWaitAsync();
         return null;
-    }));
+    }, improve: Settings.ImageImprove ? step => ImproveDescription(prompt, step) : null));
+
+    /// <summary>The chat model writes a better description: started first when it does not run; the engine makes room afterwards, as for
+    /// any image.</summary>
+    private async Task<(string Prompt, IReadOnlyList<ImageSource> Sources)> ImproveDescription(string text, Action<string> onStep)
+    {
+        var model = Host.SelectedModel ?? throw new InvalidOperationException(Lang.L("Er is geen chatmodel gekozen."));
+        if (Host.Engine?.State.IsRunning != true)
+        {
+            if (!Host.Store.StatusOf(model.Id).IsComplete) throw new InvalidOperationException(Lang.L($"{model.Name} is nog niet gedownload."));
+            if (!Host.ChatModelReady) throw new InvalidOperationException(Lang.L($"{model.Name} kan nu niet starten."));
+            onStep(Lang.L($"{model.ShortName} starten…"));
+            if (Host.Plan is { } plan) Chat.ContextLimit = plan.ContextSize;
+            Host.StartEngine(forImage: true);
+            var started = DateTime.UtcNow;
+            while (Host.Engine?.State.IsRunning != true)
+            {
+                if (Host.Engine?.State.Status == Engine.EngineStatus.Failed) throw new InvalidOperationException(Host.Engine.State.Message ?? Lang.L($"{model.Name} startte niet."));
+                if ((DateTime.UtcNow - started).TotalSeconds > 1800) throw new InvalidOperationException(Lang.L($"{model.Name} startte niet."));
+                await Task.Delay(500);
+            }
+        }
+        onStep(Lang.L("Beschrijving verbeteren…"));
+        var result = await ImagePrompt.Improve(text, Host.Engine?.Model?.Id ?? model.Id, ImagePrompt.Sender(BaseUrl), onStep);
+        return (result.Prompt, result.Sources.Select(s => new ImageSource(s.Title, s.Url)).ToList());
+    }
 
     /// <summary>A button of the system check. The page file waits for Windows' UAC prompt, so that goes off the UI thread.</summary>
     public void Perform(SystemCheck.CheckAction action)

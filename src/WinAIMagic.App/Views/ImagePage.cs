@@ -36,6 +36,8 @@ public sealed class ImagePage : IPage
     private readonly TextBox prompt = DocUi.LargeInput(L("Bijvoorbeeld: een rode vos die de krant leest op een bankje in Amsterdam, herfstlicht, foto"), 96);
     private readonly ComboBox sizes;
     private readonly Button make, stop;
+    private readonly Microsoft.UI.Xaml.Controls.Primitives.ToggleButton improve = new();
+    private readonly TextBlock improveNote = Ui.Caption();
     private readonly TextBlock planNote = Ui.Caption(), engineNote = Ui.Caption("", Theme.Solid(Theme.Amber));
     private readonly StackPanel working = Ui.V(5);
     private readonly ProgressBar bar = new() { Minimum = 0, Maximum = 1 };
@@ -44,6 +46,9 @@ public sealed class ImagePage : IPage
     private readonly Border resultCard;
     private readonly Image picture = new() { Stretch = Stretch.Uniform, MaxHeight = 620, HorizontalAlignment = HorizontalAlignment.Left };
     private readonly TextBlock caption = Ui.Caption(), about = Ui.Label("", 14, wrap: true);
+    private readonly TextBlock usedText = Ui.Label("", 13, Theme.Secondary, wrap: true);
+    private readonly Expander used = new() { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left };
+    private readonly WrapPanel sources = new() { Gap = 6, RowGap = 4 };
 
     private readonly Border galleryCard;
     private readonly WrapPanel gallery = new() { Gap = 8, RowGap = 8 };
@@ -78,12 +83,19 @@ public sealed class ImagePage : IPage
         Automation.SetName(sizes, L("Grootte"));
         make = Ui.Btn(L("Maak afbeelding"), Make, Glyph.Image, Theme.Violet);
         stop = Ui.Btn(L("Stop"), () => app.Host.Images.Stop(), Glyph.Stop);
+        // the image model cannot search: the chat model writes a better English description first, with the web when it needs to
+        improve.Content = Ui.H(6, Ui.Icon(Glyph.Globe, 13), Ui.Label(L("Verbeteren met web"), 13));
+        improve.IsChecked = app.Settings.ImageImprove;
+        improve.Checked += (_, _) => { app.Settings.ImageImprove = true; Update(); };
+        improve.Unchecked += (_, _) => { app.Settings.ImageImprove = false; Update(); };
+        Automation.SetName(improve, L("Verbeteren met web"));
         working.Children.Add(bar);
         working.Children.Add(step);
         makePart.Children.Add(prompt);
-        makePart.Children.Add(Ui.Row("auto,auto,auto,*", 10, Ui.Label(L("Grootte"), 13, Theme.Secondary), sizes, make, stop));
+        makePart.Children.Add(Ui.Row("auto,auto,auto,auto,auto,*", 10, Ui.Label(L("Grootte"), 13, Theme.Secondary), sizes, improve, make, stop));
         ((FrameworkElement)((Grid)makePart.Children[1]).Children[0]).VerticalAlignment = VerticalAlignment.Center;
         makePart.Children.Add(working);
+        makePart.Children.Add(improveNote);
         makePart.Children.Add(planNote);
         makePart.Children.Add(Ui.Caption(L("Het model volgt een beschrijving in het Engels het best: in het Nederlands mist het soms waar het om gaat.")));
         makePart.Children.Add(engineNote);
@@ -93,10 +105,13 @@ public sealed class ImagePage : IPage
         var copy = Ui.Btn(L("Kopieer"), () => _ = CopyShown(), Glyph.Copy);
         var inFolder = Ui.Btn(L("Toon in map"), ShowInFolder, Glyph.Folder);
         var remove = Ui.Btn(L("Verwijderen"), () => _ = RemoveShown(), Glyph.Trash);
-        resultCard = Ui.Card(Ui.V(10, picture, about, caption, Ui.H(8, copy, inFolder, remove)), L("Afbeelding"), Glyph.Image, Theme.Violet);
+        used.Header = Ui.Label(L("Beschrijving voor het beeldmodel"), 12, Theme.Secondary);
+        usedText.IsTextSelectionEnabled = true;
+        used.Content = usedText;
+        resultCard = Ui.Card(Ui.V(10, picture, about, used, sources, caption, Ui.H(8, copy, inFolder, remove)), L("Afbeelding"), Glyph.Image, Theme.Violet);
         galleryCard = Ui.Card(gallery, L("Eerdere afbeeldingen"), Glyph.Clock, Theme.Cyan);
 
-        var head = Ui.PageHead(Ui.PageIcon(Glyph.Image), L("Beeld"), Ui.Label(L("Maakt afbeeldingen op deze pc. Je beschrijving gaat niet naar buiten."), 13, Theme.Secondary));
+        var head = Ui.PageHead(Ui.PageIcon(Glyph.Image), L("Beeld"), Ui.Label(L("Maakt afbeeldingen op deze pc. Je beschrijving gaat niet naar buiten, tenzij je Verbeteren met web aanzet."), 13, Theme.Secondary));
         modelCard = Ui.Card(modelPart, L("Model"), Glyph.Models, Theme.Violet);
         var page = Ui.Page(head, modelCard, Ui.Card(makePart, L("Beschrijf wat je wilt zien"), Glyph.Image, Theme.Violet), resultCard, galleryCard);
         body = (StackPanel)page.Content;
@@ -162,6 +177,15 @@ public sealed class ImagePage : IPage
         make.IsEnabled = status.IsComplete && prompt.Text.Trim().Length > 0;
         make.Tip(!status.IsComplete ? L("Download eerst het model.") : prompt.Text.Trim().Length == 0 ? L("Beschrijf eerst wat je wilt zien.") : null);
         sizes.IsEnabled = !busy;
+        improve.IsEnabled = !busy;
+        string chatName = host.SelectedModel?.ShortName ?? L("Het chatmodel");
+        improve.Tip(L($"{chatName} schrijft eerst een betere Engelse beschrijving en zoekt zo nodig op het web hoe iets eruitziet. Dat kost wat tijd."));
+        bool improving = app.Settings.ImageImprove && !busy;
+        improveNote.SetIfChanged(!improving ? ""
+            : host.Engine?.State.IsRunning == true
+                ? L($"{chatName} verbetert eerst de beschrijving. Wat naar de zoekmachine gaat, is ontdaan van e-mailadressen, nummers en bedragen.")
+                : L($"{chatName} start eerst om de beschrijving te verbeteren; dat kan even duren."));
+        improveNote.Show(improving);
         prompt.IsEnabled = !busy;
         working.Show(busy);
         bar.Value = images.Fraction;
@@ -207,6 +231,20 @@ public sealed class ImagePage : IPage
             picture.Source = new BitmapImage(new Uri(shown.Path));
             about.Text = shown.Prompt;
             about.Show(shown.Prompt.Length > 0);
+            usedText.Text = shown.UsedPrompt ?? "";
+            used.Show(shown.UsedPrompt != null);
+            used.IsExpanded = false;
+            // the pages only for the image just made: an older one does not keep them
+            sources.Children.Clear();
+            if (shown.Path == app.Host.Images.Last?.Path)
+                foreach (var s in app.Host.Images.Sources.Take(10))
+                {
+                    if (!Uri.TryCreate(s.Url, UriKind.Absolute, out var url)) continue;
+                    var link = new HyperlinkButton { Content = Ui.H(4, Ui.Icon(Glyph.Globe, 11), Ui.Label(url.Host.Replace("www.", ""), 12)), NavigateUri = url, Padding = new Thickness(4, 2, 4, 2) };
+                    link.Tip(s.Title);
+                    sources.Children.Add(link);
+                }
+            sources.Show(sources.Children.Count > 0);
             string where = shown.OnCard ? L("op de videokaart") : L("op de processor");
             caption.Text = shown.Seconds > 0
                 ? L($"{shown.Width} × {shown.Height} · {Ui.Clock(shown.Seconds)} {where} · nummer {shown.Seed}")
