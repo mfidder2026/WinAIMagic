@@ -34,6 +34,13 @@ Op één pc: RTX 5060 Ti 16 GB op PCIe 3.0 x8, Core i9-10900K, 128 GB DDR4-2400 
 |---|---|---|---|
 | Qwen3.6-35B-A3B Q4 | 15 s | 380 tok/s | **39,5 tok/s** |
 | GLM-5.3-Flash Compact 24 | 98 s | 354 tok/s | **8,9 tok/s** |
+| Ministral-3-8B Q4 | 4 s | 3.260 tok/s | **68,0 tok/s** |
+
+| Beeldmodel | Eén afbeelding van 1024 x 1024, met laden | Beeldtokens |
+|---|---|---|
+| FLUX.2 Klein 4B | **9,1 s** | 5.366 per seconde |
+
+De eigenaar mat alle vier opnieuw met 0.2.6 op 5 november ([ruwe gegevens](measurements/2026-11-05-app-0.2.6.json)). GLM schreef toen 8,5 tok/s. Qwen3.6 schreef 31,4 tok/s, met de experts van 28 lagen op de processor in plaats van 23; waarom het plan toen minder lagen op de kaart zette, is nog niet uitgezocht.
 
 Met **Experts overslaan**, een keuze naast de startknop op het scherm Modellen, schrijft GLM op deze pc 11,3 (Licht) of 12,2 tok/s (Sterk), maar de antwoorden wijken dan iets af van het volledige model. Standaard staat dit uit, en Vergelijken toont elke keuze op een eigen regel.
 

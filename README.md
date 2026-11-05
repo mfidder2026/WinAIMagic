@@ -70,10 +70,17 @@ Measured with the app's own method: a 4,000-token prompt read, then 300 tokens w
 |---|---|---|---|---|---|
 | Qwen3.6-35B-A3B Q4 (second engine) | 15 s | 380 tok/s | **39.5 tok/s** | 13.6 GB | 38 GB |
 | GLM-5.3-Flash Compact 24 (main engine) | 98 s | 354 tok/s | **8.9 tok/s** | 14 GB | 98 GB |
+| Ministral-3-8B Q4 (second engine) | 4 s | 3,260 tok/s | **68.0 tok/s** | 13.3 GB | 29 GB |
+
+| Image model | One image of 1024 x 1024, with loading | Image tokens | VRAM |
+|---|---|---|---|
+| FLUX.2 Klein 4B | **9.1 s** | 5,366 per second | 7.8 GB |
+
+The owner measured all four again with 0.2.6 on 5 November ([raw data](docs/measurements/2026-11-05-app-0.2.6.json)). GLM wrote 8.5 tok/s that time. Qwen3.6 wrote 31.4 tok/s, with the experts of 28 layers on the processor instead of 23; why the plan gave it fewer layers on the card that time has not been looked into.
 
 GLM can write faster on a card short of VRAM: **Skip experts**, a choice beside the Start button on the Models page, reaches 11.3 (light) or 12.2 tok/s (strong) on this PC, but the answers then differ a little from the full model. It is off by default, and Compare shows each choice as its own row.
 
-Your numbers depend mostly on your CPU, your memory channels and your video card's link, so measure on your own PC under **Compare**. Every other model in the catalog shows "not measured" until you do. This is one PC with one video card; AMD has not been measured at all.
+Your numbers depend mostly on your CPU, your memory channels and your video card's link, so measure on your own PC under **Compare**. The other models in the catalog show "not measured" until you do. This is one PC with one video card; AMD has not been measured at all.
 
 ### A laptop with little memory
 
