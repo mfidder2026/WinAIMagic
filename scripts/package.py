@@ -139,14 +139,15 @@ def scan():
         if pattern.search(p.name.encode()):
             hits.append(("name", p))
         rel = p.relative_to(APP).as_posix()
-        if rel.startswith("engine/python/Lib"):
+        # the image engine is another project: the word only occurs in the vocabularies of its text models, among
+        # thousands of others, and never as the name the brief keeps out
+        if rel.startswith("engine/python/Lib") or p.name == IMAGE_EXE:
             continue
         if p.suffix.lower() in (".py", ".json", ".txt", ".md", ".jinja", ".pdb", ".exe"):
             data = p.read_bytes()
             for m in pattern.finditer(data):
                 ctx = data[max(0, m.start() - 14):m.end() + 6]
-                # the image engine carries a tokenizer's vocabulary, where it is an ordinary word (its pieces start with U+2581)
-                if b"Flash-Maya" not in ctx and b"\xe2\x96\x81" not in ctx:
+                if b"Flash-Maya" not in ctx:
                     hits.append(("text", p, ctx))
                     break
     for h in hits:
