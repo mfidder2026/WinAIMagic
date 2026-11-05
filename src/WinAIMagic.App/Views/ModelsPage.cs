@@ -313,14 +313,24 @@ public sealed class PlanDetails
         if (k == key) return;
         key = k;
 
-        var rows = new List<(string, string)> { (L("Vaste gewichten (VRAM)"), plan.Dense.Gb()) };
-        if (plan.ExpertCache > 0)
+        var rows = new List<(string, string)>();
+        if (plan.Experts == 0)
         {
+            // a model without experts: where its weights are is all there is to say
+            string where = plan.GpuLayers == 0 ? L(" · in het RAM")
+                : plan.GpuLayers >= plan.Layers ? L(" · op de videokaart")
+                : L($" · {plan.GpuLayers} van {plan.Layers} lagen op de videokaart");
+            rows.Add((L("Gewichten"), plan.Dense.Gb() + where));
+        }
+        else if (plan.ExpertCache > 0)
+        {
+            rows.Add((L("Vaste gewichten (VRAM)"), plan.Dense.Gb()));
             rows.Add((L("Expert-cache (VRAM)"), plan.ExpertCache.Gb() + L(" · de experts die het gesprek het meest gebruikt")));
             rows.Add((L("Experts van de SSD"), plan.SsdExperts.Gb() + L(" · alleen als een woord ze nodig heeft")));
         }
         else
         {
+            rows.Add((L("Vaste gewichten (VRAM)"), plan.Dense.Gb()));
             rows.Add((L("Experts in VRAM"), plan.GpuExperts.Gb()));
             rows.Add((L("Experts in RAM"), plan.RamExperts == 0 ? L("geen") : plan.RamExperts.Gb() + (plan.CpuMoELayers > 0 ? L($" · {plan.CpuMoELayers} lagen") : "")));
             if (plan.SsdExperts > 0) rows.Add((L("Experts van de SSD"), plan.SsdExperts.Gb() + L(" · alleen als een woord ze nodig heeft")));
@@ -330,7 +340,7 @@ public sealed class PlanDetails
         if (plan.Engram > 0) rows.Add((L("Engram-tabellen (SSD)"), plan.Engram.Gb() + L(" · per token een paar rijen")));
         rows.Add((L("KV-cache + buffers"), plan.Overhead.Gb() + L($" · {plan.ContextSize / 1024}K context")));
         if (plan.KvRam > 0) rows.Add((L("KV-cache in RAM"), plan.KvRam.Gb()));
-        rows.Add((L("VRAM-reserve"), plan.VramReserve.Gb()));
+        if (plan.VramTotal > 0) rows.Add((L("VRAM-reserve"), plan.VramReserve.Gb()));
 
         var grid = new Grid { ColumnSpacing = 24, RowSpacing = 6 };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });

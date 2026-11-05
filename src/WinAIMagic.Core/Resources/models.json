@@ -396,6 +396,25 @@
       "dense": 2678180352,
       "engine": "llama",
       "license": "qwen-community"
+    },
+    {
+      "id": "ministral-3-8b-q4",
+      "name": "Ministral-3-8B Q4",
+      "family": "mistral",
+      "summary": "8B · 4 bit · 5 GB in het geheugen · voor een laptop met weinig geheugen",
+      "vision": "ministral-3",
+      "files": [
+        {
+          "local": "ministral-3-8b-q4.gguf",
+          "size": 5198911904,
+          "sha256": "33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761",
+          "url": "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/0102285ad796bd99af90f58de616092e5630e970/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf"
+        }
+      ],
+      "memory": 5190500352,
+      "dense": 5190500352,
+      "engine": "llama",
+      "recommendMaxVramGb": 8.5
     }
   ],
   "tieredVision": [
@@ -479,6 +498,13 @@
       "size": 899283680,
       "sha256": "8971ee4f331ff0a4c609374f32984b3d4e6dc086c0aa35f1d637fad1829e887f",
       "url": "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/a483e9e6cbd595906af30beda3187c2663a1118c/mmproj-F16.gguf"
+    },
+    {
+      "id": "ministral-3",
+      "local": "ministral-3-vision.gguf",
+      "size": 858283168,
+      "sha256": "e799380f596d152ff4026a72d409ecc89c96cd437676804bc3f2ab3bd6b486ec",
+      "url": "https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/0102285ad796bd99af90f58de616092e5630e970/Ministral-3-8B-Instruct-2512-BF16-mmproj.gguf"
     }
   ]
 }

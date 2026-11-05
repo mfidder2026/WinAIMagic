@@ -51,6 +51,8 @@ All numbers here are computed by the planner for Qwen3.6-35B-A3B. None has been 
 - **Stop for the main engine** closes its parent pipe rather than sending a console break, because the engine would otherwise lose its expert profile.
 - **pwsh from the Microsoft Store** is skipped for `run_command`: its children leave the Job Object. Windows PowerShell 5.1 runs instead.
 
+- **Ministral-3-8B Q4,** a small model for a PC with 8 or 16 GB of RAM, is in this catalog and not yet on the Mac. It has no experts, so the planner treats it differently here: it never repacks into RAM (the same 5.3 tok/s, 3.6 GB less private memory), has no expert cache, and gets 8K of context where memory is short. It is only recommended on a PC with less than 23 GiB and a card of at most 8 GB; a larger card still gets Qwen3.6.
+
 ## Mac gaps fixed here (brief §11)
 
 | Mac behaviour | Here |
@@ -82,11 +84,12 @@ The same gaps still exist in MacAIMagic.
 - **Idle unload** of the model has no setting yet.
 - **Live page:** pinned RAM and the VRAM/RAM/SSD split come from the plan, not from engine telemetry.
 - **Test allocation** when choosing a backend is missing; a failing driver shows up at engine start.
+- **Making images:** the app reads images but cannot make them. The owner asked for FLUX.2 Klein 4B; that needs an image engine and a page of its own, and neither is in yet.
 
 **Never run on real hardware**
 
 - A clean Windows 11 PC, and any PC other than the one test PC.
-- A PC with 16 GB of RAM: its plan and recommendation are computed only.
+- A PC with 8 or 16 GB of RAM: plans and recommendations are computed only. Ministral was measured on the test PC with limits on layers, threads and working set, which stand in for such a PC.
 - DeepSeek, MiniMax, Qwen3.8 and the larger GLM models.
 - The page file button: a dry run checked the commands, and the change itself needs someone to accept the UAC prompt.
 - A real move of models; downloading through the app beyond a short test.

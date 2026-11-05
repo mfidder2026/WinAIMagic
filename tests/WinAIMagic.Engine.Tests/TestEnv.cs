@@ -150,6 +150,7 @@ public static class TestModels
             "deepseek" => Index("deepseek41", 40, dense, (memory - dense) / 40, engram: m.TotalSize - memory, contextLength: 1 << 20),
             "glm" => Index("glm5-next", 46, dense, (memory - dense) / 43, firstExpertLayer: 3, contextLength: 1 << 20),
             "minimax" => Index("minimax-m3", 60, dense, (memory - dense) / 57, firstExpertLayer: 3, contextLength: 1 << 20),
+            "mistral" => Index("mistral3", 34, dense, 0, contextLength: 262144),
             _ => Index(m.Id.StartsWith("qwen3.8") ? "qwen4exp" : "qwen35moe", 40, dense, (memory - dense) / 40, contextLength: 262144),
         };
     }

@@ -59,13 +59,15 @@ public sealed class GGUFIndex
     }
 
     /// <summary>KV cache per token of context: measured for DeepSeek (compressed attention) and GLM, from the heads for Qwen.
-    /// qwen35moe: from the measurement on the 5060 Ti (14.0 GB in all at 64K with 20 layers of experts on the card).</summary>
+    /// qwen35moe: from the measurement on the 5060 Ti (14.0 GB in all at 64K with 20 layers of experts on the card).
+    /// mistral3: 34 layers without compressed attention, measured on the 5060 Ti (8K, 16K and 32K use 7050, 8160 and 10370 MiB).</summary>
     public ulong KvBytesPerToken => Architecture switch
     {
         "deepseek41" or "deepseek4" => 5_600,
         "glm5-next" => 20_000,
         "qwen4exp" => 36_000,
         "qwen35moe" => 16_000,
+        "mistral3" => 142_000,
         _ => 32_000,
     };
 

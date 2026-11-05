@@ -247,8 +247,8 @@ public class SystemCheckTests : EngineTest
     [Fact]
     public void ASmallPcIsToldItStreams()
     {
-        var b = FakeGpuBackend.Amd(8);
-        using var host = Host(SystemInfo.Simulated(b, 16, 8), b);
+        var b = FakeGpuBackend.Cpu();
+        using var host = Host(SystemInfo.Simulated(b, 6, 8), b);
         var model = SystemCheck.ModelItems(host).Single(i => i.Id == "model");
         Assert.Equal(SystemCheck.CheckState.Optional, model.State);
         Assert.Contains("streamen", model.Detail);
@@ -260,22 +260,32 @@ public class SystemCheckTests : EngineTest
     [Fact]
     public void ASmallPcIsRecommendedTheModelThatStreams()
     {
-        var card = FakeGpuBackend.Nvidia(8);
+        var card = FakeGpuBackend.Nvidia(12);
         using (var host = Host(SystemInfo.Simulated(card, 16, 8), card))
         {
             var model = SystemCheck.ModelItems(host).Single(i => i.Id == "model");
             Assert.Equal(SystemCheck.CheckState.Todo, model.State);
             Assert.Equal(SystemCheck.CheckAction.OpenModels, model.Action);
-            Assert.Contains("8 GB VRAM en 16 GB RAM: Qwen3.6", model.Detail);
+            Assert.Contains("12 GB VRAM en 16 GB RAM: Qwen3.6", model.Detail);
             Assert.Contains("nog niet gemeten", model.Detail);
             Assert.DoesNotContain("helemaal", model.Detail);
             Assert.Equal("qwen3.6-35b-a3b-q4", host.SelectedModelId);
         }
         var none = FakeGpuBackend.Cpu();
+        using (var host = Host(SystemInfo.Simulated(none, 8, 8), none))
+        {
+            var model = SystemCheck.ModelItems(host).Single(i => i.Id == "model");
+            Assert.Contains("deze pc met 8 GB RAM: Ministral-3-8B Q4", model.Detail);
+            Assert.Contains("nog niet gemeten", model.Detail);
+            Assert.DoesNotContain("VRAM", model.Detail);
+            Assert.Equal("ministral-3-8b-q4", host.SelectedModelId);
+        }
+        // the model fits, and a PC without a card is not told about its VRAM
         using (var host = Host(SystemInfo.Simulated(none, 16, 8), none))
         {
             var model = SystemCheck.ModelItems(host).Single(i => i.Id == "model");
-            Assert.Contains("deze pc met 16 GB RAM: Qwen3.6", model.Detail);
+            Assert.Contains("deze pc met 16 GB RAM: Ministral-3-8B Q4", model.Detail);
+            Assert.Contains("helemaal in het RAM past", model.Detail);
             Assert.DoesNotContain("VRAM", model.Detail);
         }
     }

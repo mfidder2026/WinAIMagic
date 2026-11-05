@@ -90,6 +90,16 @@ public static class MemoryPlanner
     public const ulong VisionBytes = 1_500_000_000;
     /// <summary>llama.cpp's compute buffers at ubatch 1024, measured on the large models, and on a model with small dense weights.</summary>
     public const ulong ComputeBuffers = 2_500_000_000, SmallComputeBuffers = 1_000_000_000;
+    /// <summary>The same on a model without experts, which copies none while it reads a prompt: Ministral uses less than this at 8K.</summary>
+    public const ulong PlainComputeBuffers = 300_000_000;
+    /// <summary>What llama.cpp's KV cache takes beside its cost per token.</summary>
+    private const ulong KvBase = 400_000_000;
+    /// <summary>The context of a model without experts where memory is short: its cache would push out weights that every token reads.
+    /// Not less: the app's system prompt and its tools take part of it, and 4K saves nothing. With a limit on the working set, Ministral writes
+    /// 5 tok/s at 5 GB and 0.7 tok/s at 4.5 GB, at 8K and at 4K alike. Not measured on a real PC, whose SSD would make the second figure worse.</summary>
+    public const int PlainSmallContext = 8_192;
+    /// <summary>What Windows holds on a PC running little else: a model without experts is worth recommending when its weights fit beside it.</summary>
+    public const ulong WindowsRoom = 2_500_000_000;
     /// <summary>Main engine: prompt chunks are lent from the expert pool, so the buffers proper stay small.</summary>
     public const ulong TieredBuffers = 1_500_000_000;
     /// <summary>Main engine: the smallest expert pool worth running with.</summary>
@@ -157,22 +167,25 @@ public static class MemoryPlanner
     private static ulong VramLimitFor(ModelInfo model, SystemInfo s) =>
         EngineFor(model, s) == EngineKind.Tiered ? TieredVramLimit(s) : LlamaVramLimit(s);
 
-    /// <summary>The first model in the catalog that fits in this PC's VRAM + RAM; a larger card skips the models meant for small ones.
+    /// <summary>The first model in the catalog that fits in this PC's VRAM + RAM; a larger card skips the models meant for small ones,
+    /// and a model without experts is only for a PC with little memory: elsewhere a model that reads a little from the SSD does more.
     /// If none fits, the smallest that streams, when this PC has room for what that has to hold. Otherwise none: a model still
     /// starts, but this PC is better off as a helper in a cluster.</summary>
     public static ModelInfo? Recommended(IEnumerable<ModelInfo> models, SystemInfo s)
     {
         var usable = models.Where(m => EngineFor(m, s) != null).ToList();
         double vramGb = s.VramTotal / (double)(1UL << 30);
-        return usable.FirstOrDefault(m => FitFor(m, s) == Fit.Fits
-                                          && (m.Tier?.RecommendMaxVramGb is not double max || !s.HasGpu || vramGb <= max))
+        return usable.FirstOrDefault(m => FitFor(m, s) == Fit.Fits && (!m.IsPlain || IsSmallPc(s))
+                                          && ((m.Tier?.RecommendMaxVramGb ?? m.RecommendMaxVramGb) is not double max || !s.HasGpu || vramGb <= max))
             ?? usable.Where(m => FitFor(m, s) == Fit.Streams && HasRoomToStream(m, s)).MinBy(m => m.TotalSize);
     }
 
-    /// <summary>The dense weights, the buffers and a small expert cache, before anything comes from the SSD.</summary>
+    /// <summary>The dense weights, the buffers and a small expert cache, before anything comes from the SSD. A model without experts
+    /// has no cache: its weights have to fit in the PC's memory beside Windows, or every token reads them from the SSD.</summary>
     private static bool HasRoomToStream(ModelInfo model, SystemInfo s)
     {
         ulong dense = model.Dense ?? (model.Memory ?? model.TotalSize) / 10;
+        if (model.IsPlain) return dense + WindowsRoom <= s.RamTotal + VramLimitFor(model, s);
         return dense + ComputeBuffers + SmallestCache <= VramLimitFor(model, s) + RamBudget(s);
     }
 
@@ -187,6 +200,7 @@ public static class MemoryPlanner
         if (!FitsWhole(index, s, engine))
         {
             if (s.RamTotal >= RoomyMemory) return null;
+            if (index.ExpertBytes == 0) return PlainSmallContext;
             // 16K gives experts about 0.26 GB on Qwen3.6, or four more layers on a 6 GB card. A PC that reads nothing from the SSD
             // at 32K (a 16 GB card) would give up half its context for almost nothing.
             return IsSmallPc(s) && !Plan(index, s, SmallPcContext, vision, engine).FitsInMemory ? TinyPcContext : SmallPcContext;
@@ -219,8 +233,11 @@ public static class MemoryPlanner
         if (fixedBytes >= budget || index.KvBytesPerToken == 0) return 0;
         ulong kvTokens = (budget - fixedBytes) / index.KvBytesPerToken;
         ulong fixedOnCard = index.DenseBytes + Buffers(index) + visionBytes;
+        // without experts the whole model on the card comes first, and on a smaller card a part of it, with a small context
+        if (s.HasGpu && index.ExpertBytes == 0)
+            kvTokens = Math.Min(kvTokens, Math.Max(Sub(limit, fixedOnCard + KvBase) / index.KvBytesPerToken, PlainSmallContext));
         // the KV cache lives on the card, unless not even the dense weights do
-        if (s.HasGpu && limit >= fixedOnCard) kvTokens = Math.Min(kvTokens, (limit - fixedOnCard) / index.KvBytesPerToken);
+        else if (s.HasGpu && limit >= fixedOnCard) kvTokens = Math.Min(kvTokens, (limit - fixedOnCard) / index.KvBytesPerToken);
         return Math.Max(4096, (int)Math.Min(kvTokens, int.MaxValue) / 4096 * 4096);
     }
 
@@ -242,7 +259,11 @@ public static class MemoryPlanner
     }
 
     private static ulong Buffers(GGUFIndex index) =>
-        index.DenseBytes < 4_000_000_000 ? SmallComputeBuffers : ComputeBuffers;
+        index.ExpertBytes == 0 ? PlainComputeBuffers : index.DenseBytes < 4_000_000_000 ? SmallComputeBuffers : ComputeBuffers;
+
+    /// <summary>A model without experts that does not fit: what the plan says, in place of the words about experts.</summary>
+    private static string PlainWarning() =>
+        L("Dit model past net niet in VRAM en RAM. Wat niet past komt van de SSD. Sluit andere programma's, anders wordt het veel trager.");
 
     /// <summary>`helpers`: what each helper's GPU can hold for the model, in --rpc order. `expertCacheLimit`: an upper limit for the
     /// cache, for a PC that runs more next to the model.</summary>
@@ -297,7 +318,7 @@ public static class MemoryPlanner
         var perLayer = index.ExpertBytesPerLayer;
         int layers = Math.Max(index.LayerCount, LastLayer(index) + 1);
         ulong buffers = Buffers(index);
-        ulong kv = index.KvBytesPerToken * (ulong)context + 400_000_000;
+        ulong kv = index.KvBytesPerToken * (ulong)context + KvBase;
         ulong overhead = kv + buffers + (vision ? VisionBytes : 0);
         ulong limit = LlamaVramLimit(s), ram = RamBudget(s);
 
@@ -342,7 +363,8 @@ public static class MemoryPlanner
             inRam = Math.Min(experts, Sub(ram, dense + overhead));
             onSsd = experts - inRam;
             overhead = kv;
-            fits = onSsd == 0;
+            fits = onSsd == 0 && dense + kv <= ram;
+            if (!fits && experts == 0) warnings.Add(PlainWarning());
         }
         else if (dense + experts + overhead <= limit + ram)
         {
@@ -361,6 +383,14 @@ public static class MemoryPlanner
                 gpuLayers = GpuLayersFor(dense, overhead, limit, layers);
                 warnings.Add(L("Zelfs de vaste gewichten passen niet helemaal in het VRAM. Een deel van het model rekent op de processor."));
             }
+        }
+        else if (experts == 0)
+        {
+            // nothing to cache: as many layers as the card holds, the rest stays mapped from the file
+            fits = false;
+            onGpu = 0;
+            gpuLayers = GpuLayersFor(dense, overhead, limit, layers);
+            warnings.Add(PlainWarning());
         }
         else
         {

@@ -51,9 +51,13 @@ public sealed record ModelInfo
     [JsonPropertyName("engine")] public string Engine { get; init; } = "llama";
     [JsonPropertyName("pack")] public PackInfo? Pack { get; init; }
     [JsonPropertyName("tier")] public TierInfo? Tier { get; init; }
-    /// <summary>A licence of its own, to show before the download; null: MIT.</summary>
+    /// <summary>A licence of its own, to show before the download; null: an open licence that asks nothing first (MIT, Apache 2.0).</summary>
     [JsonPropertyName("license")] public string? License { get; init; }
+    /// <summary>Only recommended for cards up to this size, as under `tier`: for a model on the second engine, which has no tier data.</summary>
+    [JsonPropertyName("recommendMaxVramGb")] public double? RecommendMaxVramGb { get; init; }
 
+    /// <summary>No routed experts: every token reads all the weights, so nothing can stay behind on the SSD for long.</summary>
+    [JsonIgnore] public bool IsPlain => Dense != null && Dense == Memory;
     [JsonIgnore] public ulong TotalSize => Files.Aggregate(0UL, (n, f) => n + f.Size);
     [JsonIgnore] public bool HasMtp => Mtp is "builtin" or "file";
     [JsonIgnore] public string ShortName => Name.Split(' ')[0];

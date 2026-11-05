@@ -81,6 +81,7 @@ public class GGUFIndexTests : EngineTest
     [InlineData("glm5-next", 20000)]
     [InlineData("qwen4exp", 36000)]
     [InlineData("qwen35moe", 16000)]
+    [InlineData("mistral3", 142000)]
     [InlineData("other", 32000)]
     public void KvCostPerArchitecture(string arch, int bytes) =>
         Assert.Equal((ulong)bytes, TestModels.Index(arch, 1, 1, 1).KvBytesPerToken);
@@ -122,7 +123,7 @@ public class CatalogTests : EngineTest
     [Fact]
     public void CatalogLoads()
     {
-        Assert.Equal(8, C.Models.Count);
+        Assert.Equal(9, C.Models.Count);
         foreach (var m in C.Models)
         {
             Assert.NotEmpty(m.Files);
@@ -155,7 +156,7 @@ public class CatalogTests : EngineTest
     {
         foreach (var m in C.Models)
         {
-            Assert.True(new[] { "DeepSeek-V4.1-Flash", "GLM-5.3-Flash", "MiniMax-M3.1-Flash", "Qwen3.8-Flash-Next", "Qwen3.6-35B-A3B" }.Any(m.Name.StartsWith), m.Name);
+            Assert.True(new[] { "DeepSeek-V4.1-Flash", "GLM-5.3-Flash", "MiniMax-M3.1-Flash", "Qwen3.8-Flash-Next", "Qwen3.6-35B-A3B", "Ministral-3-8B" }.Any(m.Name.StartsWith), m.Name);
             Assert.All(m.Files, f => Assert.StartsWith(m.Id, f.Local));
         }
     }

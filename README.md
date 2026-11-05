@@ -74,10 +74,23 @@ GLM can write faster on a card short of VRAM: **Skip experts**, a choice beside 
 
 Your numbers depend mostly on your CPU, your memory channels and your video card's link, so measure on your own PC under **Compare**. Every other model in the catalog shows "not measured" until you do. This is one PC with one video card; AMD has not been measured at all.
 
+### A laptop with little memory
+
+Ministral-3-8B Q4 is the model for a PC with 8 or 16 GB of RAM. Measured on the same PC with limits that stand in for a laptop, not on a real one. Writing speed on a real laptop's processor will differ.
+
+| Stands in for | Context | Writing |
+|---|---|---|
+| A 16 GB card | 8K to 32K | **72 tok/s** |
+| An 8 GB card: 24 of its 34 layers on the card | 8K | **14 tok/s** |
+| No card, 16 GB of RAM: 4 processor threads | 16K in the app | **5 tok/s** |
+
+On 8 GB of RAM without a card the model needs about 5 GB free. With a limit of 5 GB on what it may keep in memory it still writes 5 tok/s; with 4.5 GB it drops to 0.7 tok/s, also at a smaller context, and a real SSD would make that worse. So close other programs there.
+
 ## Models
 
 | Model | Download | Licence |
 |---|---|---|
+| Ministral-3-8B Q4 | 5 GB | Apache 2.0 |
 | Qwen3.6-35B-A3B Q4 | 22 GB | Qwen community licence, shown before download |
 | GLM-5.3-Flash Compact 24 | 95 GB | MIT |
 | MiniMax-M3.1-Flash Compact | 93 GB | MiniMax community licence, shown before download |
@@ -87,7 +100,7 @@ Your numbers depend mostly on your CPU, your memory channels and your video card
 | DeepSeek-V4.1-Flash Compact | 277 GB | MIT |
 | DeepSeek-V4.1-Flash Q4 | 459 GB | MIT |
 
-Read the model licences before using a model commercially. Only Qwen3.6 and GLM-5.3-Flash Compact 24 have been run on the test PC so far.
+Read the model licences before using a model commercially. Only Ministral, Qwen3.6 and GLM-5.3-Flash Compact 24 have been run on the test PC so far.
 
 ## Privacy
 

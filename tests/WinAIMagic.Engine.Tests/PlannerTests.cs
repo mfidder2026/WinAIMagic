@@ -241,7 +241,8 @@ public class ThreeTierTests : EngineTest
         var big = SystemInfo.Simulated(FakeGpuBackend.Nvidia(16), 128);
         Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["qwen3.6-35b-a3b-q4"], small));
         // larger than memory is what the app is for: everything else streams on 32 GB, nothing is too big
-        foreach (var m in ModelCatalog.Shared.Models.Where(m => m.Id != "qwen3.6-35b-a3b-q4"))
+        Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["ministral-3-8b-q4"], small));
+        foreach (var m in ModelCatalog.Shared.Models.Where(m => m.Id is not ("qwen3.6-35b-a3b-q4" or "ministral-3-8b-q4")))
             Assert.Equal(MemoryPlanner.Fit.Streams, MemoryPlanner.FitFor(m, small));
         Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["deepseek-v4.1-flash-compact"], big));
         Assert.Equal(MemoryPlanner.Fit.Streams, MemoryPlanner.FitFor(byId["deepseek-v4.1-flash-q4"], big));
@@ -416,6 +417,8 @@ public class SmallPcTests : EngineTest
 {
     private static readonly ModelInfo Qwen = ModelCatalog.Shared.Model("qwen3.6-35b-a3b-q4")!;
     private static readonly GGUFIndex QwenIndex = TestModels.IndexOf(Qwen);
+    private static readonly ModelInfo Ministral = ModelCatalog.Shared.Model("ministral-3-8b-q4")!;
+    private static readonly GGUFIndex MinistralIndex = TestModels.IndexOf(Ministral);
 
     /// <summary>`vram` 0: no card, which is also what a laptop with only graphics in its processor gets.</summary>
     private static SystemInfo Pc(int vram, int ram = 16) =>
@@ -423,12 +426,10 @@ public class SmallPcTests : EngineTest
 
     private static MemoryPlan PlanAt(SystemInfo s, int context) => MemoryPlanner.Plan(QwenIndex, s, context, false);
 
+    /// <summary>A large card next to 16 GB of RAM still does best with the larger model, which reads little from the SSD there.</summary>
     [Theory]
     [InlineData(16)]
     [InlineData(12)]
-    [InlineData(8)]
-    [InlineData(6)]
-    [InlineData(0)]
     public void Qwen36StreamsOn16GBAndIsRecommended(int vram)
     {
         var s = Pc(vram);
@@ -436,16 +437,115 @@ public class SmallPcTests : EngineTest
         Assert.Equal(Qwen.Id, MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s)?.Id);
     }
 
-    /// <summary>Too little room for the dense weights, the buffers and a small cache: nothing is recommended, and the model still starts.</summary>
+    /// <summary>A laptop gets the small model. It streams on 8 GB, where nothing else would be recommended at all.</summary>
+    [Theory]
+    [InlineData(8, 16, MemoryPlanner.Fit.Fits)]
+    [InlineData(6, 16, MemoryPlanner.Fit.Fits)]
+    [InlineData(0, 16, MemoryPlanner.Fit.Fits)]
+    [InlineData(0, 12, MemoryPlanner.Fit.Streams)]
+    [InlineData(4, 8, MemoryPlanner.Fit.Streams)]
+    [InlineData(0, 8, MemoryPlanner.Fit.Streams)]
+    public void ALaptopIsRecommendedMinistral(int vram, int ram, MemoryPlanner.Fit fit)
+    {
+        var s = Pc(vram, ram);
+        Assert.Equal(fit, MemoryPlanner.FitFor(Ministral, s));
+        Assert.Equal(Ministral.Id, MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s)?.Id);
+    }
+
+    /// <summary>What Windows reports for a laptop sold with 8 GB, part of which goes to the graphics in its processor.</summary>
+    [Theory]
+    [InlineData(7.8)]
+    [InlineData(7.4)]
+    public void TheRecommendationSurvivesWhatWindowsReports(double gib)
+    {
+        var s = Pc(0, 8) with { RamTotal = (ulong)(gib * (1UL << 30)) };
+        Assert.Equal(Ministral.Id, MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s)?.Id);
+    }
+
+    /// <summary>Less than this: nothing is recommended, and a model still starts.</summary>
     [Fact]
     public void APcWithLessGetsNoRecommendationAndStillStarts()
     {
-        foreach (var s in new[] { Pc(0, 8), Pc(0, 12), Pc(4, 8), SystemInfo.Simulated(FakeGpuBackend.Amd(8), 16, 8) })
+        foreach (var s in new[] { Pc(0, 6), Pc(0, 4) })
         {
             Assert.Null(MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s));
-            Assert.Null(MemoryPlanner.Blocked(Qwen, s));
+            Assert.Null(MemoryPlanner.Blocked(Ministral, s));
             Assert.Equal(EngineKind.Llama, MemoryPlanner.EngineFor(Qwen, s));
         }
+    }
+
+    /// <summary>On no card and 16 GB: all of it in RAM, with the room that leaves for the context.</summary>
+    [Fact]
+    public void MinistralWithoutACardOn16GB()
+    {
+        var s = Pc(0);
+        int context = MemoryPlanner.ContextSize(MinistralIndex, s, 65_536, false, EngineKind.Llama);
+        Assert.Equal(16_384, context);
+        var p = MemoryPlanner.Plan(MinistralIndex, s, context, false);
+        Assert.Equal(PlanLabel.FitsInVramRam, p.Label);
+        Assert.Equal(0, p.GpuLayers);
+        Assert.Empty(p.Warnings);
+        Assert.False(MemoryPlanner.UseVision(MinistralIndex, s, true, EngineKind.Llama));
+    }
+
+    /// <summary>On no card and 8 GB it streams, with the context it cannot do without and words about what to do.</summary>
+    [Fact]
+    public void MinistralWithoutACardOn8GB()
+    {
+        var s = Pc(0, 8);
+        int context = MemoryPlanner.ContextSize(MinistralIndex, s, 65_536, false, EngineKind.Llama);
+        Assert.Equal(MemoryPlanner.PlainSmallContext, context);
+        var p = MemoryPlanner.Plan(MinistralIndex, s, context, false);
+        Assert.Equal(PlanLabel.StreamsFromSsd, p.Label);
+        Assert.Equal(0UL, p.ExpertCache);
+        Assert.Contains(p.Warnings, w => w.Contains("Sluit andere programma's"));
+        Assert.DoesNotContain(p.Warnings, w => w.Contains("experts") || w.Contains("te groot"));
+        Assert.False(MemoryPlanner.UseVision(MinistralIndex, s, true, EngineKind.Llama));
+    }
+
+    /// <summary>On an 8 GB card the layers that fit go on it: measured on the 5060 Ti, 24 of 34 at 8K use 4430 MiB and write 14 tok/s.</summary>
+    [Fact]
+    public void MinistralOnAnEightGBCard()
+    {
+        var s = Pc(8);
+        int context = MemoryPlanner.ContextSize(MinistralIndex, s, 65_536, false, EngineKind.Llama);
+        Assert.Equal(MemoryPlanner.PlainSmallContext, context);
+        var p = MemoryPlanner.Plan(MinistralIndex, s, context, false);
+        Assert.Equal(PlanLabel.FitsInVramRam, p.Label);
+        Assert.Equal(24, p.GpuLayers);
+        Assert.Contains(p.Warnings, w => w.Contains("op de processor"));
+    }
+
+    /// <summary>A 16 GB card holds all of it, with a large context and without going over its budget.</summary>
+    [Fact]
+    public void MinistralOnASixteenGBCard()
+    {
+        var s = Pc(16, 32);
+        int context = MemoryPlanner.ContextSize(MinistralIndex, s, 65_536, false, EngineKind.Llama);
+        var p = MemoryPlanner.Plan(MinistralIndex, s, context, false);
+        Assert.Equal(999, p.GpuLayers);
+        Assert.True(context >= 32_768, context.ToString());
+        Assert.True(p.VramPredicted <= p.VramBudget, $"{p.VramPredicted} > {p.VramBudget}");
+        Assert.True(MemoryPlanner.UseVision(MinistralIndex, s, true, EngineKind.Llama));
+    }
+
+    /// <summary>No experts, so nothing to cache and nothing to repack, also where the plan is otherwise for experts.</summary>
+    [Theory]
+    [InlineData(0, 8)]
+    [InlineData(0, 16)]
+    [InlineData(4, 8)]
+    [InlineData(8, 16)]
+    [InlineData(16, 32)]
+    public void TheEngineGetsNoExpertArguments(int vram, int ram)
+    {
+        var s = Pc(vram, ram);
+        var backend = vram == 0 ? FakeGpuBackend.Cpu() : FakeGpuBackend.Nvidia(vram);
+        int context = MemoryPlanner.ContextSize(MinistralIndex, s, 65_536, false, EngineKind.Llama);
+        var p = MemoryPlanner.Plan(MinistralIndex, s, context, false);
+        var args = new LlamaEngine(port: 9000).Arguments(new EngineStart(Ministral, new[] { "a" }, p, backend));
+        Assert.Contains("--no-repack", args);
+        Assert.DoesNotContain("--moe-cache-mib", args);
+        Assert.Equal("1024", args[args.ToList().IndexOf("--ubatch-size") + 1]);
     }
 
     [Fact]

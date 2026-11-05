@@ -548,7 +548,8 @@ public sealed class PlanStrip
     {
         View.Show(plan != null);
         if (plan == null) return;
-        var parts = new List<(string Name, ulong Bytes, Color C)> { (L("Vast (VRAM)"), plan.Dense + plan.Overhead, Theme.Violet) };
+        string fixedName = plan.VramTotal == 0 ? L("Vast (RAM)") : plan.GpuLayers < plan.Layers ? L("Vast (VRAM + RAM)") : L("Vast (VRAM)");
+        var parts = new List<(string Name, ulong Bytes, Color C)> { (fixedName, plan.Dense + plan.Overhead, Theme.Violet) };
         if (plan.ExpertCache > 0) parts.Add((L("Expert-cache VRAM"), plan.ExpertCache, Theme.Accent));
         else
         {

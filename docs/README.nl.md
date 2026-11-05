@@ -38,6 +38,18 @@ Met **Experts overslaan**, een keuze naast de startknop op het scherm Modellen, 
 
 Op jouw pc kan dat flink anders zijn. Meet het zelf onder **Vergelijken**. De overige modellen zijn hier nog niet gedraaid en AMD is nog niet gemeten.
 
+### Een laptop met weinig geheugen
+
+Ministral-3-8B Q4 (5 GB) is het model voor een pc met 8 of 16 GB RAM. Gemeten op dezelfde pc, met limieten die een laptop nabootsen, dus niet op een echte laptop. De snelheid op de processor van een echte laptop zal afwijken.
+
+| Bootst na | Context | Schrijven |
+|---|---|---|
+| Een videokaart van 16 GB | 8K tot 32K | **72 tok/s** |
+| Een videokaart van 8 GB: 24 van de 34 lagen op de kaart | 8K | **14 tok/s** |
+| Geen videokaart, 16 GB RAM: 4 processorthreads | 16K in de app | **5 tok/s** |
+
+Op 8 GB RAM zonder videokaart heeft het model ongeveer 5 GB vrij nodig. Met een limiet van 5 GB op wat het in het geheugen mag houden schrijft het nog 5 tok/s, met 4,5 GB zakt dat naar 0,7 tok/s, ook bij een kleinere context, en een echte SSD maakt dat nog erger. Sluit daar dus andere programma's.
+
 ## Wat nog niet werkt
 
 Zie [PARITY.md](PARITY.md) voor de hele lijst. De belangrijkste punten:

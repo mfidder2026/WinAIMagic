@@ -163,7 +163,9 @@ public sealed class SystemCheck
                 ? s.HasGpu
                     ? L($"Nog geen model. Aanbevolen voor deze pc met {s.VramTotal.Gib()} GB VRAM en {s.RamTotal.Gib()} GB RAM: {best.Name} ({best.TotalSize.GbShort()}). Het streamt van de SSD; op zo weinig geheugen is dat nog niet gemeten en het kan traag zijn.")
                     : L($"Nog geen model. Aanbevolen voor deze pc met {s.RamTotal.Gib()} GB RAM: {best.Name} ({best.TotalSize.GbShort()}). Het streamt van de SSD; op zo weinig geheugen is dat nog niet gemeten en het kan traag zijn.")
-            : L($"Nog geen model. Aanbevolen voor deze pc met {s.VramTotal.Gib()} GB VRAM en {s.RamTotal.Gib()} GB RAM: {best.Name} ({best.TotalSize.GbShort()}), dat helemaal in VRAM en RAM past.")
+            : (s.HasGpu
+                  ? L($"Nog geen model. Aanbevolen voor deze pc met {s.VramTotal.Gib()} GB VRAM en {s.RamTotal.Gib()} GB RAM: {best.Name} ({best.TotalSize.GbShort()}), dat helemaal in VRAM en RAM past.")
+                  : L($"Nog geen model. Aanbevolen voor deze pc met {s.RamTotal.Gib()} GB RAM: {best.Name} ({best.TotalSize.GbShort()}), dat helemaal in het RAM past."))
               + (models.Catalog.Models.Any(m => host.FitOf(m) == MemoryPlanner.Fit.Streams) ? " " + L("De grotere modellen kun je ook gebruiken: die streamen van de SSD.") : "");
         var model = new Item("model", L("Model"), text, CheckState.Todo, downloading ? null : L("Naar Modellen"), downloading ? null : CheckAction.OpenModels);
         bool enough = free > best.TotalSize + (5UL << 30);
