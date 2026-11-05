@@ -28,6 +28,7 @@
  "%@ dagen geleden": "vor %@ Tagen",
  "%@ draait al en schrijft eerst een Engelse beschrijving; zo nodig zoekt het op het web hoe iets eruitziet.": "%@ läuft bereits und schreibt zuerst eine englische Beschreibung; bei Bedarf sucht es im Web, wie etwas aussieht.",
  "%@ draait niet op de hoofdengine.": "%@ läuft nicht auf der Hauptengine.",
+ "%@ draait nu alleen als snel model, op de processor, voor Documenten en Beeld. Start de engine om ermee te chatten; dan stopt het snelle exemplaar.": "%@ läuft gerade nur als schnelles Modell auf dem Prozessor, für Dokumente und Bilder. Starte die Engine, um damit zu chatten; die schnelle Kopie stoppt dann.",
  "%@ draait op de hoofdengine, en die kan een model niet over meerdere pc's verdelen. Alleen de tweede engine kan dat. Kies een model dat wel in een cluster kan:": "%@ läuft auf der Hauptengine, und die kann ein Modell nicht auf mehrere PCs verteilen. Das kann nur die zweite Engine. Wähle ein Modell, das im Cluster laufen kann:",
  "%@ heeft minstens %@ VRAM nodig; deze videokaart heeft %@.": "%@ braucht mindestens %@ VRAM; diese Grafikkarte hat %@.",
  "%@ heeft niet de juiste grootte. Het origineel blijft bestaan.": "%@ hat nicht die richtige Größe. Das Original bleibt erhalten.",

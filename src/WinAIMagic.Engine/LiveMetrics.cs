@@ -153,7 +153,9 @@ public sealed class LiveMetrics : IDisposable
                 cpu = (double)(cpuNow.Busy - last.Busy) / (cpuNow.Total - last.Total) * 100;
             lastCpu = cpuNow;
 
+            // an engine that stopped says nothing any more: its last speed must not stay on the gauge
             if (fast) PollEngine(dt);
+            else { engineRate = null; lastDecoded = null; EngineBusy = false; }
             if (secondActive) PollSecond(dt);
             else secondRate = null;
             int streamed = Interlocked.Exchange(ref tokenCount, 0);

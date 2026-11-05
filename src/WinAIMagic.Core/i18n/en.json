@@ -28,6 +28,7 @@
  "%@ dagen geleden": "%@ days ago",
  "%@ draait al en schrijft eerst een Engelse beschrijving; zo nodig zoekt het op het web hoe iets eruitziet.": "%@ is running and first writes an English description; when it needs to, it looks up on the web what something looks like.",
  "%@ draait niet op de hoofdengine.": "%@ does not run on the main engine.",
+ "%@ draait nu alleen als snel model, op de processor, voor Documenten en Beeld. Start de engine om ermee te chatten; dan stopt het snelle exemplaar.": "%@ runs only as the fast model now, on the processor, for Documents and Images. Start the engine to chat with it; the fast copy then stops.",
  "%@ draait op de hoofdengine, en die kan een model niet over meerdere pc's verdelen. Alleen de tweede engine kan dat. Kies een model dat wel in een cluster kan:": "%@ runs on the main engine, and that cannot spread a model over several PCs. Only the second engine can. Choose a model that can run in a cluster:",
  "%@ heeft minstens %@ VRAM nodig; deze videokaart heeft %@.": "%@ needs at least %@ of VRAM; this graphics card has %@.",
  "%@ heeft niet de juiste grootte. Het origineel blijft bestaan.": "%@ is not the right size. The original is kept.",

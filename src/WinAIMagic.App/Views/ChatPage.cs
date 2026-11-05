@@ -308,7 +308,9 @@ public sealed class ChatPage : IPage
         engineBanner.Show(!s.IsRunning);
         if (s.IsRunning) return;
         bool can = app.Host.CanStart;
-        var key = $"{s.Status}|{s.Message}|{can}|{app.Host.WhyNotStartable}|{Settings.Shared.Language}";
+        // the chat's model may run already, as the fast model on the processor: that one does not chat here, and says so
+        var onFast = app.ChatModelOnFast;
+        var key = $"{s.Status}|{s.Message}|{can}|{app.Host.WhyNotStartable}|{Settings.Shared.Language}|{onFast?.Id}";
         if (key == bannerKey) return;
         bannerKey = key;
         UIElement content;
@@ -326,7 +328,10 @@ public sealed class ChatPage : IPage
                 var start = Ui.Btn(L("Start engine"), app.StartEngine, null, Theme.Accent);
                 start.IsEnabled = can;
                 start.Tip(can ? null : app.Host.WhyNotStartable);
-                content = Ui.Row("auto,*,auto", 8, Ui.Icon(Glyph.Power, 14, Theme.Secondary), Ui.Caption(can ? L("De engine staat uit.") : app.Host.WhyNotStartable ?? L("Model of engine nog niet klaar: zie Modellen."), Theme.Primary, 13), start);
+                string said = !can ? app.Host.WhyNotStartable ?? L("Model of engine nog niet klaar: zie Modellen.")
+                    : onFast != null ? L($"{onFast.ShortName} draait nu alleen als snel model, op de processor, voor Documenten en Beeld. Start de engine om ermee te chatten; dan stopt het snelle exemplaar.")
+                    : L("De engine staat uit.");
+                content = Ui.Row("auto,*,auto", 8, Ui.Icon(Glyph.Power, 14, Theme.Secondary), Ui.Caption(said, Theme.Primary, 13), start);
                 break;
         }
         ((FrameworkElement)content).Margin = new Thickness(16, 7, 16, 7);

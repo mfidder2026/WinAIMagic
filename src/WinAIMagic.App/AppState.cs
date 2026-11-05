@@ -71,6 +71,7 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
                 Ui.TryEnqueue(() => { Interlocked.Exchange(ref sampling, 0); Guarded(() => Sampled?.Invoke()); });
         };
         Settings.PropertyChanged += OnSetting;
+        if (Settings.FastModel.Length > 0 && Settings.FastModel == Settings.SelectedModelId) Settings.FastModel = "";
     }
 
     /// <summary>A screen that fails on one update must not take the downloads and the engine down with it: logged, and on with the rest.</summary>
@@ -92,6 +93,11 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
             case nameof(Settings.Language): Ui.TryEnqueue(() => LanguageChanged?.Invoke()); break;
             case nameof(Settings.VramReserveMib): Task.Run(Host.RefreshSystem); break;
             case nameof(Settings.ModelFolder): Task.Run(() => { Host.LoadIndex(); Host.RefreshSystem(); }); break;
+            case nameof(Settings.SelectedModelId):
+                // the heavy model is never the fast one too, however it was chosen (a card, the system check, Compare)
+                if (Settings.FastModel == Settings.SelectedModelId) Settings.FastModel = "";
+                Notify();
+                break;
             default: Notify(); break;
         }
     }
@@ -143,8 +149,18 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     {
         if (Host.Plan is { } plan) Chat.ContextLimit = plan.ContextSize;
         if (Host.SelectedModel is { } m) Chat.ModelName = m.Name;
-        return Task.Run(() => Host.StartEngine());
+        return Task.Run(async () =>
+        {
+            // the same model twice in memory helps nothing: the copy on the second engine makes room for the real one
+            if (ChatModelOnFast != null && documentHost != null) await documentHost.StopFastAndWaitAsync();
+            Host.StartEngine();
+        });
     }
+
+    /// <summary>The chat's model, when it runs only as the fast model on the second engine (on the processor, 16K): the chat does not
+    /// talk to that one.</summary>
+    public ModelInfo? ChatModelOnFast =>
+        Host.Engine?.State.IsActive != true && documentHost?.FastEngine is { } f && f.State.IsActive && f.Model?.Id == Host.SelectedModel?.Id ? f.Model : null;
 
     public void StopEngine() => Task.Run(Host.StopEngine);
 
