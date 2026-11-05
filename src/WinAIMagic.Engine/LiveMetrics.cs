@@ -41,6 +41,25 @@ public sealed class LiveMetrics : IDisposable
     private DateTime lastStream = DateTime.MinValue;
     private int? lastDecoded;
     private double? engineRate;
+    private int? lastDecodedSecond;
+    private double? secondRate;
+    private bool secondActive;
+
+    /// <summary>The second engine (documents, a description for an image); its writing counts on the gauge too.</summary>
+    public Func<IEngine?>? Second { get; set; }
+
+    /// <summary>The second engine runs: sample twice a second and ask it what it writes.</summary>
+    public bool SecondActive
+    {
+        get => secondActive;
+        set
+        {
+            if (secondActive == value) return;
+            secondActive = value;
+            if (!value) { secondRate = null; lastDecodedSecond = null; }
+            Retime();
+        }
+    }
     private EngineActivity? lastActivity;
     private bool polling, sampling;
     private (ulong Busy, ulong Total)? lastCpu;
@@ -91,7 +110,7 @@ public sealed class LiveMetrics : IDisposable
 
     private void Retime()
     {
-        var interval = fast || imageRate != null ? ActiveInterval : IdleInterval;
+        var interval = fast || secondActive || imageRate != null ? ActiveInterval : IdleInterval;
         timer.Change(interval, interval);
     }
 
@@ -135,10 +154,13 @@ public sealed class LiveMetrics : IDisposable
             lastCpu = cpuNow;
 
             if (fast) PollEngine(dt);
+            if (secondActive) PollSecond(dt);
+            else secondRate = null;
             int streamed = Interlocked.Exchange(ref tokenCount, 0);
             // the engine's own count when it answers (any client: this app, the API, tools), else the tokens this app streamed
-            double inst = imageRate ?? engineRate ?? streamed / dt;
-            bool idle = imageRate is double ir ? ir == 0 : engineRate is double r ? r == 0 : (now - lastStream).TotalSeconds > 1.5;
+            double? engines = engineRate is null && secondRate is null ? null : (engineRate ?? 0) + (secondRate ?? 0);
+            double inst = imageRate ?? engines ?? streamed / dt;
+            bool idle = imageRate is double ir ? ir == 0 : engines is double r ? r == 0 : (now - lastStream).TotalSeconds > 1.5;
             // smooth the token rate a little; drop to zero shortly after the stream stops
             lastTokenRate = idle ? 0 : lastTokenRate * 0.6 + inst * 0.4;
 
@@ -187,6 +209,20 @@ public sealed class LiveMetrics : IDisposable
             lastDecoded = decoded;
         }
         return rate;
+    }
+
+    private bool pollingSecond;
+
+    private void PollSecond(double dt)
+    {
+        var e = Second?.Invoke();
+        if (e == null || pollingSecond) return;
+        pollingSecond = true;
+        Task.Run(async () =>
+        {
+            try { secondRate = NextRate(await e.PollActivity(), ref lastDecodedSecond, dt, secondRate); }
+            finally { pollingSecond = false; }
+        });
     }
 
     private void PollEngine(double dt)

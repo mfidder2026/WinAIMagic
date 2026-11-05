@@ -77,7 +77,6 @@ public class ImagePromptTests
             });
         Assert.DoesNotContain("example.com", searched);
         Assert.DoesNotContain("0612345678", searched);
-        Assert.Contains(steps, s => s.StartsWith("Zoeken:", StringComparison.Ordinal));
-        Assert.Contains("Beschrijving schrijven…", steps);
+        Assert.Contains(steps, s => s.StartsWith("zoekt:", StringComparison.Ordinal));
     }
 }

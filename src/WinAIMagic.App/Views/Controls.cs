@@ -481,10 +481,13 @@ public sealed partial class StatusPill : Grid
     private readonly Ellipse dot = new() { Width = 8, Height = 8 };
     private readonly TextBlock text = Ui.Label("", 13, null, FontWeights.Medium);
     private readonly AppState app;
+    private readonly bool all;
 
-    public StatusPill(AppState app)
+    /// <summary>`all` false: only the app's own engine, beside its Start and Stop.</summary>
+    public StatusPill(AppState app, bool all = true)
     {
         this.app = app;
+        this.all = all;
         CornerRadius = new CornerRadius(14);
         Padding = new Thickness(11, 5, 11, 6);
         BorderThickness = new Thickness(1);
@@ -492,12 +495,41 @@ public sealed partial class StatusPill : Grid
         VerticalAlignment = VerticalAlignment.Center;
         text.MaxWidth = 300;
         Children.Add(Ui.H(7, dot, text));
-        this.Tip(L("Engine-status: klik voor het live dashboard"));
+        this.Tip(all ? L("Welke modellen in het geheugen staan: klik voor het live dashboard") : L("Engine-status: klik voor het live dashboard"));
         Tapped += (_, _) => app.Pane = new Pane(PaneKind.Live);
         app.Watch(this, Update);
     }
 
+    /// <summary>Every model in memory with what it does: the chat engine (Zwaar), the second engine (Snel) and the image model while it
+    /// draws. Green: runs; amber: loading; red: failed; grey: nothing in memory.</summary>
     private void Update()
+    {
+        if (all) { UpdateAll(); return; }
+        UpdateOwn();
+    }
+
+    private static (string Text, Windows.UI.Color Color, int Rank)? Part(EngineState s, string? name, string role) => s.Status switch
+    {
+        EngineStatus.Running => (L($"{name ?? "Model"} actief ({role})"), Theme.Mint, 1),
+        EngineStatus.Starting => (L($"{name ?? "Model"} laden… ({role})"), Theme.Amber, 2),
+        EngineStatus.Failed => (L($"{name ?? "Model"}: fout"), Theme.Pink, 3),
+        _ => null,
+    };
+
+    private void UpdateAll()
+    {
+        var parts = new List<(string Text, Windows.UI.Color Color, int Rank)>();
+        if (Part(app.EngineState, app.Host.Engine?.Model?.ShortName ?? app.Host.SelectedModel?.ShortName, L("Zwaar")) is { } heavy) parts.Add(heavy);
+        if (app.FastEngine is { } fast && Part(fast.State, fast.Model?.ShortName, L("Snel")) is { } quick) parts.Add(quick);
+        if (app.Host.Images.Busy) parts.Add((L($"{app.Host.ImageModel?.ShortName ?? L("Beeld")} tekent"), Theme.Mint, 1));
+        var color = parts.Count == 0 ? Theme.Rgb(140, 145, 160) : parts.MaxBy(p => p.Rank).Color;
+        text.MaxWidth = 520;
+        text.SetIfChanged(parts.Count == 0 ? L("Geen model geladen") : string.Join(" · ", parts.Select(p => p.Text)));
+        dot.Fill = new SolidColorBrush(color);
+        BorderBrush = Theme.Solid(color, 0.4);
+    }
+
+    private void UpdateOwn()
     {
         var s = app.EngineState;
         var color = s.Status switch

@@ -77,14 +77,26 @@ public static class ImagePrompt
                     catch (JsonException) { }
                 }
                 var call = new ToolCall(id, name, arguments);
-                onStep(WebTools.Label(call));
+                onStep(Label(call));
                 var output = await run(call);
                 foreach (var s in output.Sources) if (!sources.Any(x => x.Url == s.Url)) sources.Add(s);
-                messages.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = id, ["content"] = output.Text.Length > 6000 ? output.Text[..6000] : output.Text });
+                // the fast model has a context of 16K: a page is cut to what fits a few times
+                messages.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = id, ["content"] = output.Text.Length > 3000 ? output.Text[..3000] : output.Text });
             }
-            onStep(L("Beschrijving schrijven…"));
         }
         return new Result(text, sources);
+    }
+
+    /// <summary>What the model does, after its name: "zoekt: Rijksmuseum", "leest: rijksmuseum.nl".</summary>
+    public static string Label(ToolCall call)
+    {
+        var args = WorkspaceTools.Args(call);
+        return call.Name switch
+        {
+            "web_search" => L($"zoekt: {WorkspaceTools.Str(args, "query") ?? ""}"),
+            "fetch_url" => L($"leest: {(Uri.TryCreate(WorkspaceTools.Str(args, "url") ?? "", UriKind.Absolute, out var u) ? u.Host.Replace("www.", "") : "…")}"),
+            _ => call.Name,
+        };
     }
 
     /// <summary>The description alone: no quotes, no label in front, no thinking left behind.</summary>

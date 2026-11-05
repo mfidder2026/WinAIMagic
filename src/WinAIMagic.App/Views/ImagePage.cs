@@ -38,6 +38,8 @@ public sealed class ImagePage : IPage
     private readonly Button make, stop;
     private readonly Microsoft.UI.Xaml.Controls.Primitives.ToggleButton improve = new();
     private readonly TextBlock improveNote = Ui.Caption();
+    private readonly TextBlock roleLine = Ui.Label("", 13, Theme.Secondary, wrap: true);
+    private readonly StackPanel stepsPanel = Ui.V(5);
     private readonly TextBlock planNote = Ui.Caption(), engineNote = Ui.Caption("", Theme.Solid(Theme.Amber));
     private readonly StackPanel working = Ui.V(5);
     private readonly ProgressBar bar = new() { Minimum = 0, Maximum = 1 };
@@ -94,7 +96,9 @@ public sealed class ImagePage : IPage
         makePart.Children.Add(prompt);
         makePart.Children.Add(Ui.Row("auto,auto,auto,auto,auto,*", 10, Ui.Label(L("Grootte"), 13, Theme.Secondary), sizes, improve, make, stop));
         ((FrameworkElement)((Grid)makePart.Children[1]).Children[0]).VerticalAlignment = VerticalAlignment.Center;
+        makePart.Children.Add(roleLine);
         makePart.Children.Add(working);
+        makePart.Children.Add(stepsPanel);
         makePart.Children.Add(improveNote);
         makePart.Children.Add(planNote);
         makePart.Children.Add(Ui.Caption(L("Het model volgt een beschrijving in het Engels het best: in het Nederlands mist het soms waar het om gaat.")));
@@ -181,11 +185,13 @@ public sealed class ImagePage : IPage
         string chatName = host.SelectedModel?.ShortName ?? L("Het chatmodel");
         improve.Tip(L($"{chatName} schrijft eerst een betere Engelse beschrijving en zoekt zo nodig op het web hoe iets eruitziet. Dat kost wat tijd."));
         bool improving = app.Settings.ImageImprove && !busy;
-        improveNote.SetIfChanged(!improving ? ""
-            : host.Engine?.State.IsRunning == true
-                ? L($"{chatName} verbetert eerst de beschrijving. Wat naar de zoekmachine gaat, is ontdaan van e-mailadressen, nummers en bedragen.")
-                : L($"{chatName} start eerst om de beschrijving te verbeteren; dat kan even duren."));
-        improveNote.Show(improving);
+        // who does what: the image model always, the model that writes the description when the switch is on
+        var writer = app.Settings.ImageImprove ? app.Describer : null;
+        string drawerText = L($"Afbeelding: {model.Name}");
+        roleLine.SetIfChanged(!app.Settings.ImageImprove ? drawerText
+            : (writer != null ? L($"Beschrijving: {writer.Model.Name} ({writer.Role})") : L("Beschrijving: geen chatmodel gedownload")) + "   ·   " + drawerText);
+        improveNote.SetIfChanged(improving && writer != null ? WriterNote(writer) : "");
+        improveNote.Show(improving && writer != null);
         prompt.IsEnabled = !busy;
         working.Show(busy);
         bar.Value = images.Fraction;
@@ -198,7 +204,8 @@ public sealed class ImagePage : IPage
         bool engineRuns = host.Engine?.State.IsActive == true;
         engineNote.SetIfChanged(engineRuns && host.Engine?.Model is { } running
             ? L($"{running.ShortName} stopt zolang er een afbeelding wordt gemaakt: daarnaast is meestal geen ruimte. Start het daarna weer in een gesprek.") : "");
-        engineNote.Show(engineRuns && !busy);
+        engineNote.Show(engineRuns && !busy && !app.Settings.ImageImprove);
+        ShowSteps();
         note.SetIfChanged(images.Note ?? "");
         note.Show(images.Note != null);
         error.SetIfChanged(images.Error ?? "");
@@ -213,9 +220,47 @@ public sealed class ImagePage : IPage
 
     private void Elapsed()
     {
-        var images = app.Host.Images;
-        if (!images.Busy) return;
-        step.SetIfChanged(images.Status + " · " + Ui.Clock((DateTime.Now - images.Started).TotalSeconds));
+        if (app.Host.Images.Busy) ShowSteps();
+    }
+
+    /// <summary>What will happen before the image, in plain words: which model starts, and what makes room.</summary>
+    private string WriterNote(ImageDescriber writer)
+    {
+        var engine = writer.OnFast ? app.FastEngine : app.Host.Engine;
+        bool runs = engine?.State.IsRunning == true && engine.Model?.Id == writer.Model.Id;
+        string first = runs
+            ? L($"{writer.Model.ShortName} draait al en schrijft eerst een Engelse beschrijving; zo nodig zoekt het op het web hoe iets eruitziet.")
+            : L($"{writer.Model.ShortName} start eerst (enkele seconden tot minuten) en schrijft een Engelse beschrijving; zo nodig zoekt het op het web hoe iets eruitziet.");
+        return first + " " + L("Is er daarna te weinig geheugen voor de afbeelding, dan stopt een model om ruimte te maken; dat zie je in de stappen.")
+               + " " + L("Wat naar de zoekmachine gaat, is ontdaan van e-mailadressen, nummers en bedragen.");
+    }
+
+    private string stepsKey = "";
+
+    /// <summary>Each step with the model that does it: a ring while it runs, a check when done, a cross when it failed. It stays after the image.</summary>
+    private void ShowSteps()
+    {
+        var steps = app.Host.Images.Steps;
+        var running = steps.LastOrDefault(s => s.State == ImageStep.StepState.Running);
+        var key = string.Join("|", steps.Select(s => s.Title + s.State)) + (running == null ? "" : ((int)(DateTime.Now - running.Started).TotalSeconds).ToString());
+        stepsPanel.Show(steps.Count > 0);
+        if (key == stepsKey) return;
+        stepsKey = key;
+        stepsPanel.Children.Clear();
+        foreach (var s in steps)
+        {
+            FrameworkElement mark = s.State switch
+            {
+                ImageStep.StepState.Running => new ProgressRing { Width = 14, Height = 14, IsActive = true },
+                ImageStep.StepState.Done => Ui.Icon(Glyph.Done, 13, Theme.Solid(Theme.Mint)),
+                _ => Ui.Icon(Glyph.Error, 13, Theme.Solid(Theme.Amber)),
+            };
+            mark.Width = 16;
+            var title = Ui.Label(s.Title, 13, s.State == ImageStep.StepState.Running ? null : Theme.Secondary);
+            title.TextTrimming = TextTrimming.CharacterEllipsis;
+            var time = Ui.Label(s.State == ImageStep.StepState.Running ? Ui.Clock((DateTime.Now - s.Started).TotalSeconds) : "", 13, Theme.Secondary);
+            stepsPanel.Children.Add(Ui.Row("auto,*,auto", 8, mark, title, time));
+        }
     }
 
     private string shownPath = "";

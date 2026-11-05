@@ -64,7 +64,7 @@ FLUX.2 Klein 4B maakt afbeeldingen op het scherm **Beeld**. De download is 5,3 G
 | Geen videokaart, 4 processorthreads | 1024 x 1024 | **9 min** | 7,5 GB eigen geheugen |
 | Geen videokaart, 4 threads, laatste stap in delen | 1024 x 1024 | **12 min** | 1,4 GB eigen geheugen |
 
-FLUX staat ook op het scherm Modellen (**Kies voor afbeeldingen**) en bij **Vergelijken**, dat op elke pc dezelfde afbeelding van 1024 x 1024 maakt: 10 s met laden op de test-pc, ongeveer 5.000 beeldtokens per seconde. Terwijl het tekent, telt de snelheidsmeter die beeldtokens. Een Engelse beschrijving werkt het best. Met **Verbeteren met web** schrijft het gekozen chatmodel die Engelse beschrijving eerst, en zoekt het zo nodig op het web hoe iets eruitziet; alleen de zoekvraag en de pagina's die het leest gaan naar buiten.
+FLUX staat ook op het scherm Modellen (**Kies voor afbeeldingen**) en bij **Vergelijken**, dat op elke pc dezelfde afbeelding van 1024 x 1024 maakt: 10 s met laden op de test-pc, ongeveer 5.000 beeldtokens per seconde. Terwijl het tekent, telt de snelheidsmeter die beeldtokens. Een Engelse beschrijving werkt het best. Met **Verbeteren met web** schrijft het snelle model (Snel) die Engelse beschrijving eerst, en zoekt het zo nodig op het web hoe iets eruitziet; alleen de zoekvraag en de pagina's die het leest gaan naar buiten. Het scherm toont elke stap met het model dat hem doet, en de balk bovenaan noemt elk model dat in het geheugen staat.
 
 Elke modelkaart heeft dezelfde rolknoppen: **Zwaar** (het chatmodel), **Snel** (het snelle model van Documenten) en **Afbeeldingen**. Documenten toont alle drie, met een groene stip zolang ze draaien.
 

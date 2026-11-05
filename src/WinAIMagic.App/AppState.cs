@@ -123,6 +123,8 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     internal Uri? TestUrl { get; set; }
 
     public EngineState EngineState => TestState ?? Host.Engine?.State ?? EngineState.Stopped;
+    /// <summary>The second engine (documents, a description for an image) when it was ever started.</summary>
+    public IEngine? FastEngine => documentHost?.FastEngine;
     public double TokensPerSec => Host.Metrics.Current?.TokensPerSec ?? 0;
     public Uri BaseUrl => TestUrl ?? Host.Engine?.BaseUrl ?? new Uri($"http://{(Settings.Host == "0.0.0.0" ? "127.0.0.1" : Settings.Host)}:{Settings.Port}");
     /// <summary>The model the chat talks to.</summary>
@@ -152,32 +154,75 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     public Task MakeImage(string prompt, ImageSize size) => Task.Run(() => Host.MakeImage(prompt, size, async () =>
     {
         if (studio?.Busy == true) return Lang.L("De documentmodule is bezig. Wacht tot die klaar is of stop hem.");
-        if (documentHost != null) await documentHost.StopFastAndWaitAsync();
+        await MakeRoomForImage(size);
         return null;
     }, improve: Settings.ImageImprove ? step => ImproveDescription(prompt, step) : null));
+
+    /// <summary>Who writes the better description: the fast model (Snel), the heavy one only when there is no other.</summary>
+    public ImageDescriber? Describer
+    {
+        get
+        {
+            var store = Host.Store;
+            var downloaded = store.Catalog.Models.Where(m => store.StatusOf(m.Id).IsComplete && m.Tier?.Llama != false).ToList();
+            var heavy = Host.SelectedModel is { } h && store.StatusOf(h.Id).IsComplete ? h : null;
+            var engines = DocumentEngines;     // makes the host of the second engine when it is not there yet
+            var fast = documentHost?.FastEngine;
+            var fastRunning = fast?.State.IsRunning == true ? fast.Model : null;
+            return ImageDescriber.Choose(heavy, downloaded, Settings.FastModel, Host.Engine?.State.IsRunning == true, fastRunning,
+                                         documentHost?.CanRunFastBeside() ?? false);
+        }
+    }
+
+    /// <summary>The fast model runs on the processor and may stay beside the image when the RAM has room for both; else it makes room.</summary>
+    private async Task MakeRoomForImage(ImageSize size)
+    {
+        if (documentHost?.FastEngine is not { } fast || !fast.State.IsActive) return;
+        var plan = Host.ImagePlanFor(size);
+        // what the image engine holds of its own beside the weights it maps: measured 5 GB on the card's path, the decoder on the processor
+        ulong need = (plan.OnCard ? 5_000_000_000 : ImagePlanner.DecoderBytes(size) + 2_500_000_000) + 2_000_000_000;
+        if (SystemInfo.AvailableMemory() >= need) return;
+        Host.Images.Step(Lang.L($"{fast.Model?.ShortName ?? Lang.L("Snel")} stopt om ruimte te maken voor de afbeelding"));
+        await documentHost.StopFastAndWaitAsync();
+    }
 
     /// <summary>The chat model writes a better description: started first when it does not run; the engine makes room afterwards, as for
     /// any image.</summary>
     private async Task<(string Prompt, IReadOnlyList<ImageSource> Sources)> ImproveDescription(string text, Action<string> onStep)
     {
-        var model = Host.SelectedModel ?? throw new InvalidOperationException(Lang.L("Er is geen chatmodel gekozen."));
-        if (Host.Engine?.State.IsRunning != true)
+        var writer = Describer ?? throw new InvalidOperationException(Lang.L("Er is geen chatmodel gedownload."));
+        var model = writer.Model;
+        Uri baseUrl;
+        if (writer.OnFast)
         {
-            if (!Host.Store.StatusOf(model.Id).IsComplete) throw new InvalidOperationException(Lang.L($"{model.Name} is nog niet gedownload."));
-            if (!Host.ChatModelReady) throw new InvalidOperationException(Lang.L($"{model.Name} kan nu niet starten."));
-            onStep(Lang.L($"{model.ShortName} starten…"));
-            if (Host.Plan is { } plan) Chat.ContextLimit = plan.ContextSize;
-            Host.StartEngine(forImage: true);
-            var started = DateTime.UtcNow;
-            while (Host.Engine?.State.IsRunning != true)
+            var fast = documentHost!.FastEngine;
+            if (!(fast?.State.IsRunning == true && fast.Model?.Id == model.Id))
             {
-                if (Host.Engine?.State.Status == Engine.EngineStatus.Failed) throw new InvalidOperationException(Host.Engine.State.Message ?? Lang.L($"{model.Name} startte niet."));
-                if ((DateTime.UtcNow - started).TotalSeconds > 1800) throw new InvalidOperationException(Lang.L($"{model.Name} startte niet."));
-                await Task.Delay(500);
+                onStep(Lang.L($"{model.ShortName} ({writer.Role}) laden…"));
+                await documentHost.StartForImageAsync(model);
             }
+            baseUrl = documentHost.FastBaseUrl;
         }
-        onStep(Lang.L("Beschrijving verbeteren…"));
-        var result = await ImagePrompt.Improve(text, Host.Engine?.Model?.Id ?? model.Id, ImagePrompt.Sender(BaseUrl), onStep);
+        else
+        {
+            if (Host.Engine?.State.IsRunning != true)
+            {
+                if (!Host.ChatModelReady) throw new InvalidOperationException(Lang.L($"{model.Name} kan nu niet starten."));
+                onStep(Lang.L($"{model.ShortName} ({writer.Role}) laden…"));
+                if (Host.Plan is { } plan) Chat.ContextLimit = plan.ContextSize;
+                Host.StartEngine(forImage: true);
+                var started = DateTime.UtcNow;
+                while (Host.Engine?.State.IsRunning != true)
+                {
+                    if (Host.Engine?.State.Status == Engine.EngineStatus.Failed) throw new InvalidOperationException(Host.Engine.State.Message ?? Lang.L($"{model.Name} startte niet."));
+                    if ((DateTime.UtcNow - started).TotalSeconds > 1800) throw new InvalidOperationException(Lang.L($"{model.Name} startte niet."));
+                    await Task.Delay(500);
+                }
+            }
+            baseUrl = BaseUrl;
+        }
+        onStep(Lang.L($"{model.ShortName} ({writer.Role}) schrijft de beschrijving…"));
+        var result = await ImagePrompt.Improve(text, model.Id, ImagePrompt.Sender(baseUrl), s => onStep(model.ShortName + " " + s));
         return (result.Prompt, result.Sources.Select(s => new ImageSource(s.Title, s.Url)).ToList());
     }
 

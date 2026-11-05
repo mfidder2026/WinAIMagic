@@ -248,12 +248,11 @@ public class ImageMakerTests : EngineTest
         var m = Maker();
         var seen = new List<string>();
         m.Changed += () => { lock (seen) seen.Add(m.Status); };
-        await m.Make("een vos", Size, OnCard, Card, Files);
+        await m.Make("een vos", Size, OnCard, Card, Files, drawer: "FLUX.2");
         lock (seen)
         {
-            Assert.Contains("Tekst lezen…", seen);
-            Assert.Contains("Tekenen: stap 4 van 4", seen);
-            Assert.Contains("Afbeelding afmaken…", seen);
+            Assert.Contains("FLUX.2: Tekst lezen…", seen);
+            Assert.Contains("FLUX.2: Afbeelding afmaken…", seen);
         }
     }
 
@@ -289,6 +288,35 @@ public class ImageMakerTests : EngineTest
         Assert.Single(m.Sources);
         Assert.Equal("a red fox", Assert.Single(m.History()).UsedPrompt);
         Assert.Contains("-p a red fox ", File.ReadAllText(Paths.ImageLog));
+    }
+
+    /// <summary>Every step names the model that does it, and all of them are done afterwards; the list stays.</summary>
+    [Fact]
+    public async Task TheStepsNameTheModels()
+    {
+        var m = Maker();
+        await m.Make("een vos", Size, OnCard, Card, Files, drawer: "FLUX.2", improve: step =>
+        {
+            step("Ministral-3-8B (Snel) schrijft de beschrijving…");
+            step("Ministral-3-8B zoekt: vos");
+            return Task.FromResult<(string, IReadOnlyList<ImageSource>)>(("a red fox", Array.Empty<ImageSource>()));
+        });
+        var steps = m.Steps;
+        Assert.Equal("Ministral-3-8B (Snel) schrijft de beschrijving…", steps[0].Title);
+        Assert.Contains(steps, s => s.Title.StartsWith("FLUX.2: ", StringComparison.Ordinal));
+        Assert.All(steps, s => Assert.Equal(ImageStep.StepState.Done, s.State));
+    }
+
+    [Fact]
+    public async Task AStoppedImageEndsItsStep()
+    {
+        var m = Maker();
+        var making = m.Make("slaap", Size, OnCard, Card, Files, drawer: "FLUX.2");
+        Assert.True(WaitUntil(() => m.Status.Contains("Tekenen", StringComparison.Ordinal)));
+        m.Stop();
+        await making;
+        Assert.Equal("Stoppen…", m.Steps[^1].Title);
+        Assert.DoesNotContain(m.Steps, s => s.State == ImageStep.StepState.Running);
     }
 
     [Fact]
@@ -349,7 +377,7 @@ public class ImageMakerTests : EngineTest
     {
         var m = Maker();
         var making = m.Make("slaap", Size, OnCard, Card, Files);
-        Assert.True(WaitUntil(() => m.Status.StartsWith("Tekenen", StringComparison.Ordinal)));
+        Assert.True(WaitUntil(() => m.Status.Contains("Tekenen", StringComparison.Ordinal)));
         Assert.True(m.Busy);
         m.Stop();
         Assert.Null(await making);
@@ -496,7 +524,7 @@ public class ImageHostTests : EngineTest
         using var host = Host();
         Assert.True(host.CanStart);
         var making = host.MakeImage("slaap", Size);
-        Assert.True(WaitUntil(() => host.Images.Status.StartsWith("Tekenen", StringComparison.Ordinal)));
+        Assert.True(WaitUntil(() => host.Images.Status.Contains("Tekenen", StringComparison.Ordinal)));
         Assert.False(host.CanStart);
         Assert.Contains("afbeelding", host.WhyNotStartable);
         host.StartEngine();

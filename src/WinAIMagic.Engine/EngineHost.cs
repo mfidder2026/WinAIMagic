@@ -298,11 +298,13 @@ public sealed class EngineHost : IDisposable
                     busyNow = (await engine.PollActivity())?.Busy == true;
                 }
                 if (busyNow) return L("De engine werkt aan een antwoord. Wacht tot dat klaar is of stop het.");
+                // the heavy model shares the card with the image: it always makes room
+                Images.Step(L($"{engine.Model?.ShortName ?? L("Het chatmodel")} stopt om ruimte te maken voor de afbeelding"));
                 await engine.StopAndWait();
                 if (simulated == null) RefreshSystem();
             }
             return null;
-        }, improve);
+        }, improve, m?.ShortName ?? "");
     }
 
     /// <summary>The chosen chat model could start now: downloaded, planned, nothing in the way but an image.</summary>

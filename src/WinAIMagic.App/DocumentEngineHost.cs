@@ -24,6 +24,7 @@ internal sealed class DocumentEngineHost : IDocumentEngines, IDisposable
     public DocumentEngineHost(AppState app)
     {
         this.app = app;
+        app.Host.Metrics.Second = () => fast;
         app.Changed += () => StateChanged?.Invoke();
     }
 
@@ -91,10 +92,32 @@ internal sealed class DocumentEngineHost : IDocumentEngines, IDisposable
         var index = GGUFIndex.Load(shards, model.Files.Select(f => f.Size).ToList());
         var plan = MemoryPlanner.Plan(index, SystemInfo.Current(processor), DocumentModels.FastContext, false);
         var engine = new LlamaEngine(DocumentModels.FastPort, Paths.EngineFastLog);
-        engine.StateChanged += _ => app.Notify();
+        engine.StateChanged += state =>
+        {
+            // the gauge counts what the second engine writes too
+            Host.Metrics.SecondActive = state.IsActive;
+            app.Notify();
+        };
         fast?.Dispose();
         fast = engine;
         engine.Start(new EngineStart(model, shards, plan, processor));
+    }
+
+    /// <summary>The engine that runs the fast model, for the status pill and the image page.</summary>
+    public LlamaEngine? FastEngine => fast;
+
+    /// <summary>For an image's description: the fast model, also when no heavy model runs. Returns once it answers.</summary>
+    public async Task StartForImageAsync(ModelInfo model)
+    {
+        if (fast?.State.IsRunning == true && fast.Model?.Id == model.Id) return;
+        StartFast(model.Id);
+        var started = DateTime.UtcNow;
+        while (fast?.State.IsRunning != true)
+        {
+            if (fast?.State.Status == Engine.EngineStatus.Failed) throw new InvalidOperationException(fast.State.Message ?? L($"{model.Name} startte niet."));
+            if ((DateTime.UtcNow - started).TotalSeconds > 900) throw new InvalidOperationException(L($"{model.Name} startte niet."));
+            await Task.Delay(300);
+        }
     }
 
     public void StopFast()

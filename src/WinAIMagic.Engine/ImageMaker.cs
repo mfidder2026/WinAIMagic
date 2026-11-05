@@ -130,6 +130,8 @@ public sealed class ImageProgress
     /// <summary>Seconds per step, as the engine's progress bar says; null before the first step.</summary>
     public double? SecondsPerStep { get; private set; }
     public bool IsDrawing => stage == Stage.Drawing;
+    /// <summary>0 reading the text, 1 drawing, 2 finishing: a new number is a new step on the page.</summary>
+    public int StageIndex => (int)stage;
 
     public static string Clean(string line) => Ansi.Replace(line, "").Trim();
 
@@ -187,6 +189,15 @@ public sealed class ImageProgress
     };
 }
 
+/// <summary>One step of making an image, with the model that does it, as the page lists them.</summary>
+public sealed class ImageStep
+{
+    public enum StepState { Running, Done, Failed }
+    public string Title { get; internal set; } = "";
+    public StepState State { get; internal set; } = StepState.Running;
+    public DateTime Started { get; } = DateTime.Now;
+}
+
 /// <summary>A page an improved description came from.</summary>
 public sealed record ImageSource(string Title, string Url);
 
@@ -232,6 +243,43 @@ public sealed class ImageMaker
     public IReadOnlyList<ImageSource> Sources { get; private set; } = Array.Empty<ImageSource>();
     public DateTime Started { get; private set; }
 
+    private readonly List<ImageStep> steps = new();
+    private string drawer = "";
+
+    /// <summary>What happened, step by step; it stays on the page until the next image.</summary>
+    public IReadOnlyList<ImageStep> Steps { get { lock (steps) return steps.ToList(); } }
+
+    /// <summary>A new step: the one before it is done.</summary>
+    public void Step(string title)
+    {
+        lock (steps)
+        {
+            foreach (var s in steps) if (s.State == ImageStep.StepState.Running) s.State = ImageStep.StepState.Done;
+            steps.Add(new ImageStep { Title = title });
+        }
+        Status = title;
+        Notify();
+    }
+
+    private void Retitle(string title)
+    {
+        bool renamed;
+        lock (steps)
+        {
+            renamed = steps.Count > 0 && steps[^1].State == ImageStep.StepState.Running;
+            if (renamed) steps[^1].Title = title;
+        }
+        if (renamed) Status = title;
+        else Step(title);
+    }
+
+    private void FinishSteps(bool failed)
+    {
+        lock (steps)
+            foreach (var s in steps)
+                if (s.State == ImageStep.StepState.Running) s.State = failed ? ImageStep.StepState.Failed : ImageStep.StepState.Done;
+    }
+
     private readonly object gate = new();
     private ChildProcess? running;
     private bool stopped;
@@ -245,9 +293,10 @@ public sealed class ImageMaker
     /// <summary>Makes the image. `prepare` runs first with this maker already busy, so nothing starts beside it; what it returns is why not to go on.
     /// On return: the image, or null with the reason in `Error` (a stop leaves that empty).
     /// `improve` runs before that: it gives the description for the image model and where it came from, and names its steps; when it
-    /// fails, the image is made from the user's own description and `Note` says why.</summary>
+    /// fails, the image is made from the user's own description and `Note` says why.
+    /// `drawer`: the image model's short name, for the steps.</summary>
     public async Task<ImageResult?> Make(string prompt, ImageSize size, SystemInfo pc, IGpuBackend backend, IReadOnlyList<string> files, long? seed = null, Func<Task<string?>>? prepare = null,
-                                         Func<Action<string>, Task<(string Prompt, IReadOnlyList<ImageSource> Sources)>>? improve = null)
+                                         Func<Action<string>, Task<(string Prompt, IReadOnlyList<ImageSource> Sources)>>? improve = null, string drawer = "")
     {
         lock (gate)
         {
@@ -257,6 +306,8 @@ public sealed class ImageMaker
         }
         Error = Note = null;
         Fraction = 0;
+        lock (steps) steps.Clear();
+        this.drawer = drawer.Length > 0 ? drawer : L("Het beeldmodel");
         Status = L("Voorbereiden…");
         Started = DateTime.Now;
         Notify();
@@ -268,16 +319,15 @@ public sealed class ImageMaker
             string drawn = prompt;
             if (improve != null)
             {
-                Status = L("Beschrijving verbeteren…");
-                Notify();
                 try
                 {
-                    var better = await improve(step => { Status = step; Notify(); });
+                    var better = await improve(Step);
                     drawn = better.Prompt;
                     Sources = better.Sources;
                 }
                 catch (Exception e) when (e is not OperationCanceledException)
                 {
+                    FinishSteps(failed: true);
                     Note = L($"De beschrijving kon niet worden verbeterd ({LogFilter.Clean(e.Message)}); de afbeelding is met je eigen beschrijving gemaakt.");
                 }
                 if (stopped) return null;
@@ -334,6 +384,7 @@ public sealed class ImageMaker
         }
         finally
         {
+            FinishSteps(failed: Error != null || stopped);
             lock (gate) Busy = false;
             Status = "";
             OnRate?.Invoke(null);
@@ -362,10 +413,13 @@ public sealed class ImageMaker
                     if (ImageProgress.Clean(line).Length == 0) continue;
                     if (!line.Contains("it/s", StringComparison.Ordinal) && !line.Contains("/it", StringComparison.Ordinal) && !line.Contains("B/s", StringComparison.Ordinal))
                         log.WriteLine(LogFilter.Clean(ImageProgress.Clean(line)));
+                    int stage = progress.StageIndex;
                     if (progress.Read(line))
                     {
                         Fraction = progress.Fraction;
-                        Status = progress.Status;
+                        string title = drawer + ": " + progress.Status;
+                        if (progress.StageIndex != stage) Step(title);
+                        else Retitle(title);
                         // the steps draw image tokens; reading the text and finishing the image do not
                         OnRate?.Invoke(progress.IsDrawing && progress.SecondsPerStep is double perStep && perStep > 0 ? tokens / perStep : 0);
                         Notify();
@@ -373,8 +427,7 @@ public sealed class ImageMaker
                 }
             }
         }
-        Status = progress.Status;
-        Notify();
+        Step(drawer + ": " + progress.Status);
         var child = ChildProcess.Start(new ChildStart(exe, args) { Cwd = Path.GetDirectoryName(exe), OnOutput = Consume });
         lock (gate) running = child;
         if (stopped) child.KillTree();
@@ -397,8 +450,7 @@ public sealed class ImageMaker
             stopped = true;
             running?.KillTree();
         }
-        Status = L("Stoppen…");
-        Notify();
+        Step(L("Stoppen…"));
     }
 
     /// <summary>The images in the folder, newest first; nothing is created for this.</summary>

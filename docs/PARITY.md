@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.9.8
+# Parity with MacAIMagic 1.9.10
 
-How this version relates to MacAIMagic at commit `6696609`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `e532c8a`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -22,6 +22,12 @@ How this version relates to MacAIMagic at commit `6696609`, the last Mac commit 
 | `Views/*` | `App/Views/*` | Done, in code rather than XAML |
 
 ## Taken over since the first port
+
+### Up to `e532c8a` (1.9.10): the fast model writes the description, and the pill names every model
+
+- **Taken over, `fad00e7`:** with **Verbeteren met web** the fast model (Snel) writes the description: the one chosen under Modellen, else the smallest downloaded. The heavy model only when there is no other, or when it runs already and the fast one does not fit beside it. Pages are cut to 3,000 characters for the fast model's 16K context. The status pill names every model in memory with its role ("Ministral-3-8B actief (Snel) · FLUX.2 tekent", "Geen model geladen" when nothing is); the Engine card under Modellen keeps only its own engine. Beeld says who does what and lists every step with its model, and the list stays after the image. The speed gauge counts the second engine too.
+- **Adapted:** the second engine runs on the processor here, so the fast model takes no room on the card and stays beside the image when the RAM has room for both; it stops only when it does not. The heavy model shares the card with FLUX and still always stops, as a step on the page. Measured here with Ministral as the fast model and DeepSeek chosen but not downloaded, as the owner had it on the Mac: Ministral loaded in 4 s, searched, read rijksmuseum.nl and one more page, wrote the description, stayed beside FLUX; 89 s for everything with a 512 x 512 image, most of it the description on the processor.
+- **Does not apply:** `8998723` and `e532c8a` (the Mac's releases), `4fe3a48` (a sentence in the Mac's Dutch README).
 
 ### Up to `6696609` (1.9.8): a better description with the web, and one way to choose every role
 

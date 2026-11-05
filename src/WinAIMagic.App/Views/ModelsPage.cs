@@ -430,7 +430,7 @@ public sealed class EngineCard
     public EngineCard(AppState app)
     {
         this.app = app;
-        var head = Ui.Row("auto,*,auto", 10, new StatusPill(app), model, new EngineButton(app));
+        var head = Ui.Row("auto,*,auto", 10, new StatusPill(app, all: false), model, new EngineButton(app));
         buildPack = Ui.Btn(L("Bouw het pack"), () => _ = app.Host.BuildPack(), Glyph.Fixed);
         buildPack.HorizontalAlignment = HorizontalAlignment.Left;
         skip = SettingsDialog.Pick(skipOptions, Settings.Shared.SkipExperts, v => Settings.Shared.SkipExperts = v);
