@@ -41,7 +41,7 @@ Available in English, Dutch, German and French.
 
 ## Install
 
-1. Download `WinAIMagic-Setup-*.exe` from [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest) (about 1.8 GB).
+1. Download `WinAIMagic-Setup-*.exe` from [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest) (about 2.1 GB).
 2. Run it. Choose a folder for the models, ideally on a fast NVMe drive. No administrator rights are needed.
 3. Windows SmartScreen may warn you, because this installer is not code-signed yet: choose **More info** and **Run anyway**. The `.sha256` next to the installer lets you check the file.
 4. In the app, open **Models**, download a model, and press **Start engine**.
