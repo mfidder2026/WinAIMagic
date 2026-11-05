@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.9.10
+# Parity with MacAIMagic 1.9.11
 
-How this version relates to MacAIMagic at commit `e532c8a`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `008ab2f`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -22,6 +22,11 @@ How this version relates to MacAIMagic at commit `e532c8a`, the last Mac commit 
 | `Views/*` | `App/Views/*` | Done, in code rather than XAML |
 
 ## Taken over since the first port
+
+### `008ab2f` (1.9.11): an English, name-first description of only what can be seen
+
+- **Taken over as it is:** the Mac's instruction word for word: English whatever the user wrote, the subject's common English name first, only what can be seen (no measurements, dates, history or construction), at most 60 words. An answer that is not English is asked for once more. When the model searched but read no page, the app reads the first page with text and an encyclopedia (no stock-photo sites) and has it rewrite from those. The Mac's test names.
+- **Measured here** with Ministral as the fast model (on the processor) and "maak een foto van de eifeltoren" at 768 x 768: it searched, read en.wikipedia.org, wrote "A photograph of the Eiffel Tower in Paris, ...", and FLUX drew the real tower; 85 s for everything, most of it the description on the processor.
 
 ### Up to `e532c8a` (1.9.10): the fast model writes the description, and the pill names every model
 

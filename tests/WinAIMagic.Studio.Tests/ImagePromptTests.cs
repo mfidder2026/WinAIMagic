@@ -54,7 +54,7 @@ public class ImagePromptTests
         {
             bodies.Add(b);
             return Task.FromResult(b["tools"] == null ? Answer("the Rijksmuseum, red brick, towers") : Answer("", Search("Rijksmuseum")));
-        }, _ => { }, _ => Task.FromResult(new WebTools.Result("text", new List<Source> { new("Rijksmuseum", "https://www.rijksmuseum.nl/") })));
+        }, _ => { }, _ => Task.FromResult(new WebTools.Result("text", new List<Source> { new("Rijksmuseum", "https://www.rijksmuseum.nl/") })), _ => Task.FromResult<string?>(null));
         Assert.Equal(ImagePrompt.MaxRounds + 1, bodies.Count);
         Assert.Null(bodies[^1]["tools"]);
         Assert.Equal("none", bodies[^1]["tool_choice"]!.GetValue<string>());
@@ -78,5 +78,62 @@ public class ImagePromptTests
         Assert.DoesNotContain("example.com", searched);
         Assert.DoesNotContain("0612345678", searched);
         Assert.Contains(steps, s => s.StartsWith("zoekt:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void EnglishIsRecognised()
+    {
+        Assert.True(ImagePrompt.IsEnglish("A photograph of the Eiffel Tower in Paris on a clear afternoon"));
+        Assert.False(ImagePrompt.IsEnglish("De Eiffeltoren, een smeedijzeren monument in Parijs met vier poten"));
+        Assert.False(ImagePrompt.IsEnglish("Der Eiffelturm in Paris mit blauem Himmel und einer Wiese"));
+    }
+
+    /// <summary>A Dutch answer is asked for once more, in English, without tools.</summary>
+    [Fact]
+    public async Task ADutchAnswerIsAskedAgainInEnglish()
+    {
+        var bodies = new List<JsonObject>();
+        var r = await ImagePrompt.Improve("maak een foto van de eifeltoren", "m", b =>
+        {
+            bodies.Add(b);
+            return Task.FromResult(bodies.Count == 1 ? Answer("De Eiffeltoren in Parijs met een blauwe lucht") : Answer("A photograph of the Eiffel Tower in Paris"));
+        }, _ => { });
+        Assert.Equal("A photograph of the Eiffel Tower in Paris", r.Prompt);
+        Assert.Equal(2, bodies.Count);
+        Assert.Null(bodies[1]["tools"]);
+        Assert.Equal("The user's request:\nmaak een foto van de eifeltoren\n\nWrite the English description now.",
+                     ((JsonArray)bodies[0]["messages"]!)[^1]!["content"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void PagesWithTextAreReadNotStockPhotoSites()
+    {
+        var hits = new List<Source> { new("a", "https://www.alamy.com/x"), new("b", "https://www.rijksmuseum.nl/gebouw"), new("c", "https://nl.wikipedia.org/wiki/Rijksmuseum") };
+        Assert.Equal(new[] { "https://www.rijksmuseum.nl/gebouw", "https://nl.wikipedia.org/wiki/Rijksmuseum" }, ImagePrompt.PagesToRead(hits).Select(s => s.Url));
+        Assert.Empty(ImagePrompt.PagesToRead(new[] { hits[0] }));
+    }
+
+    /// <summary>The model searched but read nothing: its description came from memory, so the app reads the pages and asks again.</summary>
+    [Fact]
+    public async Task ASearchWithoutReadingGetsPagesRead()
+    {
+        var bodies = new List<JsonObject>();
+        var fetched = new List<string>();
+        var r = await ImagePrompt.Improve("het Rijksmuseum", "m", b =>
+        {
+            bodies.Add(b);
+            return Task.FromResult(bodies.Count switch
+            {
+                1 => Answer("", Search("x")),
+                2 => Answer("A photograph of the Rijksmuseum with a dome"),
+                _ => Answer("A photograph of the Rijksmuseum, a red-brick building with two towers"),
+            });
+        }, _ => { },
+        _ => Task.FromResult(new WebTools.Result("hits", new List<Source> { new("Rijksmuseum", "https://www.rijksmuseum.nl/gebouw"), new("Wiki", "https://nl.wikipedia.org/wiki/Rijksmuseum") })),
+        url => { fetched.Add(url); return Task.FromResult<string?>("A red-brick building with two towers."); });
+        Assert.Equal("A photograph of the Rijksmuseum, a red-brick building with two towers", r.Prompt);
+        Assert.Null(bodies[^1]["tools"]);      // the last round may only answer
+        Assert.Equal(2, fetched.Count);
+        Assert.Contains(r.Sources, s => s.Url.Contains("wikipedia"));
     }
 }
