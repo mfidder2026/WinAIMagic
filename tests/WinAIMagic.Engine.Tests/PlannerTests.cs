@@ -503,7 +503,8 @@ public class SmallPcTests : EngineTest
         Assert.False(MemoryPlanner.UseVision(MinistralIndex, s, true, EngineKind.Llama));
     }
 
-    /// <summary>On an 8 GB card the layers that fit go on it: measured on the 5060 Ti, 24 of 34 at 8K use 4430 MiB and write 14 tok/s.</summary>
+    /// <summary>On an 8 GB card the layers that fit go on it. With the KV cache in 8 bits 28 of 34 at 8K, measured on the 5060 Ti:
+    /// 4,489 MiB, writing 20.0 tok/s and reading 1,663; with 16 bits it was 24 layers, 4,284 MiB, 14.0 and 1,296.</summary>
     [Fact]
     public void MinistralOnAnEightGBCard()
     {
@@ -512,8 +513,23 @@ public class SmallPcTests : EngineTest
         Assert.Equal(MemoryPlanner.PlainSmallContext, context);
         var p = MemoryPlanner.Plan(MinistralIndex, s, context, false);
         Assert.Equal(PlanLabel.FitsInVramRam, p.Label);
-        Assert.Equal(24, p.GpuLayers);
+        Assert.Equal(28, p.GpuLayers);
+        Assert.True(p.EightBitKv);
         Assert.Contains(p.Warnings, w => w.Contains("op de processor"));
+    }
+
+    /// <summary>The KV cache is in 8 bits only where it is on a card: on the processor it read a long prompt three times slower.</summary>
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(8, true)]
+    [InlineData(16, true)]
+    public void TheCacheIsInEightBitsOnlyOnACard(int vram, bool eight)
+    {
+        var s = Pc(vram);
+        Assert.Equal(eight, MemoryPlanner.EightBitKv(s));
+        Assert.Equal(eight, MemoryPlanner.Plan(MinistralIndex, s, 8192, false).EightBitKv);
+        ulong full = MinistralIndex.KvBytesPerToken, used = MemoryPlanner.KvPerToken(MinistralIndex, s);
+        Assert.Equal(eight ? full * 11 / 20 : full, used);
     }
 
     /// <summary>A 16 GB card holds all of it, with a large context and without going over its budget.</summary>

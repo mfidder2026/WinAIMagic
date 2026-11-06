@@ -89,10 +89,21 @@ Ministral-3-8B Q4 is the model for a PC with 8 or 16 GB of RAM. Measured on the 
 | Stands in for | Context | Writing |
 |---|---|---|
 | A 16 GB card | 8K to 32K | **72 tok/s** |
-| An 8 GB card: 24 of its 34 layers on the card | 8K | **14 tok/s** |
+| An 8 GB card: 28 of its 34 layers on the card | 8K | **20 tok/s** |
 | No card, 16 GB of RAM: 4 processor threads | 16K in the app | **5 tok/s** |
 
 On 8 GB of RAM without a card the model needs about 5 GB free. With a limit of 5 GB on what it may keep in memory it still writes 5 tok/s; with 4.5 GB it drops to 0.7 tok/s, also at a smaller context, and a real SSD would make that worse. So close other programs there.
+
+**The 8-bit cache.** With a video card the second engine keeps what it remembers of the conversation (the KV cache) in 8 bits instead of 16. Measured with Ministral on this PC:
+
+- At 32K context it uses 8.6 GB of VRAM instead of 10.6; at 8K, 6.8 instead of 7.3.
+- On an 8 GB card that room holds 28 layers instead of 24, which writes 20.0 instead of 14.0 tok/s and reads prompts at 1,663 instead of 1,296 tok/s.
+- With the whole model on the card it costs a little speed: 72.5 instead of 74.7 tok/s, and prompts 1-2% slower.
+- The answers stay the same: on a text of 28,000 tokens the model chose the same next token in 98.8% of the places.
+
+Without a card it stays at 16 bits. With 4 processor threads, 8 bits read a prompt after 4,000 tokens at 8 instead of 23 tok/s. For Qwen3.6 it saves only 0.3 GB at 32K, because that model has little cache. The tables above were measured with the 16-bit cache.
+
+**Send us your numbers.** Laptops are what we cannot measure ourselves. After a measurement under **Compare**, **Share on GitHub** opens [a form](https://github.com/mfidder2026/WinAIMagic/issues/new?template=meting.yml) where you drop the exported file. Nothing is sent until you send it there.
 
 ### Making images
 

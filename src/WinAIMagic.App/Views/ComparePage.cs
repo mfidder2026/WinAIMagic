@@ -21,7 +21,8 @@ public sealed class ComparePage : IPage
     private readonly HashSet<string> selection = [];
     private readonly StackPanel choices = Ui.V(8);
     private readonly TextBlock none = Ui.Label(L("Nog geen model gedownload."), 14, Theme.Secondary);
-    private readonly Button start, clear, export;
+    private readonly Button start, clear, export, share;
+    private const string ShareUrl = "https://github.com/mfidder2026/WinAIMagic/issues/new?template=meting.yml";
     private readonly FrameworkElement idle, working;
     private readonly ProgressRing ring = new() { Width = 16, Height = 16 };
     private readonly TextBlock step = Ui.Label("", 14, Theme.Secondary), saved = Ui.Caption();
@@ -38,7 +39,10 @@ public sealed class ComparePage : IPage
         clear = Ui.Btn(L("Wis resultaten"), () => app.Host.Bench.Clear(), Glyph.Trash);
         export = Ui.Btn(L("Exporteer meting"), () => _ = ChooseExport(), Glyph.Up);
         export.Tip(L("Eén bestand met hardware, profiel en resultaten, zonder persoonlijke gegevens. Niets gaat vanzelf naar buiten."));
-        idle = Ui.H(10, start, clear, export);
+        // a form on GitHub where colleagues drop that file: laptops without a large card are the ones we cannot measure ourselves
+        share = Ui.Btn(L("Deel op GitHub"), () => _ = Windows.System.Launcher.LaunchUriAsync(new Uri(ShareUrl)), Glyph.Globe);
+        share.Tip(L("Opent een formulier op GitHub. Sleep daar het geëxporteerde bestand in; je ziet alles voordat je het verstuurt."));
+        idle = Ui.H(10, start, clear, export, share);
         working = Ui.H(8, ring, step);
 
         var measure = Ui.Card(Ui.V(10, none, choices, idle, working, saved,
@@ -114,6 +118,7 @@ public sealed class ComparePage : IPage
         var latest = bench.Latest(app.Host.Store.Catalog);
         clear.Show(bench.Results.Count > 0);
         export.Show(bench.Results.Count > 0);
+        share.Show(bench.Results.Count > 0);
         results.Show(latest.Count > 0);
         var seen = string.Join("|", latest.Select(r => r.Id));
         if (seen == shownResults) return;

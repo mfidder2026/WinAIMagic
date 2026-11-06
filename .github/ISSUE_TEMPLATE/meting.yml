@@ -1,0 +1,46 @@
+name: Meting delen (Share a measurement)
+description: Stuur de meting van je pc of laptop, zodat de app beter leert plannen. Send your PC's measurement so the app learns to plan better.
+title: "Meting: "
+labels: ["meting"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Dank je! Metingen van laptops en pc's zonder grote videokaart helpen het meest: die hebben we zelf niet.
+
+        1. Open **Vergelijk** in WinAIMagic, kies de modellen en klik **Start meting**.
+        2. Klik **Exporteer meting** en bewaar het bestand.
+        3. Sleep het bestand hieronder in het vak, of plak de inhoud.
+
+        Het bestand bevat hardware, profiel en resultaten, zonder namen of mappen. Kijk het gerust na voor je het stuurt.
+
+        *Thanks! Open Compare, run a measurement, choose Export measurement and drop the file below. It holds hardware, profile and results, without names or folders.*
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Soort computer (Kind of computer)
+      options:
+        - Laptop zonder losse videokaart (Laptop, integrated graphics only)
+        - Laptop met losse videokaart (Laptop with a discrete card)
+        - Desktop zonder losse videokaart (Desktop, integrated graphics only)
+        - Desktop met losse videokaart (Desktop with a discrete card)
+    validations:
+      required: true
+  - type: textarea
+    id: measurement
+    attributes:
+      label: Het bestand WinAIMagic-meting.json (The file)
+      description: Sleep het bestand hierheen of plak de inhoud. Drop the file here or paste its contents.
+      render: json
+    validations:
+      required: true
+  - type: input
+    id: power
+    attributes:
+      label: Op netstroom of op de accu? (Plugged in or on battery?)
+      placeholder: netstroom
+  - type: textarea
+    id: notes
+    attributes:
+      label: Opmerkingen (Notes)
+      description: Wat viel op? Bijvoorbeeld een model dat niet startte, een melding, of dat de computer warm of luid werd.

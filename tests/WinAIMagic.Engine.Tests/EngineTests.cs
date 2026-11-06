@@ -231,6 +231,22 @@ public class LlamaEngineTests : EngineTest
         Assert.DoesNotContain("--no-repack", args);
     }
 
+    /// <summary>The second engine gets the 8-bit cache with a card, and keeps 16 bits on the processor alone.</summary>
+    [Fact]
+    public void TheCacheTypeFollowsThePlan()
+    {
+        var model = ModelCatalog.Shared.Model("ministral-3-8b-q4")!;
+        var index = TestModels.IndexOf(model);
+        var e = new LlamaEngine(port: 9000);
+        List<string> For(SystemInfo s, IGpuBackend b) => e.Arguments(new EngineStart(model, new[] { "a" }, MemoryPlanner.Plan(index, s, 8192, false), b)).ToList();
+        var card = For(SystemInfo.Simulated(FakeGpuBackend.Nvidia(8), 16, 8), FakeGpuBackend.Nvidia(8));
+        Assert.Equal("q8_0", card[card.IndexOf("--cache-type-k") + 1]);
+        Assert.Equal("q8_0", card[card.IndexOf("--cache-type-v") + 1]);
+        var cpu = For(SystemInfo.Simulated(FakeGpuBackend.Cpu(), 16, 8), FakeGpuBackend.Cpu());
+        Assert.DoesNotContain("--cache-type-k", cpu);
+        Assert.DoesNotContain("--cache-type-v", cpu);
+    }
+
     [Fact]
     public void AModelLargerThanMemoryStreamsWithACache()
     {

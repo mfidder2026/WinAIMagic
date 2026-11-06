@@ -60,6 +60,8 @@ public sealed class LlamaEngine : EngineBase
         // 5.3 tok/s with 3.6 GB less private memory
         if (!plan.FitsInMemory || plan.Experts == 0) args.Add("--no-repack");
         if (plan.ExpertCache > 0) args.AddRange(new[] { "--moe-cache-mib", (plan.ExpertCache >> 20).ToString(CultureInfo.InvariantCulture) });
+        // the KV cache in 8 bits where it is on the card: half the memory for the same answers (MemoryPlanner.EightBitKv)
+        if (plan.EightBitKv) args.AddRange(new[] { "--cache-type-k", "q8_0", "--cache-type-v", "q8_0" });
         if (s.Vision != null) args.AddRange(new[] { "--mmproj", s.Vision });
         // cluster: the helpers' GPUs join as RPC devices
         if (s.Rpc != null) args.AddRange(new[] { "--rpc", s.Rpc });

@@ -53,10 +53,21 @@ Ministral-3-8B Q4 (5 GB) is het model voor een pc met 8 of 16 GB RAM. Gemeten op
 | Bootst na | Context | Schrijven |
 |---|---|---|
 | Een videokaart van 16 GB | 8K tot 32K | **72 tok/s** |
-| Een videokaart van 8 GB: 24 van de 34 lagen op de kaart | 8K | **14 tok/s** |
+| Een videokaart van 8 GB: 28 van de 34 lagen op de kaart | 8K | **20 tok/s** |
 | Geen videokaart, 16 GB RAM: 4 processorthreads | 16K in de app | **5 tok/s** |
 
 Op 8 GB RAM zonder videokaart heeft het model ongeveer 5 GB vrij nodig. Met een limiet van 5 GB op wat het in het geheugen mag houden schrijft het nog 5 tok/s, met 4,5 GB zakt dat naar 0,7 tok/s, ook bij een kleinere context, en een echte SSD maakt dat nog erger. Sluit daar dus andere programma's.
+
+**De 8-bit-cache.** Met een videokaart bewaart de tweede engine wat hij van het gesprek onthoudt (de KV-cache) in 8 bits in plaats van 16. Gemeten met Ministral op deze pc:
+
+- Bij 32K context gebruikt hij 8,6 GB VRAM in plaats van 10,6; bij 8K 6,8 in plaats van 7,3.
+- Op een videokaart van 8 GB passen daardoor 28 lagen in plaats van 24. Hij schrijft dan 20,0 in plaats van 14,0 tok/s en leest prompts met 1.663 in plaats van 1.296 tok/s.
+- Met het hele model op de kaart kost het een beetje snelheid: 72,5 in plaats van 74,7 tok/s, en prompts 1-2% trager.
+- De antwoorden blijven gelijk: op een tekst van 28.000 tokens koos het model op 98,8% van de plaatsen hetzelfde volgende woord.
+
+Zonder videokaart blijft het 16 bits. Met 4 processorthreads las 8 bits een prompt na 4.000 tokens met 8 in plaats van 23 tok/s. Voor Qwen3.6 scheelt het maar 0,3 GB bij 32K, omdat dat model weinig cache heeft. De tabellen hierboven zijn gemeten met de 16-bit-cache.
+
+**Stuur je meting.** Laptops kunnen we zelf niet meten. Na een meting onder **Vergelijken** opent **Deel op GitHub** [een formulier](https://github.com/mfidder2026/WinAIMagic/issues/new?template=meting.yml) waarin je het geëxporteerde bestand sleept. Er gaat niets weg tot je het daar zelf verstuurt.
 
 ### Afbeeldingen maken
 

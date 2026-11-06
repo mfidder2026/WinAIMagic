@@ -60,6 +60,8 @@ public sealed record MemoryPlan
 
     public int CpuMoELayers => HostExpertLayers.Count;
     public bool FitsInMemory { get; init; }
+    /// <summary>The second engine keeps its KV cache in 8 bits (q8_0) instead of 16: see `MemoryPlanner.EightBitKv`.</summary>
+    public bool EightBitKv { get; init; }
     public PlanLabel Label => FitsInMemory ? PlanLabel.FitsInVramRam : PlanLabel.StreamsFromSsd;
     public string LabelText => Label == PlanLabel.FitsInVramRam ? L("Past in VRAM + RAM") : L("Streamt van SSD");
     /// <summary>Expert bytes not in VRAM or RAM, which come from the SSD when a token needs them.</summary>
@@ -94,6 +96,17 @@ public static class MemoryPlanner
     public const ulong PlainComputeBuffers = 300_000_000;
     /// <summary>What llama.cpp's KV cache takes beside its cost per token.</summary>
     private const ulong KvBase = 400_000_000;
+
+    /// <summary>The second engine keeps its KV cache in 8 bits where that cache is on the card. Measured with Ministral on the 5060 Ti:
+    /// at 32K context 8.6 instead of 10.6 GB of VRAM, writing 72.5 instead of 74.7 tok/s (51.4 and 52.4 after 16K tokens), prompts 1-2%
+    /// slower, and the same next token in 98.8% of the positions of a 28K-token text (perplexity 0.05% higher). Not on the processor:
+    /// there, with 4 threads, a prompt after 4K tokens read at 8 instead of 23 tok/s.</summary>
+    public static bool EightBitKv(SystemInfo s) => s.HasGpu;
+
+    /// <summary>The KV cache per token as the second engine stores it: in 8 bits 0.55 of the 16 (measured 77,200 against 140,300 B for
+    /// Ministral; q8_0 itself takes 34 bytes per 32 values against 64).</summary>
+    public static ulong KvPerToken(GGUFIndex index, SystemInfo s) =>
+        EightBitKv(s) ? index.KvBytesPerToken * 11 / 20 : index.KvBytesPerToken;
     /// <summary>The context of a model without experts where memory is short: its cache would push out weights that every token reads.
     /// Not less: the app's system prompt and its tools take part of it, and 4K saves nothing. With a limit on the working set, Ministral writes
     /// 5 tok/s at 5 GB and 0.7 tok/s at 4.5 GB, at 8K and at 4K alike. Not measured on a real PC, whose SSD would make the second figure worse.</summary>
@@ -230,14 +243,15 @@ public static class MemoryPlanner
         }
         ulong limit = LlamaVramLimit(s);
         ulong budget = limit + RamBudget(s), fixedBytes = weights + MinimumOverhead + visionBytes;
-        if (fixedBytes >= budget || index.KvBytesPerToken == 0) return 0;
-        ulong kvTokens = (budget - fixedBytes) / index.KvBytesPerToken;
+        ulong perToken = KvPerToken(index, s);
+        if (fixedBytes >= budget || perToken == 0) return 0;
+        ulong kvTokens = (budget - fixedBytes) / perToken;
         ulong fixedOnCard = index.DenseBytes + Buffers(index) + visionBytes;
         // without experts the whole model on the card comes first, and on a smaller card a part of it, with a small context
         if (s.HasGpu && index.ExpertBytes == 0)
-            kvTokens = Math.Min(kvTokens, Math.Max(Sub(limit, fixedOnCard + KvBase) / index.KvBytesPerToken, PlainSmallContext));
+            kvTokens = Math.Min(kvTokens, Math.Max(Sub(limit, fixedOnCard + KvBase) / perToken, PlainSmallContext));
         // the KV cache lives on the card, unless not even the dense weights do
-        else if (s.HasGpu && limit >= fixedOnCard) kvTokens = Math.Min(kvTokens, (limit - fixedOnCard) / index.KvBytesPerToken);
+        else if (s.HasGpu && limit >= fixedOnCard) kvTokens = Math.Min(kvTokens, (limit - fixedOnCard) / perToken);
         return Math.Max(4096, (int)Math.Min(kvTokens, int.MaxValue) / 4096 * 4096);
     }
 
@@ -318,7 +332,7 @@ public static class MemoryPlanner
         var perLayer = index.ExpertBytesPerLayer;
         int layers = Math.Max(index.LayerCount, LastLayer(index) + 1);
         ulong buffers = Buffers(index);
-        ulong kv = index.KvBytesPerToken * (ulong)context + KvBase;
+        ulong kv = KvPerToken(index, s) * (ulong)context + KvBase;
         ulong overhead = kv + buffers + (vision ? VisionBytes : 0);
         ulong limit = LlamaVramLimit(s), ram = RamBudget(s);
 
@@ -420,6 +434,7 @@ public static class MemoryPlanner
             Layers = layers, HostExpertLayers = hostLayers, GpuLayers = gpuLayers,
             GpuExperts = onGpu, RamExperts = inRam, SsdExperts = onSsd, ExpertCache = cache, FitsInMemory = fits,
             TensorSplit = split, Threads = Math.Max(4, s.PerformanceCores), ContextSize = context, Vision = vision, Warnings = warnings,
+            EightBitKv = EightBitKv(s),
         };
     }
 
