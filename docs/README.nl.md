@@ -26,6 +26,7 @@ Het scherm **Systeem** laat zien wat je pc nog nodig heeft. Vaak is dat een grot
 - **Vergelijken:** dezelfde meting op elk model, op je eigen pc.
 - **Lokale API** op `http://127.0.0.1:8080`, voor OpenAI-, Anthropic- en Responses-clients.
 - **Modelmap kiezen en wijzigen,** ook met modellen erin, zonder opnieuw te downloaden.
+- **Een model verwijderen of bijwerken** op zijn kaart. Noemt een nieuwere WinAIMagic een nieuwere versie van de bestanden van een model, dan biedt de kaart **Update** aan, die alleen de veranderde bestanden downloadt.
 - **Cluster:** meerdere pc's samen, voor modellen op de tweede engine.
 
 ## Gemeten snelheid

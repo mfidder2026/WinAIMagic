@@ -85,7 +85,7 @@ public sealed class ModelCard
     private readonly TextBlock message = Ui.Caption();
     private readonly TextBlock note = Ui.Caption(color: Theme.Solid(Theme.Amber));
     private readonly TextBlock error = Ui.Caption(color: Theme.Solid(Theme.Pink));
-    private readonly Button download, visionDownload, pause, delete;
+    private readonly Button download, update, visionDownload, pause, delete;
     private readonly StackPanel roles = Ui.H(6);
     private readonly Windows.UI.Color family;
     private string rolesKey = "";
@@ -110,11 +110,12 @@ public sealed class ModelCard
         progressPart = Ui.V(5, bar, progress, message);
         download = Ui.Btn(L("Download"), () => _ = Download(), Glyph.Download, family);
         visionDownload = Ui.Btn(L("Afbeeldingsbestanden"), () => store.StartVisionDownload(model.Id), Glyph.Image);
+        update = Ui.Btn(L("Update"), () => store.StartDownload(model.Id), Glyph.Refresh, Theme.Amber);
         pause = Ui.Btn(L("Pauzeer"), () => store.StopDownload(model.Id), Glyph.Pause);
         delete = Ui.Btn(L("Verwijder model"), () => _ = ConfirmDelete(app, model), Glyph.Trash);
         makesImages = app.Host.Store.Catalog.Images.Contains(model);
         // the buttons wrap to a second line rather than hide under the roles
-        var left = new WrapPanel { Gap = 8, RowGap = 6, Children = { download, visionDownload, pause, delete } };
+        var left = new WrapPanel { Gap = 8, RowGap = 6, Children = { download, update, visionDownload, pause, delete } };
         roles.VerticalAlignment = VerticalAlignment.Center;
         var right = roles;
         var foot = Ui.Row("*,auto", 8, left, right);
@@ -141,7 +142,9 @@ public sealed class ModelCard
         bool downloading = store.Downloading.Contains(model.Id);
         bool selected = makesImages ? host.ImageModel?.Id == model.Id : host.SelectedModelId == model.Id;
         bool running = !makesImages && host.Engine?.Model?.Id == model.Id && app.EngineState.IsRunning;
-        bool inUse = makesImages ? host.Images.Busy : host.Engine?.Model?.Id == model.Id && app.EngineState.IsActive;
+        // also as the fast model on the second engine, which holds its file open
+        bool inUse = makesImages ? host.Images.Busy
+            : host.Engine?.Model?.Id == model.Id && app.EngineState.IsActive || app.FastEngine is { } f && f.State.IsActive && f.Model?.Id == model.Id;
         var pack = store.PackProgress.TryGetValue(model.Id, out var p) ? p : -1;
         bool building = pack != -1;
 
@@ -212,8 +215,11 @@ public sealed class ModelCard
 
         // what is in the way: a hard minimum, the limited mode, a drive that is too small
         var blocked = MemoryPlanner.Blocked(model, host.System);
-        ulong missing = st.Expected > st.Have ? st.Expected - st.Have : 0;
-        var noteId = $"{blocked}|{MemoryPlanner.EngineFor(model, host.System)}|{(st.IsComplete || downloading ? 0 : missing)}|{host.System.FreeDisk}";
+        bool offerUpdate = st.UpdateAvailable && !downloading;
+        // an update downloads the files that differ; the old ones go first, so their room comes back
+        ulong missing = offerUpdate ? st.UpdateBytes : st.Expected > st.Have ? st.Expected - st.Have : 0;
+        bool needsRoom = (!st.IsComplete || offerUpdate) && !downloading;
+        var noteId = $"{blocked}|{MemoryPlanner.EngineFor(model, host.System)}|{(needsRoom ? missing : 0)}|{host.System.FreeDisk}|{offerUpdate}";
         if (noteId != noteKey)
         {
             noteKey = noteId;
@@ -221,7 +227,9 @@ public sealed class ModelCard
             if (blocked != null) lines.Add(blocked);
             else if (model.Engine == "tiered" && MemoryPlanner.EngineFor(model, host.System) == EngineKind.Llama)
                 lines.Add(L("Op deze pc draait dit model in de beperkte modus, via de tweede engine: alles werkt, maar lager tempo en een kleinere context. Reden: ") + (host.System.TieredUnavailable ?? L("te weinig VRAM voor de hoofdengine.")));
-            if (!st.IsComplete && !downloading && missing > host.System.FreeDisk)
+            if (offerUpdate)
+                lines.Add(L($"Er is een nieuwere versie van dit model. Update downloadt alleen de bestanden die anders zijn ({st.UpdateBytes.GbShort()}); tot dan werkt de versie die er staat."));
+            if (needsRoom && missing > host.System.FreeDisk)
             {
                 lines.Add(L($"Op deze schijf is {host.System.FreeDisk.GbShort()} vrij; {model.ShortName} heeft nog {missing.GbShort()} nodig."));
                 if (DriveReport.BetterDrive(Paths.ModelsRoot, missing) is { } better)
@@ -243,6 +251,9 @@ public sealed class ModelCard
             ulong size = visionFiles.Aggregate(0UL, (n, f) => n + f.Expected);
             visionDownload.Tip(L($"Download wat dit model nodig heeft om afbeeldingen te lezen ({size.GbShort()})."));
         }
+        update.Show(offerUpdate);
+        update.IsEnabled = !inUse;
+        update.Tip(inUse ? (makesImages ? L("Wacht tot de afbeelding klaar is.") : L("Stop eerst de engine.")) : L("De oude bestanden worden eerst verwijderd; tijdens de download werkt dit model niet."));
         pause.Show(downloading);
         delete.Show(!downloading && !building && (st.Have > 0 || Directory.Exists(Paths.ModelDir(model.Id))));
         delete.IsEnabled = !inUse;

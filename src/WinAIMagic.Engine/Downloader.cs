@@ -33,10 +33,18 @@ public sealed class Downloader
     {
         var path = Path.Combine(item.Dir, item.Name);
         Directory.CreateDirectory(item.Dir);
-        if (File.Exists(path + ".ok"))
+        var on = ModelStore.FileStatusOf(item.Dir, item.Name, item.Size, item.Sha256);
+        if (on.Verified)
         {
             say(L($"{item.Name}: al gecontroleerd"));
             return true;
+        }
+        if (on.Stale)
+        {
+            // another version: a resume would add the new file's tail to the old one
+            say(L($"{item.Name}: andere versie op schijf, de nieuwe wordt gedownload"));
+            File.Delete(path + ".ok");
+            File.Delete(path);
         }
         string? lastError = null;
         for (int attempt = 1; attempt <= Attempts; attempt++)

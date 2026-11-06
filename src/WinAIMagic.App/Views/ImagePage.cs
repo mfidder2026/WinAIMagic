@@ -30,7 +30,7 @@ public sealed class ImagePage : IPage
     private readonly TextBlock modelName = Ui.Label("", 18, null, FontWeights.Bold, display: true), modelSummary = Ui.Caption();
     private readonly ProgressBar downloadBar = new() { Minimum = 0, Maximum = 1 };
     private readonly TextBlock downloadText = Ui.Caption(), diskNote = Ui.Caption("", Theme.Solid(Theme.Amber)), downloadError = Ui.Caption("", Theme.Solid(Theme.Pink));
-    private readonly Button download, pause, deleteModel;
+    private readonly Button download, update, pause, deleteModel;
 
     private readonly StackPanel makePart = Ui.V(12);
     private readonly TextBox prompt = DocUi.LargeInput(L("Bijvoorbeeld: een rode vos die de krant leest op een bankje in Amsterdam, herfstlicht, foto"), 96);
@@ -65,6 +65,7 @@ public sealed class ImagePage : IPage
 
         var store = app.Host.Store;
         download = Ui.Btn(L("Download"), () => { if (model != null) store.StartDownload(model.Id); }, Glyph.Download, Theme.Violet);
+        update = Ui.Btn(L("Update"), () => { if (model != null) store.StartDownload(model.Id); }, Glyph.Refresh, Theme.Amber);
         pause = Ui.Btn(L("Pauzeer"), () => { if (model != null) store.StopDownload(model.Id); }, Glyph.Pause);
         deleteModel = Ui.Btn(L("Verwijder model"), () => { if (model != null) _ = ModelCard.ConfirmDelete(app, model); }, Glyph.Trash);
         var modelHead = Ui.V(3, modelName, modelSummary);
@@ -72,7 +73,7 @@ public sealed class ImagePage : IPage
         modelPart.Children.Add(Ui.V(5, downloadBar, downloadText));
         modelPart.Children.Add(diskNote);
         modelPart.Children.Add(downloadError);
-        modelPart.Children.Add(Ui.H(8, download, pause, deleteModel));
+        modelPart.Children.Add(Ui.H(8, download, update, pause, deleteModel));
 
         Automation.SetName(prompt, L("Beschrijving"));
         prompt.TextChanged += (_, _) => Update();
@@ -164,12 +165,16 @@ public sealed class ImagePage : IPage
             : L($"{status.Have.GbShort()} van {status.Expected.GbShort()}") + (eta is { } e ? " · " + L($"{store.Speed / 1e6:0} MB/s · nog {Ui.Duration(e)}") : ""));
         ulong missing = status.Expected > status.Have ? status.Expected - status.Have : 0;
         bool shortOfDisk = !status.IsComplete && !downloading && missing > host.System.FreeDisk;
-        diskNote.SetIfChanged(shortOfDisk ? L($"Op deze schijf is {host.System.FreeDisk.GbShort()} vrij; {model.Name} heeft nog {missing.GbShort()} nodig.") : "");
-        diskNote.Show(shortOfDisk);
+        bool offerUpdate = status.UpdateAvailable && !downloading;
+        diskNote.SetIfChanged(shortOfDisk ? L($"Op deze schijf is {host.System.FreeDisk.GbShort()} vrij; {model.Name} heeft nog {missing.GbShort()} nodig.")
+            : offerUpdate ? L($"Er is een nieuwere versie van dit model. Update downloadt alleen de bestanden die anders zijn ({status.UpdateBytes.GbShort()}); tot dan werkt de versie die er staat.") : "");
+        diskNote.Show(shortOfDisk || offerUpdate);
         var downloadProblem = store.LastError.TryGetValue(model.Id, out var le) ? le : ModelCard.DeleteErrors.TryGetValue(model.Id, out var de) ? de : "";
         downloadError.SetIfChanged(downloadProblem);
         downloadError.Show(downloadProblem.Length > 0);
         download.Show(!status.IsComplete && !downloading);
+        update.Show(offerUpdate);
+        update.IsEnabled = !images.Busy;
         pause.Show(downloading);
         deleteModel.Show(!downloading && status.Have > 0);
         deleteModel.IsEnabled = !images.Busy;

@@ -55,7 +55,7 @@ The other test projects are `WinAIMagic.Chat.Tests`, `WinAIMagic.Studio.Tests` a
 - **Model files:** every address in `src/WinAIMagic.Core/Resources/models.json` names one commit, never `main`, because a sha256 belongs to one version of a file. Every Monday `.github/workflows/check-models.yml` runs `scripts/check_catalog.py` on GitHub's machines, and it reads headers only.
   - A failed run means a model can no longer be downloaded. Point its addresses at a commit that still has the files, or take over the new files with their sizes and hashes, then ask the owner about a new version.
   - When taking over new files, compare their headers with the old ones. If the tensors differ, `memory` and `dense` in the catalog change too, and the app's numbers for that model need checking.
-  - A maker's newer version is only listed in the run's summary. Taking it over is the owner's choice: it makes users download the model again.
+  - A maker's newer version is only listed in the run's summary. Taking it over is the owner's choice: the app then compares the sha256 in each file's .ok with the catalog's and offers Update on the card, which downloads only the files that differ.
 
 ## Rules from the owner
 

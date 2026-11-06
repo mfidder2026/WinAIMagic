@@ -463,9 +463,99 @@ public class DownloaderTests : EngineTest
         var c = OneFile("m", content);
         Directory.CreateDirectory(Dir("m"));
         File.WriteAllBytes(Local, content);
-        File.WriteAllText(Local + ".ok", "x");
+        File.WriteAllText(Local + ".ok", TestModels.Sha(content));
         using var store = await Download(c, "m");
         Assert.Empty(server.Requests);
+    }
+
+    // MARK: - versions (the Mac's ModelVersionTests)
+
+    private static ModelStore.FileStatus Status(string? ok, ulong have = 10, ulong expected = 10) => new("a", expected, have, ok, new[] { "abc" });
+
+    [Fact]
+    public void TheCatalogsVersion()
+    {
+        var s = Status("abc");
+        Assert.True(s.Verified && s.Complete);
+        Assert.False(s.Stale);
+        Assert.True(Status("ABC").Verified, "a hash is compared without case");
+    }
+
+    [Fact]
+    public void AnotherVersionIsAnUpdate()
+    {
+        Assert.True(Status("def").Stale);
+        Assert.True(Status("abc", have: 8).Stale, "the size no longer matches");
+        var model = new ModelStore.ModelStatus { Files = new[] { Status("def"), Status("abc") } };
+        Assert.True(model.UpdateAvailable);
+        Assert.Equal(10UL, model.UpdateBytes);
+        Assert.True(model.IsComplete, "the old version keeps working until the update");
+        Assert.False(model.AllVerified);
+    }
+
+    /// <summary>An empty .ok (a model folder from the Mac before its 1.9.12) is trusted; a file without one is no update.</summary>
+    [Fact]
+    public void AnOldOkIsTrusted()
+    {
+        var s = Status("");
+        Assert.True(s.Verified && s.Complete);
+        Assert.False(s.Stale);
+        Assert.False(Status(null).Stale, "a file downloaded by hand is no update");
+    }
+
+    [Fact]
+    public void TheOkIsReadFromDisk()
+    {
+        Directory.CreateDirectory(Dir("m"));
+        File.WriteAllBytes(Local, new byte[10]);
+        File.WriteAllText(Local + ".ok", "abc\r\n");
+        var s = ModelStore.FileStatusOf(Dir("m"), "m.gguf", 10, new[] { "abc" });
+        Assert.Equal("abc", s.OkHash);
+        Assert.True(s.Verified);
+    }
+
+    /// <summary>Update: the file of another version goes, the catalog's comes down and gets its own .ok; the other file stays.</summary>
+    [Fact]
+    public async Task AnUpdateFetchesOnlyTheFileThatDiffers()
+    {
+        byte[] oldA = Data(100, 3), newA = Data(120, 5), b = Data(80, 7);
+        var c = new ModelCatalog
+        {
+            Models = new[]
+            {
+                new ModelInfo
+                {
+                    Id = "m", Name = "T", Family = "qwen", Summary = "s",
+                    Files = new[]
+                    {
+                        new ModelFile { Local = "a.gguf", Size = 120, Sha256 = new[] { TestModels.Sha(newA) }, Url = "https://x.test/a" },
+                        new ModelFile { Local = "b.gguf", Size = 80, Sha256 = new[] { TestModels.Sha(b) }, Url = "https://x.test/b" },
+                    },
+                },
+            },
+        };
+        server.Files["https://x.test/a"] = newA;
+        server.Files["https://x.test/b"] = b;
+        Directory.CreateDirectory(Dir("m"));
+        File.WriteAllBytes(Path.Combine(Dir("m"), "a.gguf"), oldA);
+        File.WriteAllText(Path.Combine(Dir("m"), "a.gguf.ok"), TestModels.Sha(oldA));
+        File.WriteAllBytes(Path.Combine(Dir("m"), "b.gguf"), b);
+        File.WriteAllText(Path.Combine(Dir("m"), "b.gguf.ok"), TestModels.Sha(b));
+
+        using var store = Store(c);
+        var before = store.StatusOf("m");
+        Assert.True(before.UpdateAvailable);
+        Assert.True(before.IsComplete);
+        Assert.Equal(120UL, before.UpdateBytes);
+
+        store.StartDownload("m");
+        await store.WaitForDownload("m");
+        Assert.Equal(newA, File.ReadAllBytes(Path.Combine(Dir("m"), "a.gguf")));
+        Assert.Equal(TestModels.Sha(newA), File.ReadAllText(Path.Combine(Dir("m"), "a.gguf.ok")));
+        Assert.DoesNotContain(server.Requests, r => r.Url.Contains("x.test/b"));
+        var after = store.StatusOf("m");
+        Assert.False(after.UpdateAvailable);
+        Assert.True(after.AllVerified);
     }
 
     /// <summary>The app was closed in the middle of a download: the next start goes on with it.</summary>
@@ -574,7 +664,7 @@ public class DownloaderTests : EngineTest
         var c = OneFile("m", content);
         Directory.CreateDirectory(Dir("m"));
         File.WriteAllBytes(Path.Combine(Dir("m"), "File-Maya.gguf"), content);
-        File.WriteAllText(Path.Combine(Dir("m"), "File-Maya.gguf.ok"), "x");
+        File.WriteAllText(Path.Combine(Dir("m"), "File-Maya.gguf.ok"), TestModels.Sha(content));
         using var store = Store(c);
         Assert.True(File.Exists(Local));
         Assert.True(File.Exists(Local + ".ok"));

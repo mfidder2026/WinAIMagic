@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.9.11
+# Parity with MacAIMagic 1.9.12
 
-How this version relates to MacAIMagic at commit `008ab2f`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `82723b8`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -22,6 +22,14 @@ How this version relates to MacAIMagic at commit `008ab2f`, the last Mac commit 
 | `Views/*` | `App/Views/*` | Done, in code rather than XAML |
 
 ## Taken over since the first port
+
+### Up to `82723b8` (1.9.12): delete a model, recognise a newer version
+
+- **Taken over, `fcae4fa`, Update:** the .ok beside a verified file already held its sha256 here, but only its existence was checked. Now one that differs from the catalog's, or a size that no longer matches, means another version: the card (and Beeld for the image model) says so in amber with how much comes down, and offers **Update**, which downloads only the files that differ. Until then the old version keeps working. The old file is deleted before the new one comes down, as on the Mac, so the model does not work during the download; the button says so and is grey while the model runs. A pack built from the old files is built again by its own staleness check. The Mac's test names (TheCatalogsVersion, AnotherVersionIsAnUpdate, TheOkIsReadFromDisk), plus AnUpdateFetchesOnlyTheFileThatDiffers against the fake server.
+- **Taken over, `fcae4fa`, not deleting a running model:** Verwijder model was already here, but greyed only for the main engine. Like the Mac it is now grey too while the model runs as the fast model on the second engine. Before, the delete went through and that engine went on running a model that was gone.
+- **Adapted, Controleer:** not taken over as a button. Windows has written the sha256 into the .ok from its first version, so it has no empty .ok files of its own. An empty one (a model folder copied from an older Mac) is trusted, as on the Mac before Controleer; the test is AnOldOkIsTrusted.
+- **Measured here:** the Debug build with a Ministral whose .ok named another version showed Update and the amber line (5 GB); with Ministral running as the fast model its Verwijder model was grey, the heavy model's was not. Update itself was run against the fake server only, not against the real download.
+- **Not needed:** `942aead` and `e1bbe1f` (the share button came from here), `246f8f9` (a take-over from here), `50cb728` and `82723b8` (Mac versions).
 
 ### `008ab2f` (1.9.11): an English, name-first description of only what can be seen
 

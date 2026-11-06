@@ -27,6 +27,7 @@ WinAIMagic is the Windows version of [MacAIMagic](https://github.com/mfidder2026
 - **Compare** models with the same measurement on your own PC, and export the results.
 - **A local API** on `http://127.0.0.1:8080`: OpenAI (`/v1`), Anthropic (`/v1/messages`) and Responses (`/v1/responses`), so other tools can use your model.
 - **Choose where models live**, on any drive, and move them later without downloading again.
+- **Delete or update a model** on its card. When a newer WinAIMagic names a newer version of a model's files, the card offers **Update**, which downloads only the files that changed.
 - **Cluster** several PCs over USB4, Thunderbolt or ethernet for models on the second engine.
 
 Available in English, Dutch, German and French.

@@ -8,11 +8,20 @@ namespace WinAIMagic.Engine;
 /// Events and properties change on background threads: the UI marshals them itself.</summary>
 public sealed class ModelStore : IDisposable
 {
-    public sealed record FileStatus(string Name, ulong Expected, ulong Have, bool Verified)
+    /// <param name="OkHash">What the .ok beside the file says: null none, "" an empty one (its version unknown, trusted), else the sha256
+    /// the file had when it was checked.</param>
+    /// <param name="Sha">The catalog's sha256 values for this file; empty: nothing to compare with.</param>
+    public sealed record FileStatus(string Name, ulong Expected, ulong Have, string? OkHash = null, IReadOnlyList<string>? Sha = null)
     {
         public double Fraction => Expected == 0 ? 0 : Math.Min(1, (double)Have / Expected);
-        /// <summary>Put in the folder by hand: the exact size is enough to use it (sha256 is checked by our own download).</summary>
-        public bool Complete => Verified || Have == Expected;
+        /// <summary>Checked, and of the version the catalog names.</summary>
+        public bool Verified => OkHash != null && !Stale;
+        /// <summary>Another version than the catalog names: checked with another sha256, or a size that no longer matches. It keeps
+        /// working until the update.</summary>
+        public bool Stale => OkHash != null && (Have != Expected || OkHash.Length > 0 && Sha is { Count: > 0 } s && !s.Contains(OkHash, StringComparer.OrdinalIgnoreCase));
+        /// <summary>Put in the folder by hand: the exact size is enough to use it (sha256 is checked by our own download). A file of
+        /// another version still runs until the update.</summary>
+        public bool Complete => Verified || Stale || Have == Expected;
     }
 
     public sealed record ModelStatus
@@ -29,6 +38,11 @@ public sealed class ModelStore : IDisposable
         public double Fraction => Expected == 0 ? 0 : (double)Have / Expected;
         public bool IsComplete => Files.Count > 0 && Files.All(f => f.Complete) && Extras.All(f => f.Complete);
         public bool AllVerified => Files.Count > 0 && Files.All(f => f.Verified);
+        /// <summary>The catalog names another version of some files: Update downloads only those.</summary>
+        public bool UpdateAvailable => Mine.Any(f => f.Stale);
+        public ulong UpdateBytes => Mine.Where(f => f.Stale).Aggregate(0UL, (n, f) => n + f.Expected);
+        /// <summary>The model's own files, not the shared image files.</summary>
+        private IEnumerable<FileStatus> Mine => Files.Concat(Extras).Concat(Draft is { } d ? new[] { d } : Array.Empty<FileStatus>());
         /// <summary>The headers sit at the start of every shard, so the plan can be made long before a download ends.</summary>
         public bool HeadersAvailable => Files.Count > 0 && Files.All(f => f.Have >= Math.Min(f.Expected, 32UL << 20));
     }
@@ -113,20 +127,16 @@ public sealed class ModelStore : IDisposable
         foreach (var m in Catalog.All)
         {
             var dir = Paths.ModelDir(m.Id);
-            FileStatus F(string d, string name, ulong size)
-            {
-                var path = Path.Combine(d, name);
-                return new FileStatus(name, size, FileSize(path), File.Exists(path + ".ok"));
-            }
+            FileStatus F(string d, string name, ulong size, IReadOnlyList<string> sha) => FileStatusOf(d, name, size, sha);
             var vision = Catalog.VisionFor(m);
             var tiered = Catalog.TieredVisionFor(m);
             next[m.Id] = new ModelStatus
             {
-                Files = m.Files.Select(f => F(dir, f.Local, f.Size)).ToList(),
-                Extras = (m.Extras ?? Array.Empty<ModelFile>()).Select(f => F(dir, f.Local, f.Size)).ToList(),
-                Vision = vision == null ? null : F(Paths.VisionDir, vision.Local, vision.Size),
-                TieredVision = tiered == null ? Array.Empty<FileStatus>() : tiered.Files.Select(f => F(tiered.Folder, f.Local, f.Size)).ToList(),
-                Draft = m.Draft == null ? null : F(dir, m.Draft.Local, m.Draft.Size),
+                Files = m.Files.Select(f => F(dir, f.Local, f.Size, f.Sha256)).ToList(),
+                Extras = (m.Extras ?? Array.Empty<ModelFile>()).Select(f => F(dir, f.Local, f.Size, f.Sha256)).ToList(),
+                Vision = vision == null ? null : F(Paths.VisionDir, vision.Local, vision.Size, vision.Sha256),
+                TieredVision = tiered == null ? Array.Empty<FileStatus>() : tiered.Files.Select(f => F(tiered.Folder, f.Local, f.Size, f.Sha256)).ToList(),
+                Draft = m.Draft == null ? null : F(dir, m.Draft.Local, m.Draft.Size, m.Draft.Sha256),
             };
         }
         Status = next;
@@ -150,6 +160,16 @@ public sealed class ModelStore : IDisposable
             lastTotal = total;
             lastTick = now;
         }
+    }
+
+    /// <summary>One file as it is on disk, and what its .ok says.</summary>
+    public static FileStatus FileStatusOf(string dir, string name, ulong size, IReadOnlyList<string> sha)
+    {
+        var path = Path.Combine(dir, name);
+        string? ok = null;
+        try { if (File.Exists(path + ".ok")) ok = File.ReadAllText(path + ".ok").Trim(); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { ok = ""; }
+        return new FileStatus(name, size, FileSize(path), ok, sha);
     }
 
     public static ulong FileSize(string path)
