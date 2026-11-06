@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 """Lays out dist\\app (the published app with its engine folder) and builds the installer.
 
-    python scripts/package.py [--skip-publish] [--skip-setup]
+    python scripts/package.py [--skip-publish] [--skip-setup] [--skip-portable]
 
 Layout: dist\\app\\WinAIMagic.exe, dist\\app\\engine\\{tiered\\(serve, tools, bin), python\\, cuda\\, vulkan\\, cpu\\}.
 Everything the user needs comes along: no Python, Visual Studio or CUDA Toolkit on the target PC (brief §2.5).
+
+Three files for a release, in dist\\:
+- WinAIMagic-Setup-<v>.exe: everything, offline.
+- WinAIMagic-Portable-<v>.zip: the app without the NVIDIA engines (engine\\cuda, engine\\tiered\\bin), with portable.txt, so its
+  data stays beside it, and engine\\nvidia-pack.json, which names the third file.
+- WinAIMagic-NVIDIA-<v>.zip: those engines, which the portable app offers to download on a PC with an NVIDIA card. It must be
+  attached to the release v<v>: the manifest points there.
 """
 import argparse
+import hashlib
+import json
 import os
 import re
 import shutil
@@ -26,7 +35,11 @@ PACKAGES = ["numpy", "jinja2", "regex", "pyyaml", "pillow", "psutil", "jsonschem
 CUDA_BIN = Path(os.environ.get("CUDA_PATH", r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4")) / "bin" / "x64"
 CUDA_DLLS = ["cublas64_13.dll", "cublasLt64_13.dll"]
 ENGINE_NAMES = {"wam": "wam-glm", "wam-ds4": "wam-ds4", "wam-mm3": "wam-mm3"}
-LLAMA_EXES = ["llama-server.exe", "llama-bench.exe", "llama-perplexity.exe", "ggml-rpc-server.exe"]
+# llama-bench and llama-perplexity are built for measuring on the build PC, the app never runs them
+LLAMA_EXES = ["llama-server.exe", "ggml-rpc-server.exe"]
+REPO = "mfidder2026/WinAIMagic"
+# what the portable app leaves out and the NVIDIA pack holds, relative to the engine folder
+NVIDIA_FOLDERS = ["cuda", "tiered/bin"]
 IMAGE_EXE = "wam-image.exe"
 ISCC = Path(os.environ["LOCALAPPDATA"]) / "Programs" / "Inno Setup 6" / "ISCC.exe"
 BUILD = ROOT / "build"
@@ -61,8 +74,7 @@ def tiered():
         shutil.copy2(BUILD / "tiered-cuda" / f"{name}.exe", bin_dir / f"{target}.exe")
     # GLM's image encoder (scripts/build-vision-cuda.bat)
     shutil.copy2(BUILD / "vision-cuda" / "bin" / "wam-vision.exe", bin_dir / "wam-vision.exe")
-    for dll in CUDA_DLLS:
-        shutil.copy2(CUDA_BIN / dll, bin_dir / dll)
+    # cuBLAS only in engine\cuda: the main engine has that folder on its library path too (TieredLibDirs)
 
 
 def llama():
@@ -159,10 +171,61 @@ def setup():
     run([ISCC, f"/DSource={APP}", f"/DOut={DIST}", ROOT / "installer/WinAIMagic.iss"])
 
 
+def version():
+    return re.search(r"<Version>([^<]+)</Version>", (ROOT / "Directory.Build.props").read_text(encoding="utf-8")).group(1)
+
+
+def zip_tree(out, items):
+    """items: (path on disk, name in the zip). Deflate: what .NET's ZipFile and Windows' Explorer both unpack."""
+    tmp = out.with_suffix(".tmp")
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for path, name in items:
+            z.write(path, name)
+    tmp.replace(out)
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def portable():
+    v = version()
+    pack = DIST / f"WinAIMagic-NVIDIA-{v}.zip"
+    print(">", pack.name, flush=True)
+    items = [(p, p.relative_to(ENGINE).as_posix()) for folder in NVIDIA_FOLDERS for p in sorted((ENGINE / folder).rglob("*")) if p.is_file()]
+    zip_tree(pack, items)
+    manifest = {"version": v, "url": f"https://github.com/{REPO}/releases/download/v{v}/{pack.name}",
+                "size": pack.stat().st_size, "sha256": sha256(pack)}
+
+    out = DIST / f"WinAIMagic-Portable-{v}.zip"
+    print(">", out.name, flush=True)
+    left_out = [ENGINE / f for f in NVIDIA_FOLDERS]
+    files = [p for p in sorted(APP.rglob("*")) if p.is_file() and not any(p.is_relative_to(d) for d in left_out)]
+    stage = DIST / "portable-extra"
+    shutil.rmtree(stage, ignore_errors=True)
+    stage.mkdir(parents=True)
+    (stage / "portable.txt").write_text(
+        "WinAIMagic, portable version.\r\n\r\n"
+        "This file keeps settings, conversations and models in the folder 'data' next to WinAIMagic.exe.\r\n"
+        "Remove it and WinAIMagic uses %LOCALAPPDATA%\\WinAIMagic, like the installed version.\r\n", encoding="utf-8")
+    (stage / "nvidia-pack.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+    items = [(p, "WinAIMagic/" + p.relative_to(APP).as_posix()) for p in files]
+    items += [(stage / "portable.txt", "WinAIMagic/portable.txt"), (stage / "nvidia-pack.json", "WinAIMagic/engine/nvidia-pack.json")]
+    zip_tree(out, items)
+    shutil.rmtree(stage, ignore_errors=True)
+    for f in (out, pack):
+        print(f"  {f.name}: {f.stat().st_size / 1e6:.0f} MB, sha256 {sha256(f)}")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-publish", action="store_true")
     ap.add_argument("--skip-setup", action="store_true")
+    ap.add_argument("--skip-portable", action="store_true")
     a = ap.parse_args()
     APP.mkdir(parents=True, exist_ok=True)
     if not a.skip_publish:
@@ -175,4 +238,6 @@ if __name__ == "__main__":
         print("the upstream name is still in the package: see above")
     if not a.skip_setup:
         setup()
+    if not a.skip_portable:
+        portable()
     print("done:", DIST)

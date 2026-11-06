@@ -42,7 +42,8 @@ public sealed class NvidiaBackend : GpuBackendBase
     public override string? Unavailable =>
         capability == 0 ? L("De videokaart meldt geen compute capability: de driver is te oud of nvidia-smi ontbreekt.")
         : capability < MinCapability ? L($"Compute capability {capability.ToString(CultureInfo.InvariantCulture)} is te oud (minimaal {MinCapability.ToString("0.0", CultureInfo.InvariantCulture)}).")
-        : !probe.EngineFileExists(EngineFolder, "llama-server.exe") ? L($"engine\\{EngineFolder} ontbreekt in de installatie.")
+        : !probe.EngineFileExists(EngineFolder, "llama-server.exe")
+            ? probe.EngineFileExists("", NvidiaPack.ManifestName) ? L("Het NVIDIA-pakket is nog niet geïnstalleerd: zie Systeem.") : L($"engine\\{EngineFolder} ontbreekt in de installatie.")
         : null;
 
     public override string? TieredUnavailable =>

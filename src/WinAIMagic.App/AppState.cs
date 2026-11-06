@@ -245,12 +245,27 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     /// <summary>A button of the system check. The page file waits for Windows' UAC prompt, so that goes off the UI thread.</summary>
     public void Perform(SystemCheck.CheckAction action)
     {
-        void Open(SystemCheck.CheckAction a) => Ui.TryEnqueue(() => Pane = new Pane(a == SystemCheck.CheckAction.OpenCluster ? PaneKind.Cluster : PaneKind.Models));
+        void Open(SystemCheck.CheckAction a) => Ui.TryEnqueue(() =>
+        {
+            if (a == SystemCheck.CheckAction.RestartApp) Restart();
+            else Pane = new Pane(a == SystemCheck.CheckAction.OpenCluster ? PaneKind.Cluster : PaneKind.Models);
+        });
         if (action == SystemCheck.CheckAction.SetPageFile) Task.Run(() => Host.Check.Perform(action, Host, Open));
         else Host.Check.Perform(action, Host, Open);
     }
 
     public Task RunCheck() => Task.Run(() => Host.Check.Run(Host));
+
+    /// <summary>A new copy with the same arguments, which waits until this one has stopped its engines and gone (Program: --wait-for).</summary>
+    public void Restart()
+    {
+        var args = Environment.GetCommandLineArgs().Skip(1).Where(a => !a.StartsWith("--wait-for=", StringComparison.Ordinal))
+            .Append($"--wait-for={Environment.ProcessId}");
+        var start = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false };
+        foreach (var a in args) start.ArgumentList.Add(a);
+        System.Diagnostics.Process.Start(start);
+        Window.Close();
+    }
 
     // MARK: - the documents module
 

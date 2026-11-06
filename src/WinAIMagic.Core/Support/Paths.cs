@@ -14,13 +14,18 @@ public static class Paths
         {
             if (appData == null)
             {
-                appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WinAIMagic");
+                appData = Portable ? Path.Combine(AppRoot, "data")
+                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WinAIMagic");
                 Directory.CreateDirectory(appData);
             }
             return appData;
         }
         set { appData = value; Directory.CreateDirectory(value); }
     }
+
+    /// <summary>The portable app: portable.txt beside WinAIMagic.exe keeps settings, conversations and models in a folder `data`
+    /// beside it, so the whole folder can move to another drive or PC. Documents and images still go to the user's own folders.</summary>
+    public static bool Portable => File.Exists(Path.Combine(AppRoot, "portable.txt"));
 
     public static string DefaultModelsRoot => Path.Combine(AppData, "models");
 

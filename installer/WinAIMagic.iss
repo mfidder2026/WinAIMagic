@@ -55,6 +55,17 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#Source}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
+[InstallDelete]
+; older versions shipped two measuring tools and a second copy of cuBLAS beside the main engine
+Type: files; Name: "{app}\engine\cuda\llama-bench.exe"
+Type: files; Name: "{app}\engine\cuda\llama-perplexity.exe"
+Type: files; Name: "{app}\engine\vulkan\llama-bench.exe"
+Type: files; Name: "{app}\engine\vulkan\llama-perplexity.exe"
+Type: files; Name: "{app}\engine\cpu\llama-bench.exe"
+Type: files; Name: "{app}\engine\cpu\llama-perplexity.exe"
+Type: files; Name: "{app}\engine\tiered\bin\cublas64_13.dll"
+Type: files; Name: "{app}\engine\tiered\bin\cublasLt64_13.dll"
+
 [Icons]
 Name: "{group}\WinAIMagic"; Filename: "{app}\WinAIMagic.exe"
 Name: "{group}\{cm:UninstallProgram,WinAIMagic}"; Filename: "{uninstallexe}"

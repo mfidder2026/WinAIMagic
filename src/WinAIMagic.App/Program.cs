@@ -20,10 +20,18 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // a restart: the old copy first stops its engines and lets go of the instance
+        if (args.FirstOrDefault(a => a.StartsWith("--wait-for=", StringComparison.Ordinal)) is { } wait && int.TryParse(wait[11..], out int pid))
+        {
+            try { using var old = System.Diagnostics.Process.GetProcessById(pid); old.WaitForExit(60_000); }
+            catch (ArgumentException) { }
+        }
         // hidden, for tests: another data folder (before anything reads the settings); such a copy runs beside the real app
         var data = args.FirstOrDefault(a => a.StartsWith("--data=", StringComparison.Ordinal))?[7..];
         if (data != null) { Paths.AppData = data; TestData = true; }
-        string instance = data == null ? "" : "." + Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(data)))[..8];
+        // one instance per data folder: a portable copy runs beside an installed one, and beside another portable copy
+        var own = data ?? (Paths.Portable ? Paths.AppData : null);
+        string instance = own == null ? "" : "." + Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(own)))[..8];
 
         using var mutex = new Mutex(true, MutexName + instance, out bool first);
         if (!first)

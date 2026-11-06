@@ -148,7 +148,8 @@ public abstract class GpuBackendBase : IGpuBackend
     public IReadOnlyList<int> GpuIndices => Enumerable.Range(0, Adapters.Count).ToList();
     public virtual IReadOnlyDictionary<string, string> Environment => Profile.Env;
     public virtual IReadOnlyDictionary<string, string> TieredConfig => new Dictionary<string, string>();
-    public virtual IReadOnlyList<string> TieredLibDirs => new[] { Path.Combine(Paths.EngineRoot, "tiered", "bin") };
+    /// <summary>On the engine's library path: cuBLAS lies once, in engine\cuda, for both engines.</summary>
+    public virtual IReadOnlyList<string> TieredLibDirs => new[] { Path.Combine(Paths.EngineRoot, "tiered", "bin"), Path.Combine(Paths.EngineRoot, "cuda") };
 
     public ulong VramReserve(int settingMib)
     {

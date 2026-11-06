@@ -10,6 +10,8 @@ public sealed class EngineHost : IDisposable
     public ModelStore Store { get; }
     public IGpuBackend Backend { get; private set; }
     public BackendChoice Choice { get; private set; }
+    /// <summary>The NVIDIA engines the portable app downloads on a PC with such a card.</summary>
+    public NvidiaPack NvidiaPack { get; } = new();
     public LiveMetrics Metrics { get; }
     public BenchmarkRunner Bench { get; }
     public ClusterController Cluster { get; }
@@ -46,6 +48,7 @@ public sealed class EngineHost : IDisposable
         Metrics = new LiveMetrics(() => Engine, Backend.Adapters.FirstOrDefault()?.Luid ?? 0, Backend.VramTotal);
         Bench = new BenchmarkRunner();
         Check = new SystemCheck();
+        NvidiaPack.Changed += () => Check.UpdatePack(this);
         Store.Changed += () => Changed?.Invoke();
         Images.Changed += () => Changed?.Invoke();
         Images.OnRate = rate => Metrics.ImageRate = rate;

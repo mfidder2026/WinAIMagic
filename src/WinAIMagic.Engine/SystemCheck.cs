@@ -12,7 +12,7 @@ namespace WinAIMagic.Engine;
 public sealed class SystemCheck
 {
     public enum CheckState { Ok, Fixed, Todo, Optional, Failed }
-    public enum CheckAction { OpenModels, OpenCluster, SetPageFile, OpenDefender, InstallDeveloperTools }
+    public enum CheckAction { OpenModels, OpenCluster, SetPageFile, OpenDefender, InstallDeveloperTools, InstallNvidiaPack, RestartApp }
 
     public sealed record Item(string Id, string Title, string Detail, CheckState State, string? ActionLabel = null, CheckAction? Action = null);
 
@@ -30,7 +30,9 @@ public sealed class SystemCheck
         host.RefreshSystem();
         host.Store.Refresh();
         var engine = await Task.Run(() => EngineItem(host.Backend));
-        var list = new List<Item> { AppItem(), HardwareItem(host), engine, DownloadItem() };
+        var list = new List<Item> { AppItem(), HardwareItem(host), engine };
+        if (PackItem(host) is { } pack) list.Add(pack);
+        list.Add(DownloadItem());
         list.AddRange(ModelItems(host));
         list.Add(PageFileItem(host.System.PageFile, host.Backend.RequiredPageFile(host.System.RamTotal)));
         list.Add(NvmeItem(DriveReport.For(Paths.ModelsRoot)));
@@ -47,7 +49,24 @@ public sealed class SystemCheck
     internal static Item AppItem()
     {
         var version = Paths.AppVersion;
-        return new Item("app", "WinAIMagic", L($"Versie {version}") + " · " + Paths.AppRoot, CheckState.Ok);
+        return new Item("app", "WinAIMagic", L($"Versie {version}") + " · " + Paths.AppRoot + (Paths.Portable ? " · " + L("draagbaar") : ""), CheckState.Ok);
+    }
+
+    /// <summary>The engines of the portable app that it downloads for a make of card (Gpu\NvidiaPack.cs says which and how).</summary>
+    internal static Item? PackItem(EngineHost host) => host.NvidiaPack.CheckItem(host.Backend);
+
+    /// <summary>The pack's progress: only its own line changes, the rest of the check does not run again.</summary>
+    public void UpdatePack(EngineHost host)
+    {
+        var item = PackItem(host);
+        var list = Items.Where(i => i.Id != NvidiaPack.ItemId).ToList();
+        if (item != null)
+        {
+            int at = list.FindIndex(i => i.Id == "engine");
+            list.Insert(at < 0 ? list.Count : at + 1, item);
+        }
+        Items = list;
+        Changed?.Invoke();
     }
 
     internal static Item HardwareItem(EngineHost host)
@@ -238,7 +257,11 @@ public sealed class SystemCheck
                 open(action);
                 break;
             case CheckAction.OpenCluster:
+            case CheckAction.RestartApp:
                 open(action);
+                break;
+            case CheckAction.InstallNvidiaPack:
+                _ = host.NvidiaPack.Install();
                 break;
             case CheckAction.SetPageFile:
                 PageFileProblem = null;
