@@ -130,6 +130,9 @@ public sealed partial class MessageRow : Grid
     private MarkdownView? thoughts;
     private ActivityList steps = null!;
     private Spinner spinner = null!;
+    /// <summary>Beside the spinner: what the model prepares (a file, a command), or "Bezig…".</summary>
+    private readonly TextBlock busyText = Ui.Label("", 13, Theme.Secondary);
+    private StackPanel busyRow = null!;
     private MarkdownView answer = null!;
     private TextBlock error = null!;
     private Border sources = null!;
@@ -213,7 +216,10 @@ public sealed partial class MessageRow : Grid
         });
         if (memory.Thinking) thinking.SetOpen(true);
         steps = new ActivityList(memory);
-        spinner = new Spinner(16, false) { HorizontalAlignment = HorizontalAlignment.Left };
+        spinner = new Spinner(16, false) { VerticalAlignment = VerticalAlignment.Center };
+        busyText.VerticalAlignment = VerticalAlignment.Center;
+        busyRow = Ui.H(8, spinner, busyText);
+        busyRow.HorizontalAlignment = HorizontalAlignment.Left;
         answer = new MarkdownView(shifted);
         error = Ui.Caption("", new SolidColorBrush(Theme.Red), 13);
         error.IsTextSelectionEnabled = true;
@@ -230,7 +236,7 @@ public sealed partial class MessageRow : Grid
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(speak, L("Lees voor"));
         statsRow = Ui.H(10, stats, copy, speak);
 
-        var body = Ui.V(10, thinking, steps, spinner, answer, error, sources, statsRow);
+        var body = Ui.V(10, thinking, steps, busyRow, answer, error, sources, statsRow);
         card = new Border
         {
             Child = body, Padding = new Thickness(16), CornerRadius = new CornerRadius(18), HorizontalAlignment = HorizontalAlignment.Left,
@@ -254,8 +260,12 @@ public sealed partial class MessageRow : Grid
         }
         steps.Show(m.Activities.Count > 0);
         if (m.Activities.Count > 0) steps.Update(m.Activities, streaming);
-        bool spin = m.Text.Length == 0 && m.Reasoning.Length == 0 && streaming && m.Error == null;
+        // the model writes a tool call (a file, a command): say what, so the chat does not look idle
+        bool preparing = streaming && m.Text.Length == 0 && m.Error == null && m.Preparing != null;
+        bool spin = preparing || m.Text.Length == 0 && m.Reasoning.Length == 0 && streaming && m.Error == null;
         spinner.Active = spin;
+        busyRow.Show(spin);
+        if (spin) busyText.SetIfChanged(preparing ? m.Preparing! : L("Bezig…"));
         answer.Show(m.Text.Length > 0);
         answer.Set(m.Text);
         error.Show(m.Error != null);

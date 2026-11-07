@@ -48,6 +48,8 @@ public sealed class ChatMessage
     public DateTimeOffset Date { get; set; } = DateTimeOffset.UtcNow;
     /// <summary>Sent by the app, not the user: the model stopped before its work was done and is told to go on.</summary>
     public bool? Automatic { get; set; }
+    /// <summary>While the model writes a tool call: what it prepares ("Schrijft bestand demo.bas · 1.240 tekens"). Not saved.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public string? Preparing { get; set; }
 
     /// <summary>Assistant turns that only carry tool calls, and the tool results, are kept for the model but folded in the UI.</summary>
     [JsonIgnore]

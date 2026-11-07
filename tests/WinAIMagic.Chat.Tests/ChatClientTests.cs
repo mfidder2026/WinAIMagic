@@ -252,6 +252,40 @@ public class ChatRequestTests : ChatTest
         Assert.Equal(2, store.Conversations[0].Messages.Count(m => m.Role == ChatRole.Tool));
     }
 
+    /// <summary>A tool call still being written says what is coming (the Mac's case in UnfinishedTurnTests).</summary>
+    [Fact]
+    public void APreparingToolCallSaysWhatComes()
+    {
+        Assert.Equal("Schrijft bestand demo.bas", ChatClient.PreparingText("write_file", "{\"path\": \"demo.bas\", \"content\": \"10 print"));
+        Assert.EndsWith("tekens", ChatClient.PreparingText("write_file", "{\"path\":\"x.bas\",\"content\":\"" + new string('a', 1500)));
+        Assert.Equal("Bereidt een stap voor", ChatClient.PreparingText("", ""));
+        Assert.Equal("Bereidt een commando voor dir", ChatClient.PreparingText("run_command", "{\"command\":\"dir"));
+    }
+
+    /// <summary>While the model streams the arguments of write_file, the reply says so; once the call is whole, the line goes.</summary>
+    [Fact]
+    public async Task WhileAFileIsWrittenTheReplySaysSo()
+    {
+        Settings.Shared.RightWrite = "deny";
+        WorkspaceTools.Current = NewFolder("work");
+        store.Conversations[0].Workspace = WorkspaceTools.Current;
+        var pieces = new List<string> { "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"w\",\"function\":{\"name\":\"write_file\",\"arguments\":\"{\\\"path\\\":\\\"demo.bas\\\",\\\"content\\\":\\\"\"}}]}}]}" };
+        for (int i = 0; i < 60; i++)
+            pieces.Add("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"10 PRINT \\\\\\\"HALLO\\\\\\\" \"}}]}}]}");
+        pieces.Add("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"}\"}}]}}]}");
+        pieces.Add("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}");
+        pieces.Add("data: [DONE]");
+        var seen = new List<string>();
+        store.Changed += _ =>
+        {
+            if (store.Conversations[0].Messages.LastOrDefault(m => m.Role == ChatRole.Assistant)?.Preparing is { } p)
+                lock (seen) if (seen.LastOrDefault() != p) seen.Add(p);
+        };
+        await Ask("Schrijf een demo", new FakeEngine(() => Sse([.. pieces]), () => Say("KLAAR")));
+        Assert.Contains(seen, p => p.StartsWith("Schrijft bestand demo.bas", StringComparison.Ordinal));
+        Assert.All(store.Conversations[0].Messages, m => Assert.Null(m.Preparing));
+    }
+
     [Fact]
     public async Task TitleFromTheFirstQuestion()
     {

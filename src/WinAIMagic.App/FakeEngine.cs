@@ -214,6 +214,19 @@ internal static class FakeEngine
             await ToolCall(s, "browser_open", "{\"url\":\"https://example.com\"}", "call_b");
             finish = "tool_calls";
         }
+        else if (ask.Contains("bestand") && tools == 0)
+        {
+            // a long write_file, its arguments in pieces: the reply says what is being prepared
+            await ToolCall(s, "write_file", "{\"path\":\"demo.bas\",\"content\":\"", "call_f");
+            for (int i = 1; i <= 120; i++)
+            {
+                await Send(s, new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = 0, ["function"] = new JsonObject { ["arguments"] = $"{i * 10} PRINT \\\"REGEL {i}\\\"\\n" } }) });
+                await s.FlushAsync();
+                await Task.Delay(delay * 2);
+            }
+            await Send(s, new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = 0, ["function"] = new JsonObject { ["arguments"] = "\"}" } }) });
+            finish = "tool_calls";
+        }
         else if (ask.Contains("tabel") && tools == 0)
         {
             await Words(s, "content", "Je pc heeft **150 GB** vrij.\n\n| Schijf | Totaal | Vrij |\n|---|--:|--:|\n| C: | 1,8 TB | 150 GB |\n| **D:** | 4 TB | 2,1 TB |\n\nDe rest staat elders.", delay);

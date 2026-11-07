@@ -306,7 +306,10 @@ public sealed class ChatClient(HttpClient? http = null)
                         reply.Reasoning += reasoning;
                     });
                     Delta?.Invoke(id, reply.Id, content, reasoning);
-                }, context: owner);
+                }, context: owner)
+                {
+                    Prepared = p => store.Update(id, _ => reply.Preparing = p),
+                };
 
                 StreamResult result;
                 bool retried = false;
@@ -325,6 +328,7 @@ public sealed class ChatClient(HttpClient? http = null)
                     catch (OperationCanceledException) when (ct.IsCancellationRequested)
                     {
                         await throttle.DrainAsync();
+                        store.Update(id, _ => reply.Preparing = null);
                         return;
                     }
                     catch (ChatEngineException e) when (!retried && e.Status == 400 && e.Message.Contains("context", StringComparison.OrdinalIgnoreCase))
@@ -336,7 +340,7 @@ public sealed class ChatClient(HttpClient? http = null)
                     catch (Exception e)
                     {
                         await throttle.DrainAsync();
-                        store.Update(id, _ => reply.Error = e.Message);
+                        store.Update(id, _ => { reply.Error = e.Message; reply.Preparing = null; });
                         return;
                     }
                 }
@@ -344,6 +348,7 @@ public sealed class ChatClient(HttpClient? http = null)
 
                 store.Update(id, _ =>
                 {
+                    reply.Preparing = null;
                     reply.ToolCalls = result.ToolCalls;
                     reply.TokensPerSecond = result.TokensPerSecond;
                     reply.PromptTokensPerSecond = result.PromptTokensPerSecond;
@@ -1150,6 +1155,7 @@ public sealed class ChatClient(HttpClient? http = null)
 
             var result = new StreamResult();
             var calls = new SortedDictionary<int, (string Id, StringBuilder Name, StringBuilder Arguments)>();
+            int callChunks = 0;
             await using var stream = await resp.Content.ReadAsStreamAsync(idle.Token).ConfigureAwait(false);
             using var reader = new StreamReader(stream, AtomicFile.Utf8);
             while (await reader.ReadLineAsync(idle.Token).ConfigureAwait(false) is { } line)
@@ -1163,7 +1169,7 @@ public sealed class ChatClient(HttpClient? http = null)
                 catch (JsonException) { continue; }
                 using (json)
                 {
-                    if (json.RootElement.ValueKind == JsonValueKind.Object) ReadChunk(json.RootElement, result, calls, throttle);
+                    if (json.RootElement.ValueKind == JsonValueKind.Object) ReadChunk(json.RootElement, result, calls, throttle, ref callChunks);
                 }
             }
             result.ToolCalls = [.. calls.Select(kv =>
@@ -1182,7 +1188,26 @@ public sealed class ChatClient(HttpClient? http = null)
         finally { gate.Release(); }
     }
 
-    private void ReadChunk(JsonElement chunk, StreamResult result, SortedDictionary<int, (string Id, StringBuilder Name, StringBuilder Arguments)> calls, StreamThrottle throttle)
+    /// <summary>What a tool call that is still being written will do, from its name and the arguments so far (no whole JSON yet):
+    /// "Schrijft bestand demo.bas · 1.240 tekens".</summary>
+    public static string PreparingText(string name, string arguments)
+    {
+        var m = Regex.Match(arguments, "\"(path|file|name|url|query|command|app)\"\\s*:\\s*\"([^\"]{1,80})");
+        string what = name switch
+        {
+            "write_file" => L("Schrijft bestand"),
+            "edit_file" => L("Past bestand aan"),
+            "run_command" => L("Bereidt een commando voor"),
+            "system_change" => L("Maakt een plan"),
+            "create_skill" => L("Schrijft een skill"),
+            "" => L("Bereidt een stap voor"),
+            _ => L($"Bereidt voor: {name}"),
+        };
+        var size = arguments.Length > 200 ? " · " + L($"{arguments.Length.ToString("N0", AppLanguages.Current.Culture())} tekens") : "";
+        return what + (m.Success ? " " + m.Groups[2].Value : "") + size;
+    }
+
+    private void ReadChunk(JsonElement chunk, StreamResult result, SortedDictionary<int, (string Id, StringBuilder Name, StringBuilder Arguments)> calls, StreamThrottle throttle, ref int callChunks)
     {
         if (chunk.TryGetProperty("usage", out var u) && u.ValueKind == JsonValueKind.Object
             && u.TryGetProperty("total_tokens", out var total) && total.TryGetInt32(out var count) && count > 0)
@@ -1216,6 +1241,11 @@ public sealed class ChatClient(HttpClient? http = null)
                 call.Arguments.Append(Text(f, "arguments"));
             }
             calls[index] = call;
+            // the arguments of a tool call stream too (a whole program for write_file): say what is coming, now and then,
+            // so the chat does not look idle while tokens come in; they count in the speed too
+            callChunks++;
+            if (callChunks == 1 || callChunks % 25 == 0) throttle.Prepare(PreparingText(call.Name.ToString(), call.Arguments.ToString()));
+            TokensStreamed?.Invoke(1);
         }
     }
 

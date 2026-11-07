@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.14.0
+# Parity with MacAIMagic 1.14.1
 
-How this version relates to MacAIMagic at commit `3ece2c5`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `80f6c87`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -36,6 +36,15 @@ How this version relates to MacAIMagic at commit `3ece2c5`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `80f6c87` (1.14.1): what the model prepares, and the chat's end
+
+- **Taken over, `7d8f326`:** while the model writes a tool call (a whole program for write_file), the reply says what it prepares, from the name and the arguments so far ("Schrijft bestand demo.bas · 1.188 tekens"), updated on the first and every 25th chunk through the stream throttle. Those chunks count in the speed. A reply with nothing yet says "Bezig…" beside the spinner. Tests: ChatClientTests.APreparingToolCallSaysWhatComes (the Mac's cases) and WhileAFileIsWrittenTheReplySaysSo. The app's fake engine has a script `bestand` for it.
+- **Already so here, checked:**
+  - `80f6c87` (back in a conversation it shows the end): the chat page pins to the end on a new conversation and follows its size; in the Debug app a conversation of five answers was at 100% before and after Modellen.
+  - `7c5ed51` (the last message above the step card and the approval card): the scroller follows its own size change while it is pinned to the end.
+  - `344c57d` (a requested stop is never a failure): EngineBase.Terminated already counts any exit after a requested stop as stopped.
+- **Not needed:** `2db95c9` (the Mac's release; WinAIMagic takes 1.14.1).
 
 ### Up to `3ece2c5` (1.14.0): a model in one click, conversations, the step list, skills in one file
 

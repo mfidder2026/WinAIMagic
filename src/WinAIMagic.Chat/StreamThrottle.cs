@@ -20,6 +20,11 @@ public sealed class StreamThrottle
     private TimeSpan last = TimeSpan.Zero;
     private bool scheduled;
     private readonly List<TaskCompletionSource> waiters = [];
+    /// <summary>What a tool call that is being written prepares; only the latest counts.</summary>
+    private string? preparing;
+
+    /// <summary>Gets what a tool call in progress prepares, on the same thread as the text.</summary>
+    public Action<string>? Prepared { get; set; }
 
     /// <param name="deliver">Gets (content, reasoning) on the context's thread, or on a pool thread without one.</param>
     /// <param name="interval">At least this long between two deliveries.</param>
@@ -44,12 +49,22 @@ public sealed class StreamThrottle
         }
     }
 
+    /// <summary>From any thread: what a tool call that is still being written prepares ("Schrijft bestand demo.bas").</summary>
+    public void Prepare(string text)
+    {
+        lock (gate)
+        {
+            preparing = text;
+            Schedule();
+        }
+    }
+
     /// <summary>Completes when everything added so far has been delivered. Await it; do not block the owner on it.</summary>
     public Task DrainAsync()
     {
         lock (gate)
         {
-            if (!scheduled && content.Length == 0 && reasoning.Length == 0) return Task.CompletedTask;
+            if (!scheduled && content.Length == 0 && reasoning.Length == 0 && preparing == null) return Task.CompletedTask;
             var waiter = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             waiters.Add(waiter);
             return waiter.Task;
@@ -74,16 +89,20 @@ public sealed class StreamThrottle
     private void Deliver()
     {
         string c, r;
+        string? p;
         lock (gate)
         {
             c = content.ToString();
             r = reasoning.ToString();
+            p = preparing;
             content.Clear();
             reasoning.Clear();
+            preparing = null;
         }
         try
         {
             if (c.Length > 0 || r.Length > 0) deliver(c, r);
+            if (p != null) Prepared?.Invoke(p);
         }
         finally
         {
@@ -92,7 +111,7 @@ public sealed class StreamThrottle
             {
                 last = clock.Elapsed;
                 scheduled = false;
-                if (content.Length > 0 || reasoning.Length > 0) Schedule();
+                if (content.Length > 0 || reasoning.Length > 0 || preparing != null) Schedule();
                 else { done = [.. waiters]; waiters.Clear(); }
             }
             done?.ForEach(w => w.TrySetResult());
