@@ -271,10 +271,12 @@ public sealed class ChatClient(HttpClient? http = null)
                     bool isWorkspace = WorkspaceTools.Names.Contains(call.Name);
                     bool isSystem = SystemTools.Names.Contains(call.Name);
                     bool isSkill = call.Name == Skills.ToolName;
+                    bool isApp = AppTools.Names.Contains(call.Name);
                     if (isWorkspace) changedFiles = true;
                     var step = new ToolActivity
                     {
-                        Label = isWorkspace ? WorkspaceTools.Label(call) : isSystem ? SystemTools.Label(call) : isSkill ? Skills.Label(call) : WebTools.Label(call),
+                        Label = isWorkspace ? WorkspaceTools.Label(call) : isSystem ? SystemTools.Label(call) : isSkill ? Skills.Label(call)
+                            : isApp ? AppTools.Label(call) : WebTools.Label(call),
                     };
                     activities.Add(step);
                     store.Update(id, _ => reply.Activities = Copy(activities));
@@ -304,6 +306,12 @@ public sealed class ChatClient(HttpClient? http = null)
                     else if (isSkill)
                     {
                         text = Skills.Run(call);
+                    }
+                    else if (isApp)
+                    {
+                        var output = await RunApp(call, id, ct);
+                        text = output.Text;
+                        if (output.Denied) step.Denied = true;
                     }
                     else
                     {
@@ -412,6 +420,48 @@ public sealed class ChatClient(HttpClient? http = null)
                     if (!await Ask(approval, ct)) return ("The user did not approve undoing it.", true);
                     var done = await SystemTools.Undo(change, ct: ct);
                     return ($"Undone {done.Id}:\n" + done.UndoReport, false);
+                }
+            default:
+                return ($"Unknown tool {call.Name}", false);
+        }
+    }
+
+    /// <summary>app_help and app_status only read; create_skill writes a skill of the user's own after their yes.</summary>
+    private async Task<(string Text, bool Denied)> RunApp(ToolCall call, Guid id, CancellationToken ct)
+    {
+        switch (call.Name)
+        {
+            case "app_help": return (AppTools.Help(call), false);
+            case "app_status": return (AppTools.RunStatus(), false);
+            case "app_action":
+                {
+                    var args = WorkspaceTools.Args(call);
+                    var action = (WorkspaceTools.Str(args, "action") ?? "").Trim();
+                    if (!AppTools.Actions.Contains(action)) return ($"Unknown action \"{action}\". Use one of: {string.Join(", ", AppTools.Actions)}.", false);
+                    if (AppTools.Control is not { } control) return ("The app cannot do that from here.", false);
+                    var plan = control.Plan(action, args);
+                    if (plan.Error != null) return ("Error: " + plan.Error, false);
+                    var right = Settings.Shared.SystemRight(true);
+                    if (!plan.ReadOnly)
+                    {
+                        if (right == "deny") return ("The user's settings do not allow changing the app or the system (Systeembeheer). Tell the user how to do it themselves.", true);
+                        if ((right == "ask" || plan.Ask) && !Settings.Shared.AutoApprove
+                            && !await Ask(new Approval(id, call, plan.Title ?? action, plan.Detail ?? "") { Warnings = plan.AfterAnswer ? [L("Dit gebeurt als het antwoord klaar is.")] : [] }, ct))
+                            return ("The user did not approve this. Ask what they want instead.", true);
+                    }
+                    return (await control.Run(action, args), false);
+                }
+            case "create_skill":
+                {
+                    if (!Settings.Shared.Skills) return ("Skills are off in the user's settings (Systeembeheer). Tell the user they can turn them on.", true);
+                    if (AppTools.Skill(call) is not { } skill) return ("Error: give a name (letters, digits, hyphens), a description and the instructions.", false);
+                    var replaces = AppTools.Replaces(skill.Name);
+                    var title = replaces == "own" ? L($"Eigen skill vervangen: {skill.Name}")
+                        : replaces == "builtin" ? L($"Eigen versie van de ingebouwde skill: {skill.Name}") : L($"Skill maken: {skill.Name}");
+                    if (!Settings.Shared.AutoApprove && !await Ask(new Approval(id, call, title, skill.Text), ct))
+                        return ("The user did not approve this skill. Ask what they want changed.", true);
+                    var file = AppTools.WriteSkill(skill.Name, skill.Text);
+                    return ($"Skill {skill.Name} saved as {file}. It is in the skill list from the next message on and loads with use_skill. Tell the user where it is (Settings, Systeembeheer, Open map) and that they can change it there.", false);
                 }
             default:
                 return ($"Unknown tool {call.Name}", false);
@@ -660,7 +710,8 @@ public sealed class ChatClient(HttpClient? http = null)
         var tools = new JsonArray();
         if (s.WebSearch) foreach (var t in WebTools.Definitions) tools.Add(t!.DeepClone());
         if (s.WorkspaceTools && WorkspaceTools.Workspace != null) foreach (var t in WorkspaceTools.Definitions) tools.Add(t!.DeepClone());
-        // skills and system management come last: with them off the request starts the same as before
+        // the app's own tools, skills and system management come last: with them off the request starts the same as before
+        if (s.AppTools) foreach (var t in AppTools.Definitions(s.Skills)) tools.Add(t!.DeepClone());
         if (s.Skills && Skills.All.Count > 0) tools.Add(Skills.Definition);
         if (s.SystemManagement) foreach (var t in SystemTools.Definitions) tools.Add(t!.DeepClone());
         return tools;
@@ -686,6 +737,7 @@ public sealed class ChatClient(HttpClient? http = null)
             system += "\n\n" + ChatTexts.KeepGoing + noTools;
         }
         // Instellingen → Systeembeheer: nothing is added while they are off
+        if (s.AppTools) system += "\n\n" + AppTools.PromptSection(s.Skills);
         if (s.SystemManagement) system += "\n\n" + SystemTools.PromptSection();
         if (s.Skills && Skills.PromptSection(Skills.All) is { Length: > 0 } section) system += "\n\n" + section;
         if (s.SystemPrompt.Length > 0) system += "\n\n" + s.SystemPrompt;

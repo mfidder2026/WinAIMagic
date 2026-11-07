@@ -21,6 +21,9 @@ Skills are on by default. Turn them off under Settings → **System management**
 | diagnose | slow, processor and memory, errors in the event log, drives |
 
 ## Making your own skill
+The easiest way: ask in the chat, for example "make a skill for programming in C64 assembler, with the files in this folder". The model writes the skill, you see it on a card, and after **Allow** it is in the list. That is also how you change your own skill later.
+
+You can also make one yourself:
 1. Settings → System management → **Open folder**.
 2. Make a folder, for example `my-printer`, with a file `SKILL.md` in it:
 ```

@@ -71,6 +71,8 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
                 Ui.TryEnqueue(() => { Interlocked.Exchange(ref sampling, 0); Guarded(() => Sampled?.Invoke()); });
         };
         Settings.PropertyChanged += OnSetting;
+        // the model knows the app and can act in it (app_status, app_action)
+        AppTools.Control = new AppControl(this);
         if (Settings.FastModel.Length > 0 && Settings.FastModel == Settings.SelectedModelId) Settings.FastModel = "";
     }
 

@@ -264,11 +264,13 @@ public class SystemToolsTests : ChatTest
 /// <summary>The tools in the conversation: rights, the approval card, and admin plans that always ask.</summary>
 public class SystemLoopTests : ChatTest
 {
-    private readonly ConversationStore store = new();
+    private readonly ConversationStore store;
     private Conversation C => store.Conversations[0];
 
     public SystemLoopTests()
     {
+        // here, not as a field: a field is made before ChatTest points the app data at this test's own folder
+        store = new ConversationStore();
         Settings.Shared.SystemManagement = true;
         Settings.Shared.Skills = true;
     }

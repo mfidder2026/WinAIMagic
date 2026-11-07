@@ -30,6 +30,7 @@ WinAIMagic is the Windows version of [MacAIMagic](https://github.com/mfidder2026
 - **Delete or update a model** on its card. A downloaded model has **Controleer op update**: in a few seconds, without reading the model's files, it compares them with this version's catalog and asks the maker's server. An update starts at once; otherwise the card says there is none.
 - **System management.** The model can look at this PC (one read-only PowerShell command at a time) and change its settings through a plan you approve, with the current value of each step on the card. Administrator steps share one Windows prompt (UAC), can make a restore point first, and the model can undo a change when you ask. Built-in **skills** give it tested commands per subject (appearance, energy, network, software, startup items, storage, security, diagnosis); add your own. Both are on by default under Settings, Systeembeheer.
 - **Help** in the app: a Hulp page, a ? at the top for the page on screen, and F1.
+- **The app knows itself.** Ask in the chat for what you want done in WinAIMagic ("download the model that suits this PC", "turn thinking off", "make a skill for C64 assembler", "make an image of ...") and the model does it after your approval on a card. It reads the app's own help and state for that. Its own rights, API keys and the server address it cannot change.
 - **Cluster** several PCs over USB4, Thunderbolt or ethernet for models on the second engine.
 
 Available in English, Dutch, German and French.

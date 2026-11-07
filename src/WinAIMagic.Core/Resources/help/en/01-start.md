@@ -20,6 +20,16 @@ WinAIMagic runs large AI models entirely on this PC. Nothing goes to the cloud: 
 - **Compare models**, link several PCs in a **Cluster**, and use the model from other programs (see *Local API*).
 - **Set up this PC**: the model looks at this PC and sets it up for you, with skills per subject (see *System management*).
 
+## Just ask the app
+The model knows WinAIMagic. Ask in the chat for what you want, and it does it, after your approval on a card:
+- "Which model suits this PC best? Download it."
+- "Turn thinking off and make the context 128K."
+- "Make Ministral the fast model."
+- "Make a skill for programming in C64 assembler."
+- "Make an image of a lighthouse at sunset."
+
+For that it reads the help itself and looks at how the app and this PC stand. It does not change its own rights, API keys or the server address: you set those yourself. Turn it off under Settings → System management → **The app**.
+
 ## Finding help
 - At the top right is **?**: it opens the help for the screen that is open.
 - **F1** does the same from any screen.

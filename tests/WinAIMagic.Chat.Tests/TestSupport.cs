@@ -28,6 +28,7 @@ public abstract class ChatTest : IDisposable
         // skills and system management are on by default; the older tests describe the requests without them
         Settings.Shared.Skills = false;
         Settings.Shared.SystemManagement = false;
+        Settings.Shared.AppTools = false;
         WorkspaceTools.Current = null;
         DeveloperTools.MissingOverride = [];
         CommandRunner.ShellOverride = null;

@@ -153,6 +153,13 @@ All numbers here are computed by the planner for Qwen3.6-35B-A3B. None has been 
 
 ## Mac gaps fixed here (brief §11)
 
+- **The app knows itself (new here, after 0.2.9; the Mac should take it over).** A model asked to make a skill wrote a file in the work folder and a line in WINAIMAGIC.md: it did not know where skills go, and could not write there. Now, under Settings → Systeembeheer → De app (on by default):
+  - `app_help` reads the app's own help (a topic, a search, or the list);
+  - `app_status` gives the app's state: version, PC, every model with its id, fit and download state, the roles, the engines, the settings it may change, the rights and the folders;
+  - `app_action` does it: open a screen or help topic, download, pause, check for an update or delete a model, choose the heavy, fast or image model, start or stop the engine, change a setting, make an image, start a new conversation. A change asks on a card under the system-change right, and deleting a model always asks. What would stop the engine the conversation runs on (stopping it, a new heavy model, an image) waits until the answer is done. It may not change its own rights, the API keys, the server, the model folder or the cluster;
+  - `create_skill` writes `Skills\<name>\SKILL.md` after a card, and the system prompt says skills go nowhere else.
+  - Run with the real Ministral in the Debug build, in its own data folder: "maak een skill c64-test ..." gave a card and the SKILL.md; "zet het denken uit" set Thinking to false after its card, once the setting names were in the tool's description (before that, Ministral asked back); "welk model raad je aan" read app_status and answered without downloading. A first version let Ministral offer a 95 GB download nobody asked for (declined is what a user would do; the test script approved it, and the partial file was removed): the prompt now says to never download, delete or switch a model on its own. Not run with a larger model.
+
 | Mac behaviour | Here |
 |---|---|
 | A catalog address follows the newest version, so a file the maker replaces only fails once it has come down | Every address names one commit; the size is checked before a byte is written, and the model's download stops at once |

@@ -164,10 +164,12 @@ public static class SettingsDialog
         var help = Ui.IconBtn(Glyph.Help, () => app.OpenHelp("sysadmin"), L("Hulp bij dit onderdeel"));
         return Tab(
             Ui.Row("*,auto", 12, Note(L("Het model kan deze pc voor je bekijken en instellen. Een wijziging keur je eerst goed, en het model kan hem weer ongedaan maken.")), help),
+            Section(L("De app"),
+                Toggle(L("Het model kent de app: het leest de hulp en ziet hoe de app en deze pc ervoor staan"), s.AppTools, v => s.AppTools = v)),
             Section(L("Skills"),
                 Toggle(L("Skills: instructies per onderwerp, met geteste commando's"), s.Skills, v => s.Skills = v),
                 Ui.Row("*,auto", 12,
-                    Note(L("Eigen skills: een map met een SKILL.md erin. Een eigen skill met dezelfde naam vervangt de ingebouwde.")),
+                    Note(L("Eigen skills: een map met een SKILL.md erin. Een eigen skill met dezelfde naam vervangt de ingebouwde. Vraag het model in de chat om een skill te maken.")),
                     Ui.Btn(L("Open map"), () =>
                     {
                         Directory.CreateDirectory(Paths.UserSkills);

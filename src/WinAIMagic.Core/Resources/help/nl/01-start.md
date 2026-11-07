@@ -20,6 +20,16 @@ WinAIMagic draait grote AI-modellen helemaal op deze pc. Er gaat niets naar de c
 - **Modellen vergelijken**, meerdere pc's koppelen in een **Cluster**, en het model gebruiken vanuit andere programma's (zie *Lokale API*).
 - **Deze pc instellen**: het model bekijkt deze pc en stelt hem voor je in, met skills per onderwerp (zie *Systeembeheer*).
 
+## Vraag het de app zelf
+Het model kent WinAIMagic. Vraag in de chat gewoon wat je wilt, en het doet het, na jouw goedkeuring op een kaart:
+- "Welk model past het best op deze pc? Download het."
+- "Zet het denken uit en maak de context 128K."
+- "Maak Ministral het snelle model."
+- "Maak een skill voor programmeren in C64-assembler."
+- "Maak een afbeelding van een vuurtoren bij zonsondergang."
+
+Het leest daarvoor zelf de hulp en kijkt hoe de app en deze pc ervoor staan. Zijn eigen rechten, API-sleutels en het serveradres verandert het niet: die stel je zelf in. Uitzetten kan onder Instellingen → Systeembeheer → **De app**.
+
 ## Hulp vinden
 - Rechtsboven staat **?**: dat opent de hulp bij het scherm dat open is.
 - **F1** doet hetzelfde vanuit elk scherm.

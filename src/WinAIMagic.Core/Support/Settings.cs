@@ -78,6 +78,8 @@ public sealed class Settings : INotifyPropertyChanged
     /// <summary>Instellingen → Systeembeheer, both on by default. Skills: markdown instructions per subject that the model loads
     /// when it needs them. System management: the model reads this PC's settings and changes them through a plan the user approves.</summary>
     public bool Skills { get => Get(true); set => Set(value); }
+    /// <summary>The model knows the app: it reads WinAIMagic's help and how the app stands now, and makes skills (app_help, app_status, create_skill).</summary>
+    public bool AppTools { get => Get(true); set => Set(value); }
     public bool SystemManagement { get => Get(true); set => Set(value); }
     /// <summary>Reading the system (diagnosis) and changing it: "allow", "ask" or "deny". Admin changes always ask.</summary>
     public string RightSystemRead { get => Get("allow"); set => Set(value); }
