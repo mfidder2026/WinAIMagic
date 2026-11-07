@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using WinAIMagic.Chat.Agent;
 using WinAIMagic.Core.Support;
 using static WinAIMagic.Core.Support.Lang;
 
@@ -17,6 +18,8 @@ public sealed record Approval(Guid Conversation, ToolCall Call, string Title, st
     public IReadOnlyList<PlanStep> Steps { get; init; } = [];
     /// <summary>Needs administrator rights: Windows asks (UAC) after this yes, and "always" is not offered.</summary>
     public bool Admin { get; init; }
+    /// <summary>Asks every time, also after "always" (sending a mail, a click that sends something).</summary>
+    public bool EveryTime { get; init; }
 }
 
 /// <summary>One step of a system plan on the approval card.</summary>
@@ -144,7 +147,8 @@ public sealed class ChatClient(HttpClient? http = null)
     private (Guid Conversation, DateTime? Modified, string? Text)? frozenNotes;
 
     /// <summary>Web questions need a few rounds; work in a folder (read, write, run, read the log, fix) needs many more.</summary>
-    private int MaxToolRounds => WorkspaceActive || Settings.Shared.SystemManagement || LoadedConnectors.Count > 0 ? 200 : 20;
+    private int MaxToolRounds => WorkspaceActive || Settings.Shared.SystemManagement || LoadedConnectors.Count > 0 || AgentOn ? 200 : 20;
+    private static bool AgentOn => AgentTools.All.Exists(s => s.IsOn);
     private static bool WorkspaceActive => Settings.Shared.WorkspaceTools && WorkspaceTools.Workspace != null;
 
     public void Answer(Approval approval, bool allow, bool always = false)
@@ -168,10 +172,10 @@ public sealed class ChatClient(HttpClient? http = null)
         return Ask(new Approval(conversation, call, title, detail), ct);
     }
 
-    /// <summary>"Always in this conversation" covers everything but admin rights: those are asked every time.</summary>
+    /// <summary>"Always in this conversation" covers everything but admin rights and what asks every time.</summary>
     private async Task<bool> Ask(Approval approval, CancellationToken ct)
     {
-        lock (sync) if (trusted.Contains(approval.Conversation) && !approval.Admin) return true;
+        lock (sync) if (trusted.Contains(approval.Conversation) && !approval.Admin && !approval.EveryTime) return true;
         if (approval.Admin) Snapshot = true;
         var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (sync)
@@ -380,11 +384,12 @@ public sealed class ChatClient(HttpClient? http = null)
                     bool isSchedule = call.Name == TaskTool.ToolName;
                     bool isLoadConnector = call.Name == McpManager.LoadTool;
                     var connectorTool = Connectors?.Route(call.Name);
+                    var agent = AgentTools.For(call.Name);
                     if (isWorkspace) changedFiles = true;
                     var callArgs = WorkspaceTools.Args(call);
                     var step = new ToolActivity
                     {
-                        Label = isWorkspace ? WorkspaceTools.Label(call) : isSystem ? SystemTools.Label(call) : isSkill ? Skills.Label(call)
+                        Label = agent != null ? agent.Label(call) : isWorkspace ? WorkspaceTools.Label(call) : isSystem ? SystemTools.Label(call) : isSkill ? Skills.Label(call)
                             : isApp ? AppTools.Label(call)
                             : isSteps ? WorkSteps.Label(WorkSteps.Parse(callArgs))
                             : isSchedule ? L($"Taak plannen: {WorkspaceTools.Str(callArgs, "title") ?? ""}")
@@ -394,7 +399,13 @@ public sealed class ChatClient(HttpClient? http = null)
                     activities.Add(step);
                     store.Update(id, _ => reply.Activities = Copy(activities));
                     string text;
-                    if (isWorkspace)
+                    if (agent != null)
+                    {
+                        var output = await RunAgent(agent, call, id, ct);
+                        text = output.Text;
+                        if (output.Denied) step.Denied = true;
+                    }
+                    else if (isWorkspace)
                     {
                         var kind = WorkspaceTools.RightFor(call.Name);
                         var right = Settings.Shared.Right(kind);
@@ -639,6 +650,22 @@ public sealed class ChatClient(HttpClient? http = null)
         return (await Connectors!.CallAsync(route, args, ct), false);
     }
 
+    /// <summary>Mail, the browser and controlling programs: each call says whether it runs, asks (a card, perhaps every time) or is
+    /// refused.</summary>
+    private async Task<(string Text, bool Denied)> RunAgent(IAgentToolSet agent, ToolCall call, Guid id, CancellationToken ct)
+    {
+        switch (await agent.Check(call))
+        {
+            case AgentStep.Refuse refuse:
+                return (refuse.Reason, true);
+            case AgentStep.Ask ask:
+                var approval = new Approval(id, call, ask.Title, ask.Detail) { Warnings = ask.Warnings ?? [], EveryTime = ask.EveryTime };
+                if (!await Ask(approval, ct)) return ("The user did not allow this. Ask what they want instead, or continue without it.", true);
+                break;
+        }
+        return (await agent.Run(call, ct), false);
+    }
+
     /// <summary>schedule_task: always with the card first; the task gets this conversation's folder.</summary>
     private async Task<(string Text, bool Denied)> ScheduleTask(ToolCall call, Guid id, CancellationToken ct)
     {
@@ -754,7 +781,7 @@ public sealed class ChatClient(HttpClient? http = null)
 
     private static readonly string[] CallMarks = ["<tool_call>", "</tool_call>", "<function=", "</function>", "</parameter>"];
     private static readonly string[] EndWords = ["klaar", "done", "fertig", "terminé", "termine"];
-    private static readonly string[] Invitations = ["let me know", "laat me weten", "laat het me weten", "lass es mich wissen", "faites-moi savoir", "dites-moi"];
+    private static readonly string[] Invitations = ["let me know", "laat me weten", "laat het me weten", "lass es mich wissen", "lass mich wissen", "faites-moi savoir", "dites-moi"];
     private static readonly string[] Announcements =
     [
         " laat me ", " laten we ", " ik ga ", " ik maak nu", " ik zal ", " nu ga ik", " nu maak ik", " ga ik nu", " ik probeer ",
@@ -779,6 +806,11 @@ public sealed class ChatClient(HttpClient? http = null)
         if (CallMarks.Any(m => answer.Contains(m, StringComparison.Ordinal) || thought.Contains(m, StringComparison.Ordinal))) return true;
         if (answer.EndsWith('?')) return false;
         if (answer.EndsWith(':')) return true;
+        // the last sentence
+        var parts = SentenceEnd.Replace(answer, "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var last = parts.Length == 0 ? "" : " " + parts[^1].ToLowerInvariant();
+        // the model waits for the user ("laat me weten zodra …"): that is no stop halfway, also after tool use
+        if (Invitations.Any(i => last.Contains(i, StringComparison.Ordinal))) return false;
         if (tookSteps)
         {
             int first = 0;
@@ -787,19 +819,19 @@ public sealed class ChatClient(HttpClient? http = null)
             while (end < answer.Length && char.IsLetter(answer[end])) end++;
             return !EndWords.Contains(answer[first..end].ToLowerInvariant());
         }
-        // the last sentence: does it announce a next step?
-        var parts = SentenceEnd.Replace(answer, "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        var last = parts.Length == 0 ? "" : " " + parts[^1].ToLowerInvariant();
-        if (Invitations.Any(i => last.Contains(i, StringComparison.Ordinal))) return false;
+        // does the last sentence announce a next step?
         return Announcements.Any(a => last.Contains(a, StringComparison.Ordinal));
     }
 
     private static readonly string[] DoneWords = ["KLAAR", "DONE", "FERTIG", "TERMINÉ", "TERMINE"];
+    private static readonly Regex DoneAtEnd = new(@"[\s*]*\b(KLAAR|DONE|FERTIG|TERMINÉ|TERMINE)[\s*.!]*$", RegexOptions.Compiled);
 
     /// <summary>The answer without the done-word the model was asked to start with: "KLAAR — morgen staat er niets" becomes
     /// "Morgen staat er niets". Only the word in capitals counts: "Klaar! Het bestand is er" is ordinary language.</summary>
     public static string WithoutDoneWord(string text)
     {
+        // also at the very end: "… verder zoek. KLAAR" (in capitals only: "Ik ben klaar" stays)
+        if (DoneAtEnd.Match(text) is { Success: true, Index: > 0 } tail) text = text[..tail.Index];
         int i = 0;
         while (i < text.Length && (char.IsWhiteSpace(text[i]) || text[i] == '*')) i++;
         int end = i;
@@ -916,13 +948,15 @@ public sealed class ChatClient(HttpClient? http = null)
         if (s.AppTools) foreach (var t in AppTools.Definitions(s.Skills)) tools.Add(t!.DeepClone());
         if (s.Skills && Skills.All.Count > 0) tools.Add(Skills.Definition);
         if (s.SystemManagement) foreach (var t in SystemTools.Definitions) tools.Add(t!.DeepClone());
+        foreach (var set in AgentTools.All.Where(x => x.IsOn))
+            foreach (var t in set.Definitions) tools.Add(t!.DeepClone());
         if (OffersSteps) tools.Add(WorkSteps.Definition);
         return tools;
     }
 
     /// <summary>The step list is there when the model can do work of several steps: in a folder, on the system, with connectors.</summary>
     private static bool OffersSteps =>
-        WorkspaceActive || Settings.Shared.SystemManagement || Connectors?.Enabled.Count > 0;
+        WorkspaceActive || Settings.Shared.SystemManagement || Connectors?.Enabled.Count > 0 || AgentOn;
 
     /// <summary>This run's tools: the settings' ones, planning a task, and the connectors this conversation loaded.</summary>
     internal JsonArray RunTools()
@@ -963,6 +997,7 @@ public sealed class ChatClient(HttpClient? http = null)
         if (s.Skills && Skills.PromptSection(Skills.All) is { Length: > 0 } section) system += "\n\n" + section;
         if (OffersSteps)
             system += "\n\n" + L("Werk je aan een taak van drie stappen of meer, zet die dan eerst op met task_list en werk de lijst bij als een stap begint of klaar is. De gebruiker ziet de lijst boven het invoerveld.");
+        foreach (var set in AgentTools.All.Where(x => x.IsOn)) system += "\n\n" + set.PromptSection;
         if (Connectors?.PromptSection() is { Length: > 0 } connectors) system += "\n\n" + connectors;
         if (s.SystemPrompt.Length > 0) system += "\n\n" + s.SystemPrompt;
         if (summary != null)

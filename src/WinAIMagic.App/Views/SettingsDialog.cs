@@ -8,7 +8,7 @@ using static WinAIMagic.Core.Support.Lang;
 
 namespace WinAIMagic.App.Views;
 
-/// <summary>Instellingen: the tabs Chat, Engine, Systeembeheer, Connectors and Taken (600 x 520). A choice counts at once.</summary>
+/// <summary>Instellingen: the tabs Chat, Engine, Systeembeheer, Connectors, Taken, Agent and Telegram (720 x 600). A choice counts at once.</summary>
 public static class SettingsDialog
 {
     private static bool open;
@@ -17,12 +17,12 @@ public static class SettingsDialog
     {
         if (open) return;
         open = true;
-        var host = new Grid { Width = 600, Height = 520 };
+        var host = new Grid { Width = 720, Height = 600 };
         var dialog = Ui.Dialog(app);
         dialog.CloseButtonText = L("Sluiten");
         dialog.Content = host;
-        dialog.Resources["ContentDialogMaxWidth"] = 640.0;
-        dialog.Resources["ContentDialogMaxHeight"] = 760.0;
+        dialog.Resources["ContentDialogMaxWidth"] = 780.0;
+        dialog.Resources["ContentDialogMaxHeight"] = 840.0;
         void Fill(int t) => BuildInto(host, app, t, Fill);
         Fill(tab);
         // a new language shows here at once too
@@ -50,15 +50,20 @@ public static class SettingsDialog
         var system = new SelectorBarItem { Text = L("Systeembeheer"), Icon = Ui.Icon(Glyph.Gears) };
         var connectors = new SelectorBarItem { Text = L("Connectors"), Icon = Ui.Icon(Glyph.Connect) };
         var tasks = new SelectorBarItem { Text = L("Taken"), Icon = Ui.Icon(Glyph.Tasks) };
+        var agent = new SelectorBarItem { Text = L("Agent"), Icon = Ui.Icon(Glyph.Robot) };
+        var telegram = new SelectorBarItem { Text = L("Telegram"), Icon = Ui.Icon(Glyph.Send) };
         bar.Items.Add(chat);
         bar.Items.Add(engine);
         bar.Items.Add(system);
         bar.Items.Add(connectors);
         bar.Items.Add(tasks);
-        bar.SelectedItem = tab switch { 1 => engine, 2 => system, 3 => connectors, 4 => tasks, _ => chat };
+        bar.Items.Add(agent);
+        bar.Items.Add(telegram);
+        bar.SelectedItem = tab switch { 1 => engine, 2 => system, 3 => connectors, 4 => tasks, 5 => agent, 6 => telegram, _ => chat };
         var scroll = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 8, 14, 0) }.At(1);
         UIElement Content() => bar.SelectedItem == engine ? EngineTab(app) : bar.SelectedItem == system ? SystemTab(app)
-            : bar.SelectedItem == connectors ? new ConnectorsTab(app).View : bar.SelectedItem == tasks ? TasksTab(app) : ChatTab();
+            : bar.SelectedItem == connectors ? new ConnectorsTab(app).View : bar.SelectedItem == tasks ? TasksTab(app)
+            : bar.SelectedItem == agent ? new AgentTab(app).View : bar.SelectedItem == telegram ? new TelegramTab(app).View : ChatTab();
         scroll.Content = Content();
         bar.SelectionChanged += (_, _) =>
         {
@@ -241,7 +246,7 @@ public static class SettingsDialog
                 Ui.Row("auto,auto,*", 8, openList, checkNow, status)),
             Section(L("Op de achtergrond"),
                 Toggle(L("In het systeemvak blijven als het venster dicht is"), s.StayInTray, v => s.StayInTray = v),
-                Note(L("Alleen als er taken of een heartbeat aan staan. Dan kunnen ze doorgaan met het venster dicht; WinAIMagic staat dan rechtsonder in het systeemvak.")),
+                Note(L("Alleen als er taken, een heartbeat of Telegram aan staan. Dan kunnen ze doorgaan met het venster dicht; WinAIMagic staat dan rechtsonder in het systeemvak.")),
                 Toggle(L("Het model stoppen als het venster dicht gaat"), s.StopModelOnClose, v => s.StopModelOnClose = v),
                 login),
             Section(L("Taken"),

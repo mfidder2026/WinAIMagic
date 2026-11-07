@@ -78,6 +78,8 @@ public sealed class Conversation
     public Guid? Task { get; set; }
     /// <summary>Not in the sidebar: a heartbeat check that had nothing to report is removed, one that has stays under Taken.</summary>
     public bool? Hidden { get; set; }
+    /// <summary>The Telegram account this conversation talks with (Instellingen → Telegram), if any.</summary>
+    public long? Telegram { get; set; }
 
     /// <summary>The title in the chosen language while it is still the default.</summary>
     [JsonIgnore]

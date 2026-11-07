@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><title>Testwinkel</title></head>
+<body>
+<h1>Welkom bij de testwinkel</h1>
+<p>Hier kun je zoeken en bestellen.</p>
+<a href="page2.html">Over ons</a>
+<form id="zoek" action="page2.html" method="get">
+  <input type="search" name="q" placeholder="Zoeken">
+  <button type="submit">Zoek</button>
+</form>
+<input type="password" name="wachtwoord" placeholder="Wachtwoord">
+<input type="text" name="cardnumber" autocomplete="cc-number" placeholder="Kaartnummer">
+<button id="toon" onclick="document.getElementById('uit').textContent='Getoond!'">Meer tonen</button>
+<button onclick="document.title='Gekocht'">Nu kopen</button>
+<p id="uit"></p>
+</body></html>

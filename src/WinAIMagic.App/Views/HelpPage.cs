@@ -176,6 +176,8 @@ public sealed class HelpPage : IPage
         "Repair" => Glyph.Repair,
         "Connect" => Glyph.Connect,
         "Tasks" => Glyph.Tasks,
+        "Send" => Glyph.Send,
+        "Robot" => Glyph.Robot,
         _ => Glyph.Help,
     };
 }

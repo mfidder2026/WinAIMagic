@@ -6,6 +6,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\WinAIMagic.Core\WinAIMagic.Core.csproj" />
     <InternalsVisibleTo Include="WinAIMagic.Chat.Tests" />
     <InternalsVisibleTo Include="WinAIMagic.Studio" />

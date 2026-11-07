@@ -11,3 +11,5 @@ keywords: privacy veiligheid lokaal cloud gegevens wachtwoord sleutel prompt-inj
 - **Netwerk**: de API en cluster-helpers luisteren standaard alleen op deze pc of op de directe kabel.
 - **Connectors**: een connector op internet stuurt wat het model meegeeft naar die dienst; een connector op deze pc niet. Tokens staan in Windows Referentiebeheer.
 - **Taken**: een taak of heartbeat werkt met dezelfde rechten als een gesprek. Een wijziging wacht altijd op jouw goedkeuring, ook als je er niet bij bent.
+- **Telegram**: je berichten en de antwoorden gaan via de servers van Telegram, niet versleuteld van begin tot eind. Alleen gekoppelde accounts krijgen antwoord; de token staat in Windows Referentiebeheer. Het model en je bestanden blijven op de pc.
+- **Agent**: e-mail, de browser, programma's en spraak staan standaard uit. Mail blijft in Outlook; het browservenster heeft eigen cookies; voorlezen gebeurt op deze pc, maar inspreken gaat via de online spraakdienst van Microsoft (Windows-dictee). Versturen, kopen en verwijderen vragen elke keer.

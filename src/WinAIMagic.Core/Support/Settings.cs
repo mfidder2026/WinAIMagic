@@ -99,6 +99,24 @@ public sealed class Settings : INotifyPropertyChanged
     public bool StayInTray { get => Get(true); set => Set(value); }
     /// <summary>Closing the window stops the model (unless something is running), so its memory is free again.</summary>
     public bool StopModelOnClose { get => Get(true); set => Set(value); }
+    // Instellingen → Agent, all off by default
+    /// <summary>The model reads mail through Outlook; drafts and sending after a card.</summary>
+    public bool FeatureMail { get => Get(false); set => Set(value); }
+    /// <summary>The model browses in a window of its own in WinAIMagic.</summary>
+    public bool FeatureBrowser { get => Get(false); set => Set(value); }
+    /// <summary>The model controls the programs the user allows (ComputerApps), every action after a card.</summary>
+    public bool FeatureComputerUse { get => Get(false); set => Set(value); }
+    /// <summary>The programs the model may control, one per line: the path of the .exe.</summary>
+    public string ComputerApps { get => Get(""); set => Set(value); }
+    /// <summary>Speak in the chat and read answers aloud.</summary>
+    public bool FeatureVoice { get => Get(false); set => Set(value); }
+    public bool SpeakAnswers { get => Get(false); set => Set(value); }
+    public string VoiceId { get => Get(""); set => Set(value); }
+    // Instellingen → Telegram
+    /// <summary>Talk with the model on this PC through a Telegram bot of your own (off by default).</summary>
+    public bool FeatureTelegram { get => Get(false); set => Set(value); }
+    /// <summary>Tasks and the heartbeat report in Telegram too, to the first account paired.</summary>
+    public bool TelegramNotify { get => Get(true); set => Set(value); }
     /// <summary>Tests: allow what would be asked.</summary>
     public bool AutoApprove { get => Get(false); set => Set(value); }
     /// <summary>Speculative decoding with the model's multi-token prediction head (GLM, Qwen).</summary>

@@ -70,5 +70,6 @@ public static class Glyph
         Clock = "\uE823", Compress = "\uE73F", ChevronRight = "\uE76C", Close = "\uE711", Terminal = "\uE756", Code = "\uE943",
         Help = "\uE897", Shield = "\uEA18", Home = "\uE80F", Library = "\uE8F1", Info = "\uE946", Lightbulb = "\uE82F", Lock = "\uE72E",
         Keyboard = "\uE765", Repair = "\uE90F", Search = "\uE721", Gears = "\uE9F5", Tasks = "\uE787", Steps = "\uE9D5",
-        Connect = "\uE703", Heart = "\uEB51", Hourglass = "\uE916", Circle = "\uEA3A", CircleDone = "\uE930", More = "\uE712";
+        Connect = "\uE703", Heart = "\uEB51", Hourglass = "\uE916", Circle = "\uEA3A", CircleDone = "\uE930", More = "\uE712",
+        Send = "\uE724", Robot = "\uE99A", Mic = "\uE720", Speaker = "\uE767", SpeakerOff = "\uE74F", Mail = "\uE715", Pointer = "\uE7C9";
 }

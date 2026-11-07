@@ -25,7 +25,7 @@ public class HelpTests : ChatTest
         foreach (var page in new[] { "Live", "Models", "Documents", "Images", "Tasks", "Compare", "Cluster", "System", "Help", "Chat", null })
             Assert.Contains(HelpCenter.TopicFor(page), ids);
         // the settings tab and F1 open these
-        foreach (var id in new[] { "start", "troubleshooting", "shortcuts", "sysadmin", "skills", "connectors", "tasks" }) Assert.Contains(id, ids);
+        foreach (var id in new[] { "start", "troubleshooting", "shortcuts", "sysadmin", "skills", "connectors", "tasks", "telegram", "agent" }) Assert.Contains(id, ids);
     }
 
     [Fact]

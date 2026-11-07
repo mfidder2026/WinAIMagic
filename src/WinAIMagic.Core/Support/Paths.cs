@@ -54,6 +54,8 @@ public static class Paths
     public static string Heartbeat => Path.Combine(AppData, "HEARTBEAT.md");
     /// <summary>The connectors, in the mcpServers format of Claude Desktop.</summary>
     public static string McpConfig => Path.Combine(AppData, "mcp.json");
+    /// <summary>The Telegram accounts that may talk to this PC, and how far the bot has read.</summary>
+    public static string Telegram => Path.Combine(AppData, "telegram.json");
     /// <summary>A log per connector (its stderr, what failed).</summary>
     public static string McpLogs => Path.Combine(AppData, "Connectors");
 

@@ -134,7 +134,10 @@ public sealed partial class MessageRow : Grid
     private TextBlock error = null!;
     private Border sources = null!;
     private TextBlock stats = null!;
-    private Button copy = null!;
+    private Button copy = null!, speak = null!;
+    private FontIcon speakIcon = null!;
+    private Guid? messageId;
+    private bool wasReading;
     private FrameworkElement statsRow = null!;
     private string copyText = "", sourcesShown = "", reasoning = "";
     private bool wasStreaming;
@@ -220,7 +223,12 @@ public sealed partial class MessageRow : Grid
         copy.Width = 26;
         copy.Height = 22;
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(copy, L("Kopieer"));
-        statsRow = Ui.H(10, stats, copy);
+        speakIcon = Ui.Icon(Glyph.Speaker, 12, Theme.Tertiary);
+        speak = ChatUi.Plain(speakIcon, () => { if (messageId is { } mid) Speech.Shared.Speak(copyText, mid); }, L("Lees voor"));
+        speak.Width = 26;
+        speak.Height = 22;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(speak, L("Lees voor"));
+        statsRow = Ui.H(10, stats, copy, speak);
 
         var body = Ui.V(10, thinking, steps, spinner, answer, error, sources, statsRow);
         card = new Border
@@ -262,6 +270,15 @@ public sealed partial class MessageRow : Grid
             if (m.PromptTokensPerSecond is { } p) line += "   prompt " + p.ToString("0", culture) + " tok/s";
             stats.SetIfChanged(line);
             copyText = m.Text;
+        }
+        messageId = m.Id;
+        speak.Show(Settings.Shared.FeatureVoice);
+        bool reading = Speech.Shared.Speaking == m.Id;
+        if (reading != wasReading)
+        {
+            wasReading = reading;
+            speakIcon.Glyph = reading ? Glyph.SpeakerOff : Glyph.Speaker;
+            speak.Tip(reading ? L("Stop met voorlezen") : L("Lees voor"));
         }
         if (streaming != wasStreaming)
         {

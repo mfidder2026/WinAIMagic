@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 namespace WinAIMagic.App;
 
 /// <summary>Hidden, debug builds only (--fake-engine): a scripted stand-in for the engine on a local port, so the chat can be tried
-/// without a model. The last question picks the script: stappen, schrijf, systeemwijziging, beheerder, plan, taak, commando, 4000 code, 4000 tekst, fout, nudge, amber, rood, traag.</summary>
+/// without a model. The last question picks the script: stappen, schrijf, systeemwijziging, beheerder, plan, taak, surf, tabel, commando, 4000 code, 4000 tekst, fout, nudge, amber, rood, traag.</summary>
 internal static class FakeEngine
 {
     public static Uri Start()
@@ -207,6 +207,16 @@ internal static class FakeEngine
         {
             await ToolCall(s, "schedule_task", "{\"title\":\"Schijfoverzicht\",\"prompt\":\"Hoeveel ruimte is er vrij op C:?\",\"when\":\"weekdays\",\"time\":\"08:00\"}", "call_t");
             finish = "tool_calls";
+        }
+        else if (ask.Contains("surf") && tools == 0)
+        {
+            // the browser agent: its own window, the page as text (Instellingen → Agent → Browser on)
+            await ToolCall(s, "browser_open", "{\"url\":\"https://example.com\"}", "call_b");
+            finish = "tool_calls";
+        }
+        else if (ask.Contains("tabel") && tools == 0)
+        {
+            await Words(s, "content", "Je pc heeft **150 GB** vrij.\n\n| Schijf | Totaal | Vrij |\n|---|--:|--:|\n| C: | 1,8 TB | 150 GB |\n| **D:** | 4 TB | 2,1 TB |\n\nDe rest staat elders.", delay);
         }
         else if (ask.Contains("commando") && tools == 0)
         {

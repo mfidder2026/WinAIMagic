@@ -154,7 +154,7 @@ public sealed partial class VirtualList : Panel
 /// only its tail is touched. A long text is parsed off the UI thread, one parse at a time.</summary>
 public sealed partial class MarkdownView : Grid
 {
-    private enum Kind { Text, Code, Heading }
+    private enum Kind { Text, Code, Heading, Table }
 
     /// <param name="Joined">Goes on from the piece before it, without the space between blocks.</param>
     private sealed record Piece(Kind Kind, string Text, string Language = "", int Level = 0, bool Joined = false, int Lines = 1);
@@ -185,6 +185,7 @@ public sealed partial class MarkdownView : Grid
         double perLine = Math.Max(w / (size * 0.52), 20), sum = 0;
         foreach (var p in page)
             sum += p.Kind == Kind.Code ? p.Lines * CodeLines.LineHeight + 48
+                : p.Kind == Kind.Table ? p.Lines * (LineHeight + 6) + 28
                 : p.Kind == Kind.Heading ? 36
                 : (p.Lines + p.Text.Length / perLine) * LineHeight + (p.Joined ? 0 : 8);
         return sum;
@@ -253,6 +254,7 @@ public sealed partial class MarkdownView : Grid
                 {
                     case MarkdownBlock.Code c: Add(new Piece(Kind.Code, c.Content, c.Language, 0, false, c.Content.Count(x => x == '\n') + 1)); break;
                     case MarkdownBlock.Heading h: Add(new Piece(Kind.Heading, h.Value, "", h.Level)); break;
+                    case MarkdownBlock.Table tb: Add(new Piece(Kind.Table, tb.Raw, "", 0, false, tb.Rows.Count + (tb.Header == null ? 0 : 1))); break;
                     case MarkdownBlock.Text t: Chunks(t.Value, Add); break;
                 }
         if (page.Count > 0) all.Add(page);
@@ -329,6 +331,7 @@ public sealed partial class MarkdownView : Grid
     private UIElement Make(Piece p)
     {
         if (p.Kind == Kind.Code) return new CodeBox();
+        if (p.Kind == Kind.Table) return new TableBox(size);
         var t = new TextBlock { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true, FontFamily = Theme.Text, FontSize = size, LineHeight = LineHeight };
         if (color != null) t.Foreground = color;
         return t;
@@ -340,6 +343,12 @@ public sealed partial class MarkdownView : Grid
         {
             code.Margin = new Thickness(0, first ? 0 : 8, 0, 0);
             code.Set(p.Language, p.Text);
+            return;
+        }
+        if (e is TableBox table)
+        {
+            table.Margin = new Thickness(0, first ? 0 : 8, 0, 0);
+            table.Set(MarkdownLite.Table(p.Text.Split('\n')), (tb, s) => Inlines(tb, s));
             return;
         }
         var t = (TextBlock)e;
@@ -378,6 +387,67 @@ public sealed partial class MarkdownView : Grid
             }
             else t.Inlines.Add(run);
         }
+    }
+}
+
+/// <summary>A Markdown table as a grid: the header bold with a line under it, columns as wide as they need, the text selectable.</summary>
+public sealed partial class TableBox : Grid
+{
+    private readonly double size;
+    private readonly Grid grid = new() { ColumnSpacing = 16, RowSpacing = 6 };
+
+    public TableBox(double size)
+    {
+        this.size = size;
+        Children.Add(new ScrollViewer
+        {
+            Content = grid,
+            Padding = new Thickness(10),
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollMode = ScrollMode.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollMode = ScrollMode.Disabled,
+            ZoomMode = ZoomMode.Disabled,
+        });
+        Background = Theme.Solid(Microsoft.UI.Colors.Black, 0.18);
+        BorderBrush = Theme.Solid(Theme.Accent, 0.18);
+        BorderThickness = new Thickness(1);
+        CornerRadius = new CornerRadius(10);
+        HorizontalAlignment = HorizontalAlignment.Left;
+    }
+
+    public void Set(MarkdownBlock.Table table, Action<TextBlock, string> inlines)
+    {
+        grid.Children.Clear();
+        grid.RowDefinitions.Clear();
+        grid.ColumnDefinitions.Clear();
+        int columns = Math.Max(table.Header?.Count ?? 0, table.Rows.Count == 0 ? 0 : table.Rows.Max(r => r.Count));
+        for (int i = 0; i < columns; i++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        int row = 0;
+        void Add(IReadOnlyList<string> cells, bool bold)
+        {
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            for (int i = 0; i < columns; i++)
+            {
+                var t = new TextBlock { IsTextSelectionEnabled = true, FontFamily = Theme.Text, FontSize = size, TextWrapping = TextWrapping.NoWrap };
+                inlines(t, i < cells.Count ? cells[i] : "");
+                if (bold) t.FontWeight = FontWeights.SemiBold;
+                Grid.SetRow(t, row);
+                Grid.SetColumn(t, i);
+                grid.Children.Add(t);
+            }
+            row++;
+        }
+        if (table.Header is { } header)
+        {
+            Add(header, true);
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var line = new Border { Height = 1, Background = Theme.Solid(Theme.Accent, 0.25) };
+            Grid.SetRow(line, row++);
+            Grid.SetColumnSpan(line, Math.Max(columns, 1));
+            grid.Children.Add(line);
+        }
+        foreach (var r in table.Rows) Add(r, false);
     }
 }
 

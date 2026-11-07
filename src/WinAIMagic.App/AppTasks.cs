@@ -27,7 +27,8 @@ public sealed partial class AppState
     private bool modelStartedByTasks, keptAwake;
 
     /// <summary>Tasks or a heartbeat that can go on with the window closed.</summary>
-    public bool HasBackgroundWork => Settings.Heartbeat || Tasks.Tasks.Any(t => t.Enabled);
+    public bool HasBackgroundWork => Settings.Heartbeat || Tasks.Tasks.Any(t => t.Enabled)
+        || (Settings.FeatureTelegram && Telegram.Token != null);
 
     /// <summary>Called once the window is there: the timer and the chat client's signals.</summary>
     public void StartTasks()
@@ -35,13 +36,23 @@ public sealed partial class AppState
         if (taskTimer != null) return;
         Chat.Tasks = Tasks;
         Notifier.SetUp(this);
-        Chat.Finished += id => Ui.TryEnqueue(() => RunFinished(id));
+        Chat.Finished += id => Ui.TryEnqueue(() =>
+        {
+            RunFinished(id);
+            SpeakIfWanted(id);
+        });
         Chat.Sent += id =>
         {
             // the user used the model: it is theirs now, a task must not stop it
             lock (TaskRuns) if (!TaskRuns.ContainsKey(id)) modelStartedByTasks = false;
         };
-        Chat.ApprovalAsked += a => Ui.TryEnqueue(() => ApprovalNeeded(a));
+        Chat.ApprovalAsked += a => Ui.TryEnqueue(() =>
+        {
+            ApprovalNeeded(a);
+            bool isTask;
+            lock (TaskRuns) isTask = TaskRuns.ContainsKey(a.Conversation);
+            TelegramBridge.Approval(a, isTask);
+        });
         Tasks.Changed += Notify;
         Connectors.Changed += Notify;
         taskTimer = Ui.CreateTimer();
@@ -50,6 +61,7 @@ public sealed partial class AppState
         // after sleep the timer's next tick comes within 30 s, and a missed run is made up for then
         taskTimer.Start();
         TickTasks();
+        StartTelegram();
     }
 
     public void TickTasks()
@@ -156,6 +168,18 @@ public sealed partial class AppState
         Notify();
     }
 
+    /// <summary>Instellingen → Agent → "Lees antwoorden vanzelf voor": the answer of a conversation on screen, not of a task or
+    /// Telegram.</summary>
+    private void SpeakIfWanted(Guid id)
+    {
+        var s = Settings;
+        bool isTask;
+        lock (TaskRuns) isTask = TaskRuns.ContainsKey(id);
+        if (!s.FeatureVoice || !s.SpeakAnswers || isTask || !WindowActive) return;
+        if (Store.Find(id) is not { Telegram: null, Task: null } c) return;
+        if (c.Messages.LastOrDefault(m => m.Role == ChatRole.Assistant && m.Text.Length > 0 && m.Error == null) is { } last) Speech.Shared.Speak(last.Text, last.Id);
+    }
+
     private void HeartbeatFinished(Guid id)
     {
         var time = DateTimeOffset.Now.ToString("t", AppLanguages.Current.Culture());
@@ -172,17 +196,23 @@ public sealed partial class AppState
         var answer = last?.Error ?? (last?.Text ?? "").Split('\n').FirstOrDefault(l => l.Trim().Length > 0) ?? "";
         HeartbeatStatus = L($"Laatste controle {time}: er is iets te melden.");
         Notifier.Post(L("WinAIMagic heeft iets voor je"), answer, id);
+        TelegramBridge.Notify(L("WinAIMagic heeft iets voor je"), last?.Error ?? last?.Text ?? "");
     }
 
     private void TaskNotification(Guid id, Guid taskId)
     {
         var title = Tasks.Task(taskId)?.Title ?? L("Taak");
         var last = Store.Find(id)?.Messages.LastOrDefault(m => m.Role == ChatRole.Assistant);
-        if (last?.Error is { } error) Notifier.Post(L($"Taak gestopt: {title}"), error, id);
+        if (last?.Error is { } error)
+        {
+            Notifier.Post(L($"Taak gestopt: {title}"), error, id);
+            TelegramBridge.Notify(L($"Taak gestopt: {title}"), error);
+        }
         else
         {
             var answer = (last?.Text ?? "").Split('\n').FirstOrDefault(l => l.Trim().Length > 0);
             Notifier.Post(L($"Taak klaar: {title}"), answer ?? L("Open het gesprek voor de uitkomst."), id);
+            TelegramBridge.Notify(L($"Taak klaar: {title}"), ChatClient.WithoutDoneWord(last?.Text ?? ""));
         }
     }
 
@@ -225,6 +255,9 @@ public sealed partial class AppState
     private void StopTasks()
     {
         taskTimer?.Stop();
+        Telegram.Stop();
+        StopAgent();
+        Speech.Shared.StopSpeaking();
         KeepAwake(false);
         Connectors.StopAll();
     }

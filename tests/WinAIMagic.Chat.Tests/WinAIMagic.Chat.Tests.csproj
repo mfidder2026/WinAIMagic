@@ -9,6 +9,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!-- the browser agent's page script runs in a real WebView2, as the app's -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3719.77" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\WinAIMagic.Chat\WinAIMagic.Chat.csproj" />

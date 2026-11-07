@@ -3,12 +3,15 @@ using System.Text.RegularExpressions;
 
 namespace WinAIMagic.Chat;
 
-/// <summary>What the chat renders: paragraphs, fenced code and headings. No tables, on purpose.</summary>
+/// <summary>What the chat renders: paragraphs, fenced code, headings and tables.</summary>
 public abstract record MarkdownBlock
 {
     public sealed record Text(string Value) : MarkdownBlock;
     public sealed record Code(string Language, string Content) : MarkdownBlock;
     public sealed record Heading(int Level, string Value) : MarkdownBlock;
+    /// <summary>A Markdown table: the header (the row above the |---| line, unless empty) and the rows without empty ones.
+    /// Raw holds the table's lines, so a growing answer only redraws a table that changed.</summary>
+    public sealed record Table(IReadOnlyList<string>? Header, IReadOnlyList<IReadOnlyList<string>> Rows, string Raw) : MarkdownBlock;
 }
 
 /// <summary>A piece of a line with one style.</summary>
@@ -25,14 +28,28 @@ public static class MarkdownLite
         var para = new List<string>();
         List<string>? code = null;
         var lang = "";
+        var rows = new List<string>();
+        void FlushTable()
+        {
+            if (rows.Count > 0) { o.Add(Table(rows)); rows = []; }
+        }
         void Flush()
         {
             if (para.Count > 0) { o.Add(new MarkdownBlock.Text(string.Join("\n", para))); para = []; }
+            FlushTable();
         }
         foreach (var raw in s.Split('\n'))
         {
             var line = raw.EndsWith('\r') ? raw[..^1] : raw;
             var trimmed = line.Trim();
+            // a run of "| … |" lines is a table, outside code
+            if (code == null && TableCells(line) != null)
+            {
+                if (para.Count > 0) { o.Add(new MarkdownBlock.Text(string.Join("\n", para))); para = []; }
+                rows.Add(line);
+                continue;
+            }
+            FlushTable();
             if (trimmed.StartsWith("```", StringComparison.Ordinal))
             {
                 if (code != null)
@@ -69,6 +86,30 @@ public static class MarkdownLite
         if (code != null) o.Add(new MarkdownBlock.Code(lang, string.Join("\n", code)));
         Flush();
         return o;
+    }
+
+    /// <summary>A Markdown table row: "| a | b |" → ["a", "b"]; null for any other line.</summary>
+    public static List<string>? TableCells(string line)
+    {
+        var s = line.Trim();
+        if (s.Length < 2 || s[0] != '|' || s[^1] != '|') return null;
+        return [.. s[1..^1].Split('|').Select(c => c.Trim())];
+    }
+
+    /// <summary>The line under the header: |---|:--:|</summary>
+    public static bool IsSeparator(IReadOnlyList<string> cells) =>
+        cells.All(c => c.Length > 0 && c.All(ch => ch is '-' or ':' or ' ')) && cells.Any(c => c.Contains('-'));
+
+    /// <summary>The table of these lines: the row above the separator is the header, unless it is empty; empty rows go.</summary>
+    public static MarkdownBlock.Table Table(IReadOnlyList<string> lines)
+    {
+        var all = lines.Select(l => TableCells(l) ?? []).ToList();
+        List<string>? header = null;
+        int sep = all.FindIndex(IsSeparator);
+        if (sep == 1) { header = all[0]; all.RemoveRange(0, 2); }
+        else if (sep >= 0) all.RemoveAt(sep);
+        if (header != null && header.TrueForAll(c => c.Length == 0)) header = null;
+        return new MarkdownBlock.Table(header, [.. all.Where(r => !r.TrueForAll(c => c.Length == 0))], string.Join("\n", lines));
     }
 
     /// <summary>Bold, italic, inline code, strikethrough and links in one paragraph; whitespace stays as it is.</summary>

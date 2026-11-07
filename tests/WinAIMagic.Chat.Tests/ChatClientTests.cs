@@ -28,6 +28,8 @@ public class UnfinishedTurnTests
     {
         Assert.True(ChatClient.LooksUnfinished("dtruss levert geen uitvoer, exit code 0. Dit werkt niet lekker.", "", false, true, true));
         Assert.False(ChatClient.LooksUnfinished("KLAAR: het spel draait in VICE.", "", false, true, true));
+        // waiting for the user is no stop halfway (seen on the Mac with Qwen asking for a permission switch)
+        Assert.False(ChatClient.LooksUnfinished("Zet het vinkje aan. Laat het me weten zodra het vinkje aan staat, dan typ ik de tekst.", "", false, true, true));
         Assert.False(ChatClient.LooksUnfinished("**Klaar!** Het staat in uit.txt.", "", false, true, true));
         Assert.False(ChatClient.LooksUnfinished("DONE. The file is written.", "", false, true, true));
         Assert.False(ChatClient.LooksUnfinished("Welke map bedoel je?", "", false, true, true));

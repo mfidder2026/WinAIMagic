@@ -41,7 +41,14 @@ public sealed partial class Composer : Grid
     private readonly Border glass;
     private readonly Grid ringHost = new() { Visibility = Visibility.Collapsed, IsHitTestVisible = false };
     private readonly Storyboard turn = new();
-    private readonly Button image, send, stop;
+    private readonly Button image, send, stop, mic;
+    private readonly TextBlock loading = Ui.Caption(L("Model laden, je vraag gaat daarna vanzelf"));
+    /// <summary>A question sent while the model is not loaded: it loads first, and the question goes when it is there.</summary>
+    private bool waitingForModel;
+    /// <summary>The text before speaking started: what is heard comes after it.</summary>
+    private string beforeSpeaking = "";
+    /// <summary>Stops listening and sends after a pause in speaking.</summary>
+    private CancellationTokenSource? silence;
     private readonly ToggleButton think, web, folder;
     private readonly TextBlock folderName = Ui.Label("", 12, null, FontWeights.Medium);
     private readonly RightsButton rights;
@@ -103,9 +110,25 @@ public sealed partial class Composer : Grid
             Automation.SetName(b, name);
         }
 
+        mic = Small(Ui.Icon(Glyph.Mic, 15), ToggleListening, L("Inspreken"));
+        Automation.SetName(mic, L("Inspreken"));
+        var micProblem = new TeachingTip { Target = mic, IsLightDismissEnabled = true };
+        mic.Loaded += (_, _) => { if (micProblem.XamlRoot == null) micProblem.XamlRoot = mic.XamlRoot; };
+        Speech.Shared.Changed += () => app.Ui.TryEnqueue(() =>
+        {
+            Refresh();
+            if (Speech.Shared.Problem is { } why && !micProblem.IsOpen)
+            {
+                micProblem.Subtitle = why;
+                micProblem.IsOpen = true;
+                Speech.Shared.Problem = null;
+            }
+        });
+        Children.Add(micProblem);
         var tools = Ui.H(6, image, Pair(think, ThinkMenu()), web, Pair(folder, FolderMenu()), rights);
         var sendHost = new Grid { Children = { send, stop } };
-        var content = Ui.V(8, thumbsHost, imageNote, box, Ui.Row("*,auto", 8, tools, sendHost));
+        loading.VerticalAlignment = VerticalAlignment.Center;
+        var content = Ui.V(8, thumbsHost, imageNote, box, Ui.Row("*,auto", 8, tools, Ui.H(8, loading, mic, sendHost)));
 
         // a turning gradient edge while the model writes, a calm one otherwise: the storyboard only runs while it writes
         var rotate = new RotateTransform { CenterX = Ring / 2, CenterY = Ring / 2 };
@@ -167,7 +190,10 @@ public sealed partial class Composer : Grid
 
     private bool Working => conversation is { } id && app.Chat.IsBusy(id);
 
-    private bool CanSend => app.EngineState.IsRunning && !Working && (box.Text.Trim().Length > 0 || attachments.Count > 0)
+    /// <summary>The model is there, or can load for this question.</summary>
+    private bool ModelThere => app.EngineState.IsRunning || app.EngineState.Status == Engine.EngineStatus.Starting || app.Host.CanStart;
+
+    private bool CanSend => ModelThere && !waitingForModel && !Working && (box.Text.Trim().Length > 0 || attachments.Count > 0)
         && (attachments.Count == 0 || app.Host.WhyNoImages == null);
 
     /// <summary>The state of the buttons.</summary>
@@ -197,6 +223,11 @@ public sealed partial class Composer : Grid
         bool tell = noImages != null && (triedImage || attachments.Count > 0);
         imageNote.SetIfChanged(tell ? noImages! : "");
         imageNote.Show(tell);
+        mic.Show(s.FeatureVoice);
+        var listening = Speech.Shared.Listening;
+        mic.Foreground = listening ? new SolidColorBrush(Theme.Red) : Theme.Secondary;
+        mic.Tip(listening ? L("Stop met luisteren") : L("Inspreken (via Windows-dictee)"));
+        loading.Show(waitingForModel);
         bool working = Working;
         send.Show(!working);
         stop.Show(working);
@@ -218,9 +249,42 @@ public sealed partial class Composer : Grid
         if (box.PlaceholderText != hint) box.PlaceholderText = hint;
     }
 
-    private void Send()
+    private void ToggleListening()
     {
+        var speech = Speech.Shared;
+        if (speech.Listening) { speech.StopListening(); return; }
+        beforeSpeaking = box.Text.Length == 0 ? "" : box.Text.TrimEnd() + " ";
+        _ = speech.StartListening(heard => app.Ui.TryEnqueue(() =>
+        {
+            if (!speech.Listening) return;
+            box.Text = beforeSpeaking + heard;
+            box.SelectionStart = box.Text.Length;
+            // a pause of two seconds after speaking: the question is done, and it goes by itself
+            silence?.Cancel();
+            var wait = silence = new CancellationTokenSource();
+            _ = Task.Delay(2000, wait.Token).ContinueWith(t =>
+            {
+                if (!t.IsCanceled) app.Ui.TryEnqueue(() => { if (speech.Listening && ReferenceEquals(silence, wait)) Send(); });
+            }, TaskScheduler.Default);
+        }));
+    }
+
+    private async void Send()
+    {
+        if (Speech.Shared.Listening) Speech.Shared.StopListening();
+        silence?.Cancel();
         if (!CanSend || conversation is not { } id) return;
+        if (!app.EngineState.IsRunning)
+        {
+            // load the model first; the question waits in the field and goes as soon as the model is there
+            waitingForModel = true;
+            Refresh();
+            bool ready = await app.EnsureModelForChat();
+            waitingForModel = false;
+            Refresh();
+            if (ready) Send();
+            return;
+        }
         app.Send(box.Text.Trim(), [.. attachments], id);
         box.Text = "";
         attachments.Clear();

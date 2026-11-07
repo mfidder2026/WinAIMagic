@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.11.0
+# Parity with MacAIMagic 1.13.0
 
-How this version relates to MacAIMagic at commit `bcaeacd`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `19213aa`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -29,8 +29,33 @@ How this version relates to MacAIMagic at commit `bcaeacd`, the last Mac commit 
 | `Support/LiveMetrics`, `SystemInfo`, `SystemCheck` | `Engine/` same names, `Engine/Gpu/*` | Done; counters are locale independent |
 | `Support/Settings`, `Paths`, `Localization`, `Translations` | `Core/Support/*`, `Core/i18n/*.json` | Done |
 | `Views/*` | `App/Views/*` | Done, in code rather than XAML |
+| `Chat/Telegram/*` (`TelegramBot`, `TelegramService`, `TelegramBridge`, `TelegramFormat`), `TelegramSettingsView` | `Chat/Telegram/*` (same names), `App/AppTelegram`, `App/Views/TelegramTab` | Done; token in the Credential Manager, accounts and offset in `telegram.json`; voice messages not understood (no recognizer for recordings) |
+| `Chat/Agent/AgentTools`, `MailTools` | `Chat/Agent/AgentTools`, `MailTools` (`OutlookMail`) | Adapted: classic Outlook through COM instead of the Mail app; without it a draft goes through mailto: |
+| `Chat/Agent/BrowserTools` | `Chat/Agent/BrowserTools`, `App/BrowserWindow` (WebView2) | Done; the page script is the Mac's, its arguments go in as JSON |
+| `Chat/Agent/ComputerTools` | `Chat/Agent/ComputerTools` (UI Automation, SendInput) | Adapted: programs by .exe path, a Windows never-list, no Alt+F4 or Windows key |
+| `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices (on the PC); dictation through Windows dictation (Microsoft's online service); no SpeechAnalyzer |
 
 ## Taken over since the first port
+
+### Up to `19213aa` (1.12.0 and 1.13.0): Telegram, tables, Agent (mail, browser, programs, speech)
+
+- **Not needed:** `75e03b6`, `fd7a8b6`, `bd471ee` (the Mac taking over Windows' 0.2.12 and the shared version number; WinAIMagic's `eccb3d8` already made it 1.11.0), `a638bd7` and `19213aa` (the Mac's releases).
+- **Taken over, `9644cb0`, `e39624e`, `cdca20f`, Telegram:**
+  - The same Bot API calls, long polling, pairing (a 6-digit code, 10 minutes, once, private chats only, strangers ignored and only their id logged), one conversation per account ("✈︎ Telegram · name"), /nieuw, /stop, /status, the growing answer (an edit per 1.5 s, split at 3500 characters, Telegram HTML with plain text as fallback, tables as columns in `<pre>`), photos and text files, approval cards (only the conversation's account, a late press refused, administrator rights never, a day without answer is no), and tasks and the heartbeat reporting to the first account.
+  - Windows: the token in the Credential Manager (the connectors' store), the accounts and the offset in `telegram.json` in the app data folder. Messages are handled on the UI thread. With Telegram on, closing the window keeps the app in the notification area. A question from Telegram counts as the user's, so a task does not stop the model it loaded.
+  - Found here: one request failing on a closed pooled connection put the status on "problem" for 5 s, and an approval card in that time was dropped. Cards and notifications now go while polling runs, and a request that fails on the connection is tried once more.
+  - Tests with the Mac's names, on its own `fake_telegram.py` and a C# stand-in engine: TelegramFormatTests, TelegramAccessTests, TelegramBridgeTests (a stranger, pairing and the answer in HTML, /nieuw, the offset kept, the button, administrator rights, a voice message with a stand-in recognizer, tasks to the first account), plus VoiceIsOffSaysSo.
+  - Not run: the real Telegram with a real bot, a real model through Telegram.
+- **Taken over, `9761d8b`, tables in the chat:** a run of `| … |` lines is a grid with a bold header; not in code, not a pipe in a sentence (ChatTableTests). The settings gear of `cdca20f` was already here; the settings dialog is larger now (720 × 600) for its seven tabs.
+- **Taken over, `79063d7`:** the done-word also goes at the end ("… KLAAR"), and the loading line names the chosen model's size from 50 GB on, else only the state.
+- **Taken over, `8264a5d`:** a last sentence that waits for the user ("laat het me weten zodra …") ends the turn, also after tool use; a click on a text field puts the cursor there.
+- **Adapted, `f5a167a`, `99c233e`, `02ed384`, Agent (Instellingen → Agent, all off by default):**
+  - The Mac's run / ask / refuse per call and `Approval.EveryTime` (no "Altijd in dit gesprek" on the card or in Telegram for what asks every time).
+  - **Mail** through classic Outlook's COM interface (all its accounts, inbox and sent mail, short numbers for Outlook's long ids), on an STA thread with a time limit. The new Outlook and the Mail app have no such interface; without classic Outlook mail_draft opens a mailto: draft and the rest says what is missing. Tests on a stand-in mailbox (MailToolsTests with the Mac's names; TheValuesGoToOutlookAsTheyAre replaces the AppleScript argv test). Outlook itself was not used: the owner's mail was not read.
+  - **Browser** in a WinUI window with WebView2 and its own profile in the app data folder. The Mac's page script, rules (a link runs, a button asks, risky words ask every time, secret fields refused) and output. Tested on a real WebView2 in a hidden window with the Mac's test pages (OpenReadClickAndType, plus typed text that tries to break out of the script). Checked in the Debug app with the fake engine: the window "Browser van het model · Example Domain" opened and the model got the page with numbered links.
+  - **Programs** through UI Automation: the allowed programs are .exe paths; the never-list holds command lines and script hosts, PowerShell, Terminal, the Registry Editor, Settings, Control Panel, Task Manager, MMC, password managers, the sign-in and UAC screens and WinAIMagic. Keys go with SendInput; Alt+F4 and the Windows key are refused. ComputerToolsTests with the Mac's names. Not run against a real program: Notepad might be the owner's open document.
+  - **Speech:** reading aloud with Windows' own voices (the speaker under an answer, "Lees antwoorden vanzelf voor", a voice choice), on the PC. Dictation uses Windows dictation, which goes through Microsoft's online speech service and needs online speech recognition switched on in Windows; the SAPI recognizers on the test PC have no Dutch. Two seconds of silence send the question. A question while the model is not loaded loads it first and then goes (typed or spoken). Telegram voice messages are not understood: Windows' recognizer reads no recordings. VoiceTests.WhatIsReadAloud.
+  - Not run: Outlook, a real website with a model, a real program, the microphone, a voice read aloud by ear.
 
 ### Up to `bcaeacd` (1.10.0 and 1.11.0): conversations at once, a step list, tasks and heartbeat, connectors
 
@@ -217,6 +242,8 @@ The same gaps still exist in MacAIMagic.
 ## Not done yet
 
 **Features**
+
+- **Speech on the PC itself:** dictation goes through Microsoft's online service, and Telegram voice messages are not understood. An on-device recognizer (such as Whisper as an engine of its own) would fix both.
 
 - **AMD:** no HIP engine ships, so AMD cards use the second engine through Vulkan (limited mode).
 - **Images on DeepSeek and MiniMax:** wired (their vision tower goes into the pack, the engine runs it), but those models are not on the reference PC, so this has not run with a real image. GLM on the main engine and Qwen3.6 on the second engine have.

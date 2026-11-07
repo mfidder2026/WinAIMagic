@@ -452,6 +452,32 @@ public class WorkspaceNotesTests : ChatTest
     }
 }
 
+public class ChatTableTests
+{
+    private static string Show(MarkdownBlock b) => b switch
+    {
+        MarkdownBlock.Table t => "table " + (t.Header == null ? "-" : string.Join("/", t.Header)) + " : " + string.Join(" ; ", t.Rows.Select(r => string.Join("/", r))),
+        _ => b.ToString(),
+    };
+
+    /// <summary>The Mac's case: "how much space is free" answered with a table, which showed as pipes and dashes.</summary>
+    [Fact]
+    public void AMarkdownTableBecomesATable()
+    {
+        var blocks = MarkdownLite.Blocks("Je pc heeft **150 GB** vrij.\n\n| | |\n|---|---|\n| Totale schijf | 1,8 TB |\n| **Vrij** | 150 GB |\n\nDe rest staat elders.");
+        Assert.Equal(3, blocks.Count);
+        Assert.Equal(new MarkdownBlock.Text("Je pc heeft **150 GB** vrij."), blocks[0]);
+        Assert.Equal("table - : Totale schijf/1,8 TB ; **Vrij**/150 GB", Show(blocks[1]));
+        Assert.Equal(new MarkdownBlock.Text("De rest staat elders."), blocks[2]);
+        Assert.Equal("table Model/GB : Qwen/20", Show(MarkdownLite.Blocks("| Model | GB |\n|:--|--:|\n| Qwen | 20 |").Single()));
+        Assert.Equal(new MarkdownBlock.Code("", "| a | b |"), MarkdownLite.Blocks("```\n| a | b |\n```").Single());   // not inside code
+        Assert.Equal(new MarkdownBlock.Text("a | b"), MarkdownLite.Blocks("a | b").Single());   // a pipe in a sentence is no table
+        // a table right under a line of text, without a blank line
+        var tight = MarkdownLite.Blocks("Vrij:\n| a | b |\nKlaar");
+        Assert.Equal(["Text { Value = Vrij: }", "table - : a/b", "Text { Value = Klaar }"], tight.Select(Show).ToArray());
+    }
+}
+
 public class MarkdownTests
 {
     [Fact]
@@ -468,8 +494,6 @@ public class MarkdownTests
     [Fact]
     public void TheDialect()
     {
-        // no tables: they stay text
-        Assert.Equal(new MarkdownBlock.Text("| a | b |\n|---|---|"), MarkdownLite.Blocks("| a | b |\n|---|---|")[0]);
         // a fence that never closes still is code
         Assert.Equal(new MarkdownBlock.Code("", "a\n\nb"), MarkdownLite.Blocks("```\na\n\nb").Single());
         // fences may be indented, a language has its spaces trimmed

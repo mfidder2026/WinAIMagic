@@ -30,6 +30,9 @@ public sealed class AppControl : IAppControl
         ["SkipExperts"] = ["off", "light", "strong"],
         ["ImageSize"] = ["", "512x512", "768x768", "1024x1024", "1024x768", "768x1024"],
         ["SystemPrompt"] = null,
+        // Instellingen → Telegram and Agent; pairing, the token and the allowed programs stay with the user
+        ["FeatureTelegram"] = null, ["TelegramNotify"] = null,
+        ["FeatureMail"] = null, ["FeatureBrowser"] = null, ["FeatureComputerUse"] = null, ["FeatureVoice"] = null, ["SpeakAnswers"] = null,
     };
 
     private static readonly Dictionary<string, PaneKind> Pages = new(StringComparer.OrdinalIgnoreCase)
@@ -321,6 +324,7 @@ public sealed class AppControl : IAppControl
                 {
                     var p = typeof(Settings).GetProperty(Arg(a, "setting"), BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)!;
                     p.SetValue(Settings.Shared, Parse(p.PropertyType, Arg(a, "value")));
+                    if (p.Name == "FeatureTelegram") app.Telegram.Restart();
                     app.Notify();
                     var later = p.Name is "ContextSize" or "Mtp" or "SkipExperts" or "Vision" ? " It counts after the engine restarts." : "";
                     return $"{p.Name} is now {Convert.ToString(p.GetValue(Settings.Shared), CultureInfo.InvariantCulture)}.{later}";

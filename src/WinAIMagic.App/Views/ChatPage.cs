@@ -328,7 +328,9 @@ public sealed class ChatPage : IPage
         switch (s.Status)
         {
             case EngineStatus.Starting:
-                content = Ui.Row("auto,*", 8, new Spinner(16), Ui.Caption(L($"{s.Message} Het eerste laden duurt enkele minuten."), Theme.Primary, 13));
+                // only a large model takes minutes; a small one is there in seconds
+                var gb = (long)((app.ChatModel?.TotalSize ?? 0) / 1_000_000_000);
+                content = Ui.Row("auto,*", 8, new Spinner(16), Ui.Caption(gb >= 50 ? L($"{s.Message} Het eerste laden van {gb} GB duurt enkele minuten.") : s.Message, Theme.Primary, 13));
                 break;
             case EngineStatus.Failed:
                 var again = Ui.Btn(L("Opnieuw"), app.StartEngine);
@@ -438,7 +440,8 @@ public sealed class ChatPage : IPage
         var edge = warned ? Theme.Red : Theme.Amber;
         var icon = a.Call.Name.StartsWith("system_", StringComparison.Ordinal) ? (a.Admin ? Glyph.Shield : Glyph.Gears)
             : a.Call.Name == "run_command" ? Glyph.Terminal : a.Call.Name == TaskTool.ToolName ? Glyph.Tasks
-            : a.Call.Name.Contains("__", StringComparison.Ordinal) ? Glyph.Connect : Glyph.Document;
+            : a.Call.Name.Contains("__", StringComparison.Ordinal) ? Glyph.Connect
+            : WinAIMagic.Chat.Agent.AgentTools.Owner(a.Call.Name)?.Icon switch { "mail" => Glyph.Mail, "browser" => Glyph.Globe, "computer" => Glyph.Pointer, _ => Glyph.Document };
         var head = Ui.Row("auto,*,auto", 8, Ui.Icon(icon, 15, amber), Ui.Label(a.Title, 15, null, FontWeights.SemiBold, wrap: true, display: true),
             a.Admin ? Ui.H(4, Ui.Icon(Glyph.Key, 12, Theme.Solid(Theme.Amber)), Ui.Label(L("Beheerder"), 12, Theme.Solid(Theme.Amber), FontWeights.Bold)) : null);
         var body = Ui.V(10, head);
@@ -484,7 +487,7 @@ public sealed class ChatPage : IPage
         // "always" never covers administrator rights
         var buttons = Ui.Row("auto,*,auto,auto", 8,
             Ui.Btn(L("Weigeren"), () => app.Chat.Answer(a, false)), null,
-            a.Admin ? null : Ui.Btn(L("Altijd in dit gesprek"), () => app.Chat.Answer(a, true, true)),
+            a.Admin || a.EveryTime ? null : Ui.Btn(L("Altijd in dit gesprek"), () => app.Chat.Answer(a, true, true)),
             Ui.Btn(L("Toestaan"), () => app.Chat.Answer(a, true), Glyph.Check, edge));
         body.Children.Add(buttons);
         return new Border

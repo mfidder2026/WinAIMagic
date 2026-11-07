@@ -66,6 +66,7 @@ public sealed class SlowEngine : HttpMessageHandler
             var text = lastUser?["content"] is JsonValue v && v.TryGetValue<string>(out var s) ? s : "";
             bool afterTool = msgs[^1]!["role"]!.GetValue<string>() == "tool";
             if (text.Contains("SCHRIJF") && !afterTool) return Call("write_file", new JsonObject { ["path"] = "x.txt", ["content"] = "hoi" }, "call1");
+            if (text.Contains("MAILSTUUR") && !afterTool) return Call("mail_send", new JsonObject { ["to"] = "test@example.com", ["subject"] = "Hallo", ["body"] = "Een test." }, "call4");
             if (text.Contains("PLAN") && !afterTool)
                 return Call("task_list", new JsonObject
                 {
@@ -224,6 +225,10 @@ public class DoneWordTests
         Assert.Equal("Klaar! Het bestand is er.", ChatClient.WithoutDoneWord("Klaar! Het bestand is er."));   // ordinary language stays
         Assert.Equal("KLAARZETTEN gaat zo.", ChatClient.WithoutDoneWord("KLAARZETTEN gaat zo."));
         Assert.Equal("KLAAR", ChatClient.WithoutDoneWord("KLAAR"));   // nothing after it: leave it
+        // at the end too (seen with Qwen3.6: "… verder zoek. KLAAR")
+        Assert.Equal("Laat maar weten als je verder wilt zoeken.", ChatClient.WithoutDoneWord("Laat maar weten als je verder wilt zoeken. KLAAR"));
+        Assert.Equal("Het is af.", ChatClient.WithoutDoneWord("Het is af.\n\n**KLAAR**"));
+        Assert.Equal("Ik ben klaar", ChatClient.WithoutDoneWord("Ik ben klaar"));
     }
 }
 
