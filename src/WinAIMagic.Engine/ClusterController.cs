@@ -104,6 +104,100 @@ public sealed class ClusterController : IDisposable
     public IReadOnlyList<ulong>? BudgetOverride { get; set; }
     public string? RpcArgument => Active.Count == 0 ? null : string.Join(",", Active.Select(h => $"{h.Host}:{h.Port}"));
 
+    // MARK: - main PC: before and during a start with helpers
+
+    /// <summary>Why the last start went without some helpers, or why the model parts stopped arriving; null when all is well.</summary>
+    public string? Problem { get; private set; }
+    /// <summary>While the engine loads with helpers: bytes sent since the start, the rate now, and about how much has to go.</summary>
+    public (ulong Sent, double BytesPerSecond, ulong Expected)? Transfer { get; private set; }
+
+    /// <summary>Tests: whether a helper answers on its port, instead of a real connection.</summary>
+    public Func<string, int, bool>? ReachOverride { get; set; }
+
+    /// <summary>Does something listen on the helper's port? A firewall that drops the packets makes a start wait for minutes;
+    /// this asks for a few seconds first.</summary>
+    public static bool Reachable(string host, int port, TimeSpan timeout)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            var connect = client.ConnectAsync(host, port);
+            return connect.Wait(timeout) && client.Connected;
+        }
+        catch (Exception e) when (e is SocketException or AggregateException or ObjectDisposedException) { return false; }
+    }
+
+    /// <summary>Before a start: every selected helper that does not answer on its port stays out of this start, and Problem says
+    /// why in plain words. Returns the helpers that answered.</summary>
+    public IReadOnlyList<Helper> CheckBeforeStart(TimeSpan? timeout = null)
+    {
+        var active = Active;
+        var down = active.Where(h => !(ReachOverride?.Invoke(h.Host, h.Port) ?? Reachable(h.Host, h.Port, timeout ?? TimeSpan.FromSeconds(3)))).ToList();
+        lock (gate)
+            foreach (var h in down)
+            {
+                int i = helpers.FindIndex(x => x.Id == h.Id);
+                if (i >= 0) helpers[i] = helpers[i] with { Unreachable = true };
+            }
+        var names = string.Join(", ", down.Select(h => h.Name + " (" + h.Id + ")"));
+        Problem = down.Count == 0 ? null
+            : L($"Niet bereikbaar op hun poort, dus de engine start zonder hen: {names}. Staat de helper aan (Cluster, Start helper)? Meestal houdt de firewall op die pc de verbinding tegen, of staat het netwerk daar op Openbaar. Sta de app toe in de firewall voor een privénetwerk.");
+        Transfer = null;
+        Changed?.Invoke();
+        return Active;
+    }
+
+    /// <summary>Bytes this PC sent over all its network adapters, for the transfer to the helpers.</summary>
+    public static ulong BytesSent()
+    {
+        ulong sum = 0;
+        foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+            try { sum += (ulong)Math.Max(nic.GetIPStatistics().BytesSent, 0); }
+            catch (NetworkInformationException) { }
+        }
+        return sum;
+    }
+
+    /// <summary>Tests: the bytes sent, instead of the adapters' counters.</summary>
+    public Func<ulong>? SentOverride { get; set; }
+
+    /// <summary>While the engine loads with helpers: how far the model parts are, and a plain warning when nothing has gone out for
+    /// a while. Runs until the engine runs or stops; a helper keeps what it received, so a next start sends much less.</summary>
+    public async Task WatchTransfer(Func<bool> loading, ulong expected, TimeSpan? tick = null, TimeSpan? stallAfter = null, CancellationToken ct = default)
+    {
+        var step = tick ?? TimeSpan.FromSeconds(2);
+        var stall = stallAfter ?? TimeSpan.FromSeconds(90);
+        ulong start = SentOverride?.Invoke() ?? BytesSent(), last = start;
+        var lastMove = DateTime.UtcNow;
+        while (loading() && !ct.IsCancellationRequested)
+        {
+            try { await Task.Delay(step, ct); } catch (OperationCanceledException) { break; }
+            ulong now = SentOverride?.Invoke() ?? BytesSent();
+            ulong delta = now > last ? now - last : 0;
+            double rate = delta / step.TotalSeconds;
+            last = now;
+            // a trickle (a heartbeat, a page) is no transfer
+            if (rate > 256 * 1024) lastMove = DateTime.UtcNow;
+            Transfer = (now - start, rate, expected);
+            if (DateTime.UtcNow - lastMove > stall && now - start < expected)
+                Problem = L($"Er gaat al {(int)stall.TotalSeconds} s niets meer naar de helpers, terwijl er nog delen van het model heen moeten. Kijk op de helper onder Cluster of hij nog draait, en of de kabel of het netwerk er nog is.");
+            Changed?.Invoke();
+        }
+        Transfer = null;
+        Changed?.Invoke();
+    }
+
+    /// <summary>What goes to the helpers: their share of the model, at most what they can hold.</summary>
+    public static ulong ExpectedTransfer(ulong modelBytes, IReadOnlyList<ulong> helperBudgets, ulong localBudget)
+    {
+        ulong helpersTotal = helperBudgets.Aggregate(0UL, (a, b) => a + b);
+        if (helpersTotal == 0) return 0;
+        double share = (double)helpersTotal / (helpersTotal + localBudget);
+        return Math.Min(helpersTotal, (ulong)(modelBytes * share));
+    }
+
     // MARK: - main PC: find helpers
 
     /// <summary>Discovery goes through the device watcher, which is how Windows offers DNS-SD browsing.</summary>

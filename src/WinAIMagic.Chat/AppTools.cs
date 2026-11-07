@@ -36,6 +36,7 @@ public static class AppTools
     [
         "open_page", "open_help", "download_model", "pause_download", "check_update", "delete_model",
         "choose_model", "start_engine", "stop_engine", "set_setting", "make_image", "new_conversation",
+        "find_helpers", "add_helper", "use_helper", "cluster_role", "allow_lan", "start_helper", "stop_helper",
     ];
 
     /// <summary>The settings app_action may change, named in its description, so a small model need not look them up first.</summary>
@@ -57,6 +58,7 @@ public static class AppTools
                 + "download_model, pause_download, check_update, delete_model (model: an id from app_status), "
                 + "choose_model (role: heavy, fast or images; model: id), start_engine, stop_engine, "
                 + $"set_setting (setting and value; settings: {SettingList}), make_image (prompt, in English), new_conversation. "
+                + "Cluster (several PCs share one model; only models on the second engine): find_helpers (asks the helpers again and lists them), add_helper (address, host or host:port), use_helper (helper: its id host:port; value: true or false), cluster_role (value: main or helper), allow_lan (value: true or false; needed without a direct cable), start_helper, stop_helper. To build a cluster: on each other PC that PC's own WinAIMagic becomes helper (cluster_role helper; it starts the helper); on the main PC find_helpers, use_helper for each, then start_engine; app_status shows how far the model parts are and what went wrong. "
                 + "Only do what the user asked for: never download, delete or switch a model on your own, also not one you recommend. The user approves a change on a card first. An action that stops the engine this conversation runs on (stop_engine, a new heavy model, make_image) happens when your answer is done: finish your answer then, and say what will happen.",
                 new JsonObject
                 {
@@ -68,6 +70,8 @@ public static class AppTools
                     ["setting"] = Prop("string", "A setting name from app_status"),
                     ["value"] = Prop("string", "The new value of the setting"),
                     ["prompt"] = Prop("string", "What the image should show, in English"),
+                    ["address"] = Prop("string", "A helper's address, host or host:port"),
+                    ["helper"] = Prop("string", "A helper's id (host:port) from app_status"),
                 }, "action"));
         if (skills)
             tools.Add(Function("create_skill", "Make a new skill of the user's own, or replace one of their own skills, so it shows in the skill list and can be loaded with use_skill. A skill is instructions for one subject with commands that work on this PC. The user approves it first. Do not put a skill in a work folder or in WINAIMAGIC.md: this tool is the only place skills go.",

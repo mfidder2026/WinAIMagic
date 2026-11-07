@@ -259,13 +259,27 @@ public sealed class EngineHost : IDisposable
         engine.Changed += () => Changed?.Invoke();
         Engine = engine;
         var vision = plan.Vision ? Store.VisionPaths(m) : Array.Empty<string>();
+        // a helper that does not answer would make the start wait for minutes: it stays out, and the cluster says why
+        string? rpc = null;
+        if (ClusterApplies && Cluster.Active.Count > 0)
+        {
+            Cluster.CheckBeforeStart();
+            rpc = Cluster.RpcArgument;
+            plan = Plan ?? plan;
+        }
         engine.Start(new EngineStart(m, Store.ShardPaths(m), plan, Backend)
         {
             Vision = vision.FirstOrDefault(),
             VisionVocab = vision.ElementAtOrDefault(1),
             Draft = Store.DraftPath(m),
-            Rpc = ClusterApplies ? Cluster.RpcArgument : null,
+            Rpc = rpc,
         });
+        if (rpc != null)
+        {
+            ulong model = m.Memory ?? m.TotalSize;
+            ulong local = System.VramTotal + System.RamTotal / 2;
+            _ = Cluster.WatchTransfer(() => engine.State.Status == EngineStatus.Starting, ClusterController.ExpectedTransfer(model, Cluster.HelperBudgets, local));
+        }
     }
 
     public void StopEngine() => Engine?.Stop();

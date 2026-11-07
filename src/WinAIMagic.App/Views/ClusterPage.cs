@@ -27,6 +27,8 @@ public sealed class ClusterPage : IPage
     private readonly Button addManual;
     private readonly TextBlock localStat = Stat(), helperStat = Stat(), totalStat = Stat();
     private readonly TextBlock fit = Ui.Label("", 13, null, wrap: true), split = Ui.Caption();
+    /// <summary>How far the model parts are on their way to the helpers, and what went wrong with a helper.</summary>
+    private readonly TextBlock transfer = Ui.Label("", 13, Theme.Secondary, wrap: true), problem = Ui.Label("", 13, Theme.Solid(Theme.Amber), wrap: true);
     private string shownHelpers = "?", shownOffers = "?";
 
     // a helper
@@ -64,7 +66,7 @@ public sealed class ClusterPage : IPage
         var helperCard = Ui.Card(Ui.V(12, searching, helpers, Ui.Row("*,auto", 8, manual, addManual)), L("Helpers"), Glyph.Network, Theme.Mint);
 
         var stats = Ui.H(24, StatBlock(localStat, L("Deze pc")), StatBlock(helperStat, L("Helpers")), StatBlock(totalStat, L("Totaal voor de GPU's")));
-        var together = Ui.Card(Ui.V(10, stats, fit, split, Ui.Caption(L("Wijzigingen gelden bij de volgende start van de engine."))), L("Samen"), Glyph.Memory, Theme.Violet);
+        var together = Ui.Card(Ui.V(10, stats, fit, split, transfer, problem, Ui.Caption(L("Wijzigingen gelden bij de volgende start van de engine."))), L("Samen"), Glyph.Memory, Theme.Violet);
         mainSide = Ui.V(Theme.SectionSpacing, tieredCard, helperCard, together);
 
         // a helper
@@ -134,6 +136,16 @@ public sealed class ClusterPage : IPage
 
     private void RefreshMain()
     {
+        var c = app.Host.Cluster;
+        var culture = AppLanguages.Current.Culture();
+        if (c.Transfer is { } t)
+        {
+            string sent = (t.Sent / 1e9).ToString("0.0", culture), whole = (t.Expected / 1e9).ToString("0", culture), rate = (t.BytesPerSecond / 1e6).ToString("0", culture);
+            transfer.SetIfChanged(L($"Naar de helpers gestuurd: {sent} van ongeveer {whole} GB, {rate} MB/s. De eerste start stuurt alles; de helper bewaart het, dus een volgende start gaat sneller."));
+        }
+        transfer.Show(c.Transfer != null);
+        problem.SetIfChanged(c.Problem ?? "");
+        problem.Show(c.Problem != null);
         var host = app.Host;
         var cluster = host.Cluster;
 
@@ -165,7 +177,7 @@ public sealed class ClusterPage : IPage
         }
         helpers.Show(all.Count > 0);
 
-        var culture = AppLanguages.Current.Culture();
+        // (culture: above)
         double local = MemoryPlanner.LlamaVramLimit(host.System) / 1e9, extra = cluster.HelperBudgets.Aggregate(0UL, (n, b) => n + b) / 1e9;
         localStat.SetIfChanged($"{local.ToString("0", culture)} GB");
         helperStat.SetIfChanged($"+{extra.ToString("0", culture)} GB");

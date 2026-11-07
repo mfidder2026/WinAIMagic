@@ -14,8 +14,8 @@ public class HelpTests : ChatTest
         Assert.True(nl.Count >= 18, $"{nl.Count} topics");
         Assert.Equal(nl.Select(t => t.Id), en.Select(t => t.Id));
         Assert.All(nl.Concat(en), t => Assert.True(t.Title.Length > 0 && t.Body.Length > 200, t.Id));
-        // the help is about this PC, not a Mac
-        Assert.All(nl, t => Assert.DoesNotContain(" Mac ", " " + t.Body + " "));
+        // the help is about this PC, not a Mac (only the cluster says a Mac can be a helper)
+        Assert.All(nl.Where(t => t.Id != "cluster"), t => Assert.DoesNotContain(" Mac ", " " + t.Body + " "));
     }
 
     [Fact]

@@ -103,6 +103,20 @@ public sealed class AppControl : IAppControl
             o.AppendLine($"- {name} = {shown}{(options != null ? $" (one of: {string.Join(", ", options.Select(x => x.Length == 0 ? "\"\" for automatic" : x))})" : "")}");
         }
         o.AppendLine();
+        o.AppendLine();
+        var c = h.Cluster;
+        o.AppendLine($"Cluster: this PC is {(c.IsHelperRole ? "a helper" : "the main PC")}; local network {(Settings.Shared.ClusterAllowLan ? "allowed" : "not allowed (direct cable only)")}; addresses: {string.Join(", ", ClusterController.Addresses().Select(x => $"{x.Interface} {x.Ip}{(x.Direct ? " (direct cable)" : "")}"))}.");
+        if (c.IsHelperRole) o.AppendLine(c.HelperRunning ? $"Helper running on {c.HelperAddress}." : "Helper not running (start_helper).");
+        else
+        {
+            o.AppendLine(h.ClusterApplies ? "The chosen heavy model can use helpers (second engine)." : $"The chosen heavy model runs on the main engine, which cannot use helpers; models that can: {string.Join(", ", h.ClusterModels.Select(m => m.Id))}.");
+            var helpers = c.Helpers;
+            if (helpers.Count == 0) o.AppendLine("No helpers found on the network. A helper is another PC or Mac with WinAIMagic or MacAIMagic in the role helper and its helper started.");
+            foreach (var x in helpers)
+                o.AppendLine($"- helper {x.Id}: {x.Name}, {x.Chip}, {x.GpuGb:0.#} GB for the model{(x.MemoryGb > 0 ? $", {x.MemoryGb:0} GB memory" : "")}, {(x.ViaDirectLink ? "direct cable" : "network")}{(x.Manual ? ", added by hand" : "")}{(x.Unreachable ? ", NOT REACHABLE on its port" : "")}{(c.Selected.Contains(x.Id) ? ", in use" : ", not in use")}");
+        }
+        if (c.Transfer is { } t) o.AppendLine($"Sending model parts to the helpers: {t.Sent / 1e9:0.0} of about {t.Expected / 1e9:0} GB, {t.BytesPerSecond / 1e6:0} MB/s.");
+        if (c.Problem is { } problem) o.AppendLine("Cluster problem: " + problem);
         o.AppendLine($"Rights (only the user changes these, in Settings): work folder read {Settings.Shared.RightRead}, write {Settings.Shared.RightWrite}, run {Settings.Shared.RightRun}; system read {Settings.Shared.RightSystemRead}, change {Settings.Shared.RightSystemChange}.");
         o.AppendLine($"Model folder: {Paths.ModelsRoot}. Own skills: {Paths.UserSkills}. Images: {Paths.PicturesFolder}. Documents: {Paths.DocumentsRoot}.");
         o.Append($"Local API: http://{Settings.Shared.Host}:{Settings.Shared.Port}/v1 (OpenAI) and /v1/messages (Anthropic){(Settings.Shared.ApiKey.Length > 0 ? ", with an API key" : "")}.");
@@ -182,6 +196,41 @@ public sealed class AppControl : IAppControl
                     var now = Convert.ToString(p.GetValue(Settings.Shared), CultureInfo.InvariantCulture);
                     return new(L($"Instelling {p.Name}: {now} → {value}"));
                 }
+            case "find_helpers":
+                return new(ReadOnly: true);
+            case "add_helper":
+                return Arg(a, "address").Length == 0 ? new(Error: "Give the address (host or host:port).") : new(L($"Helper toevoegen: {Arg(a, "address")}"));
+            case "use_helper":
+                {
+                    var helper = Host.Cluster.Helpers.FirstOrDefault(x => x.Id.Equals(Arg(a, "helper"), StringComparison.OrdinalIgnoreCase) || x.Name.Equals(Arg(a, "helper"), StringComparison.OrdinalIgnoreCase));
+                    if (helper == null) return new(Error: $"No helper \"{Arg(a, "helper")}\". Known: {string.Join(", ", Host.Cluster.Helpers.Select(x => x.Id))}.");
+                    bool on = Arg(a, "value") is not ("false" or "0" or "off");
+                    return new(on ? L($"Helper gebruiken: {helper.Name}") : L($"Helper niet meer gebruiken: {helper.Name}"), L("Dit geldt bij de volgende start van de engine."));
+                }
+            case "cluster_role":
+                {
+                    var role = Arg(a, "value").ToLowerInvariant();
+                    if (role is not ("main" or "helper")) return new(Error: "value is main or helper.");
+                    if (role == "helper")
+                    {
+                        bool direct = ClusterController.Addresses().Any(x => x.Direct);
+                        var detail = L("Deze pc leent dan zijn videokaart uit aan een hoofd-pc: de engine stopt, de helper start, en dit gesprek antwoordt niet meer tot de pc weer hoofd-pc is.")
+                            + (direct || Settings.Shared.ClusterAllowLan ? "" : " " + L("Er is geen directe kabel: sta ook het lokale netwerk toe, anders kan geen hoofd-pc de helper bereiken."));
+                        return new(L("Deze pc wordt helper in het cluster"), detail, AfterAnswer: ChatEngineRuns);
+                    }
+                    return new(L("Deze pc wordt weer hoofd-pc"));
+                }
+            case "allow_lan":
+                {
+                    bool on = Arg(a, "value") is not ("false" or "0" or "off");
+                    return on ? new(L("Lokaal netwerk toestaan voor het cluster"), L("Let op: de helper heeft geen wachtwoord. Gebruik dit alleen op een netwerk dat je vertrouwt, nooit op een openbaar netwerk."), Ask: true)
+                              : new(L("Alleen een directe kabel voor het cluster"));
+                }
+            case "start_helper":
+                if (Host.Cluster.HelperRunning) return new(Error: "The helper runs already.");
+                return !Host.Cluster.IsHelperRole ? new(Error: "This PC is the main PC: cluster_role helper first.") : new(L("Helper starten"), AfterAnswer: ChatEngineRuns);
+            case "stop_helper":
+                return Host.Cluster.HelperRunning ? new(L("Helper stoppen")) : new(Error: "The helper is not running.");
             case "make_image":
                 if (Arg(a, "prompt").Length == 0) return new(Error: "Give a prompt.");
                 if (Host.ImageModel is not { } im || !store.StatusOf(im.Id).IsComplete) return new(Error: "No image model is downloaded (download_model flux-2-klein-4b first).");
@@ -276,6 +325,60 @@ public sealed class AppControl : IAppControl
                     var later = p.Name is "ContextSize" or "Mtp" or "SkipExperts" or "Vision" ? " It counts after the engine restarts." : "";
                     return $"{p.Name} is now {Convert.ToString(p.GetValue(Settings.Shared), CultureInfo.InvariantCulture)}.{later}";
                 }
+            case "find_helpers":
+                {
+                    Host.Cluster.RecheckManual();
+                    await Task.Delay(TimeSpan.FromSeconds(3));
+                    var list = Host.Cluster.Helpers;
+                    return list.Count == 0
+                        ? "No helpers found. Each other PC needs WinAIMagic (or MacAIMagic) as helper with its helper started, on a direct cable or with the local network allowed on both. A helper on another subnet: add_helper with its address."
+                        : "Helpers: " + string.Join("; ", list.Select(x => $"{x.Id} {x.Name} ({x.Chip}, {x.GpuGb:0.#} GB{(x.Unreachable ? ", not reachable" : "")})"));
+                }
+            case "add_helper":
+                Host.Cluster.AddManual(Arg(a, "address"));
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                return "Added. " + (Host.Cluster.Helpers.FirstOrDefault(x => x.Manual && x.Host == Arg(a, "address").Split(':')[0]) is { } added
+                    ? added.Unreachable ? $"{added.Id} does not answer: is its helper started, and does its firewall allow the app?" : $"{added.Id} answers, {added.GpuGb:0.#} GB for the model."
+                    : "It is in the list.");
+            case "use_helper":
+                {
+                    var helper = Host.Cluster.Helpers.First(x => x.Id.Equals(Arg(a, "helper"), StringComparison.OrdinalIgnoreCase) || x.Name.Equals(Arg(a, "helper"), StringComparison.OrdinalIgnoreCase));
+                    var set = new HashSet<string>(Host.Cluster.Selected);
+                    if (Arg(a, "value") is "false" or "0" or "off") set.Remove(helper.Id); else set.Add(helper.Id);
+                    Host.Cluster.Selected = set;
+                    app.Notify();
+                    return $"{helper.Name} is {(set.Contains(helper.Id) ? "in use" : "not in use")} from the next engine start.";
+                }
+            case "cluster_role":
+                {
+                    var role = Arg(a, "value").ToLowerInvariant();
+                    if (role == "helper")
+                    {
+                        if (app.EngineState.IsActive) { await Task.Run(Host.StopEngine); await Task.Delay(TimeSpan.FromSeconds(3)); }
+                        Settings.Shared.ClusterRole = "helper";
+                        await Task.Run(() => Host.Cluster.StartHelper());
+                        app.Notify();
+                        return Host.Cluster.HelperRunning ? $"This PC is a helper now, on {Host.Cluster.HelperAddress}." : "This PC is a helper, but the helper did not start: " + string.Join(" ", Host.Cluster.HelperLog.TakeLast(2));
+                    }
+                    Host.Cluster.StopHelper();
+                    Settings.Shared.ClusterRole = "main";
+                    app.Notify();
+                    return "This PC is the main PC again.";
+                }
+            case "allow_lan":
+                {
+                    Settings.Shared.ClusterAllowLan = Arg(a, "value") is not ("false" or "0" or "off");
+                    if (Host.Cluster.HelperRunning) await Host.Cluster.RestartHelper();
+                    app.Notify();
+                    return Settings.Shared.ClusterAllowLan ? "The local network is allowed for the cluster." : "Only a direct cable now.";
+                }
+            case "start_helper":
+                if (app.EngineState.IsActive) { await Task.Run(Host.StopEngine); await Task.Delay(TimeSpan.FromSeconds(3)); }
+                await Task.Run(() => Host.Cluster.StartHelper());
+                return Host.Cluster.HelperRunning ? $"The helper runs on {Host.Cluster.HelperAddress}." : "The helper did not start: " + string.Join(" ", Host.Cluster.HelperLog.TakeLast(2));
+            case "stop_helper":
+                Host.Cluster.StopHelper();
+                return "The helper is stopped.";
             case "make_image":
                 {
                     var size = ImageSize.Parse(Settings.Shared.ImageSize) is { } chosen && ImagePlanner.Sizes.Contains(chosen) ? chosen : ImagePlanner.DefaultSize(Host.System);
