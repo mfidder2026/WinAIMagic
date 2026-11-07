@@ -26,7 +26,9 @@ Het scherm **Systeem** laat zien wat je pc nog nodig heeft. Vaak is dat een grot
 - **Vergelijken:** dezelfde meting op elk model, op je eigen pc.
 - **Lokale API** op `http://127.0.0.1:8080`, voor OpenAI-, Anthropic- en Responses-clients.
 - **Modelmap kiezen en wijzigen,** ook met modellen erin, zonder opnieuw te downloaden.
-- **Een model verwijderen of bijwerken** op zijn kaart. Noemt een nieuwere WinAIMagic een nieuwere versie van de bestanden van een model, dan biedt de kaart **Update** aan, die alleen de veranderde bestanden downloadt.
+- **Een model verwijderen of bijwerken** op zijn kaart. Een gedownload model heeft **Controleer op update**: in een paar seconden, zonder de bestanden van het model te lezen, vergelijkt het ze met de catalogus van deze versie en vraagt het de server van de maker. Een update begint meteen; anders zegt de kaart dat er geen is.
+- **Systeembeheer.** Het model kan deze pc bekijken (één PowerShell-commando dat alleen leest) en instellingen wijzigen met een plan dat jij goedkeurt, met per stap de huidige waarde op de kaart. Stappen met beheerdersrechten delen één vraag van Windows (UAC), kunnen eerst een herstelpunt maken, en het model maakt een wijziging ongedaan als je dat vraagt. Ingebouwde **skills** geven het geteste commando's per onderwerp (uiterlijk, energie, netwerk, software, opstartitems, opslag, beveiliging, diagnose); je kunt eigen skills toevoegen. Beide staan standaard aan onder Instellingen, Systeembeheer.
+- **Hulp** in de app: een pagina Hulp, een ? bovenaan voor het scherm dat open is, en F1.
 - **Cluster:** meerdere pc's samen, voor modellen op de tweede engine.
 
 ## Gemeten snelheid

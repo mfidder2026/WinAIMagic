@@ -85,7 +85,7 @@ public sealed class ModelCard
     private readonly TextBlock message = Ui.Caption();
     private readonly TextBlock note = Ui.Caption(color: Theme.Solid(Theme.Amber));
     private readonly TextBlock error = Ui.Caption(color: Theme.Solid(Theme.Pink));
-    private readonly Button download, update, visionDownload, pause, delete;
+    private readonly Button download, update, check, visionDownload, pause, delete;
     private readonly StackPanel roles = Ui.H(6);
     private readonly Windows.UI.Color family;
     private string rolesKey = "";
@@ -111,11 +111,13 @@ public sealed class ModelCard
         download = Ui.Btn(L("Download"), () => _ = Download(), Glyph.Download, family);
         visionDownload = Ui.Btn(L("Afbeeldingsbestanden"), () => store.StartVisionDownload(model.Id), Glyph.Image);
         update = Ui.Btn(L("Update"), () => store.StartDownload(model.Id), Glyph.Refresh, Theme.Amber);
+        check = Ui.Btn(L("Controleer op update"), () => _ = store.CheckForUpdate(model.Id), Glyph.Refresh);
+        check.Tip(L("Vergelijkt de bestanden op deze pc met deze versie van WinAIMagic en vraagt de server of er iets nieuws is. Duurt enkele seconden; een update begint meteen."));
         pause = Ui.Btn(L("Pauzeer"), () => store.StopDownload(model.Id), Glyph.Pause);
         delete = Ui.Btn(L("Verwijder model"), () => _ = ConfirmDelete(app, model), Glyph.Trash);
         makesImages = app.Host.Store.Catalog.Images.Contains(model);
         // the buttons wrap to a second line rather than hide under the roles
-        var left = new WrapPanel { Gap = 8, RowGap = 6, Children = { download, update, visionDownload, pause, delete } };
+        var left = new WrapPanel { Gap = 8, RowGap = 6, Children = { download, update, check, visionDownload, pause, delete } };
         roles.VerticalAlignment = VerticalAlignment.Center;
         var right = roles;
         var foot = Ui.Row("*,auto", 8, left, right);
@@ -219,7 +221,9 @@ public sealed class ModelCard
         // an update downloads the files that differ; the old ones go first, so their room comes back
         ulong missing = offerUpdate ? st.UpdateBytes : st.Expected > st.Have ? st.Expected - st.Have : 0;
         bool needsRoom = (!st.IsComplete || offerUpdate) && !downloading;
-        var noteId = $"{blocked}|{MemoryPlanner.EngineFor(model, host.System)}|{(needsRoom ? missing : 0)}|{host.System.FreeDisk}|{offerUpdate}";
+        bool checking = store.Checking.Contains(model.Id);
+        var checkResult = store.CheckResult.TryGetValue(model.Id, out var cr) && (!downloading || cr.Good) ? cr : default;
+        var noteId = $"{blocked}|{MemoryPlanner.EngineFor(model, host.System)}|{(needsRoom ? missing : 0)}|{host.System.FreeDisk}|{offerUpdate}|{checking}|{checkResult.Text}";
         if (noteId != noteKey)
         {
             noteKey = noteId;
@@ -227,7 +231,10 @@ public sealed class ModelCard
             if (blocked != null) lines.Add(blocked);
             else if (model.Engine == "tiered" && MemoryPlanner.EngineFor(model, host.System) == EngineKind.Llama)
                 lines.Add(L("Op deze pc draait dit model in de beperkte modus, via de tweede engine: alles werkt, maar lager tempo en een kleinere context. Reden: ") + (host.System.TieredUnavailable ?? L("te weinig VRAM voor de hoofdengine.")));
-            if (offerUpdate)
+            // what the last check said goes before an update notice: it says the update is coming down
+            if (checking) lines.Add(L("Op update controleren…"));
+            else if (checkResult.Text != null) lines.Add(checkResult.Text);
+            else if (offerUpdate)
                 lines.Add(L($"Er is een nieuwere versie van dit model. Update downloadt alleen de bestanden die anders zijn ({st.UpdateBytes.GbShort()}); tot dan werkt de versie die er staat."));
             if (needsRoom && missing > host.System.FreeDisk)
             {
@@ -252,6 +259,9 @@ public sealed class ModelCard
             visionDownload.Tip(L($"Download wat dit model nodig heeft om afbeeldingen te lezen ({size.GbShort()})."));
         }
         update.Show(offerUpdate);
+        // here and of the catalog's version: one button that checks, and updates at once when there is something
+        check.Show(st.IsComplete && !offerUpdate && !downloading && !building);
+        check.IsEnabled = !checking;
         update.IsEnabled = !inUse;
         update.Tip(inUse ? (makesImages ? L("Wacht tot de afbeelding klaar is.") : L("Stop eerst de engine.")) : L("De oude bestanden worden eerst verwijderd; tijdens de download werkt dit model niet."));
         pause.Show(downloading);

@@ -186,7 +186,7 @@ public static class MemoryPlanner
     /// starts, but this PC is better off as a helper in a cluster.</summary>
     public static ModelInfo? Recommended(IEnumerable<ModelInfo> models, SystemInfo s)
     {
-        var usable = models.Where(m => EngineFor(m, s) != null).ToList();
+        var usable = models.Where(m => m.Recommend && EngineFor(m, s) != null).ToList();
         double vramGb = s.VramTotal / (double)(1UL << 30);
         return usable.FirstOrDefault(m => FitFor(m, s) == Fit.Fits && (!m.IsPlain || IsSmallPc(s))
                                           && ((m.Tier?.RecommendMaxVramGb ?? m.RecommendMaxVramGb) is not double max || !s.HasGpu || vramGb <= max))

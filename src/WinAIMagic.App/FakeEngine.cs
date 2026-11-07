@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 namespace WinAIMagic.App;
 
 /// <summary>Hidden, debug builds only (--fake-engine): a scripted stand-in for the engine on a local port, so the chat can be tried
-/// without a model. The last question picks the script: stappen, schrijf, commando, 4000 code, 4000 tekst, fout, nudge, amber, rood, traag.</summary>
+/// without a model. The last question picks the script: stappen, schrijf, systeemwijziging, beheerder, commando, 4000 code, 4000 tekst, fout, nudge, amber, rood, traag.</summary>
 internal static class FakeEngine
 {
     public static Uri Start()
@@ -176,6 +176,25 @@ internal static class FakeEngine
         {
             await Words(s, "reasoning_content", "Ik maak het bestand aan.", delay);
             await ToolCall(s, "write_file", "{\"path\":\"demo.txt\",\"content\":\"Regel een\\nRegel twee\\nRegel drie\\n\"}", "call_w");
+            finish = "tool_calls";
+        }
+        else if ((ask.Contains("systeemwijziging") || ask.Contains("beheerder")) && tools == 0)
+        {
+            // a plan on the app's own test key; "beheerder" marks it as an administrator step (the card only: answer Weigeren)
+            bool admin = ask.Contains("beheerder");
+            var plan = new JsonObject
+            {
+                ["summary"] = "Kleur op groen",
+                ["steps"] = new JsonArray(new JsonObject
+                {
+                    ["title"] = "kleur op groen zetten",
+                    ["check"] = "Get-ItemPropertyValue -Path 'HKCU:\\Software\\WinAIMagicTest' -Name color 2>$null",
+                    ["apply"] = "New-Item -Path 'HKCU:\\Software\\WinAIMagicTest' -Force | Out-Null; Set-ItemProperty -Path 'HKCU:\\Software\\WinAIMagicTest' -Name color -Value groen",
+                    ["undo"] = "Set-ItemProperty -Path 'HKCU:\\Software\\WinAIMagicTest' -Name color -Value blauw",
+                    ["admin"] = admin,
+                }),
+            };
+            await ToolCall(s, "system_change", plan.ToJsonString(), "call_s");
             finish = "tool_calls";
         }
         else if (ask.Contains("commando") && tools == 0)

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using WinAIMagic.Core.Support;
+using static WinAIMagic.Core.Support.Lang;
 using Xunit;
 
 namespace WinAIMagic.Engine.Tests;
@@ -493,14 +494,107 @@ public class DownloaderTests : EngineTest
         Assert.False(model.AllVerified);
     }
 
-    /// <summary>An empty .ok (a model folder from the Mac before its 1.9.12) is trusted; a file without one is no update.</summary>
+    /// <summary>An empty .ok (a model folder from the Mac before its 1.9.12) is trusted on its size; a file without one is no update.</summary>
     [Fact]
-    public void AnOldOkIsTrusted()
+    public void AnOldOkIsTrustedOnItsSize()
     {
         var s = Status("");
         Assert.True(s.Verified && s.Complete);
         Assert.False(s.Stale);
+        Assert.True(Status("", have: 8).Stale, "an old .ok with another size is another version");
         Assert.False(Status(null).Stale, "a file downloaded by hand is no update");
+    }
+
+    /// <summary>The maker's server answers HEAD with the file's identity in x-linked-etag (large files) or etag (small ones).</summary>
+    private sealed class HeadServer : HttpMessageHandler
+    {
+        public readonly Dictionary<string, (HttpStatusCode Status, string? Etag)> Answers = new();
+        public readonly List<string> Asked = new();
+        public bool Down;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Assert.Equal(HttpMethod.Head, request.Method);
+            var url = request.RequestUri!.ToString();
+            Asked.Add(url);
+            if (Down) throw new HttpRequestException("no network");
+            if (!Answers.TryGetValue(url, out var a)) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            var r = new HttpResponseMessage(a.Status);
+            if (a.Etag != null) r.Headers.TryAddWithoutValidation("x-linked-etag", "\"" + a.Etag + "\"");
+            return Task.FromResult(r);
+        }
+    }
+
+    private const string Pin = "0123456789abcdef0123456789abcdef01234567";
+    private static ModelFile Pinned(string name) => new() { Local = name, Size = 10, Sha256 = new[] { "abc" }, Url = $"https://hf.test/o/r/resolve/{Pin}/{name}" };
+
+    [Fact]
+    public async Task TheMakerHasNewerFilesOrNot()
+    {
+        var head = new HeadServer();
+        var http = new HttpClient(head);
+        var a = Pinned("a.gguf");
+        string main = a.Url.Replace(Pin, "main");
+        head.Answers[a.Url] = (HttpStatusCode.Found, "abc");
+        head.Answers[main] = (HttpStatusCode.Found, "abc");
+        Assert.Equal(ModelStore.UpdateCheck.None, await ModelStore.MakerHasNewer(new[] { a }, http));
+        Assert.Contains(main, head.Asked);
+
+        head.Answers[main] = (HttpStatusCode.Found, "def");
+        Assert.Equal(ModelStore.UpdateCheck.MakerHasNewer, await ModelStore.MakerHasNewer(new[] { a }, http));
+        head.Answers.Remove(main);
+        Assert.Equal(ModelStore.UpdateCheck.MakerHasNewer, await ModelStore.MakerHasNewer(new[] { a }, http));   // gone from main
+
+        head.Down = true;
+        Assert.Equal(ModelStore.UpdateCheck.Offline, await ModelStore.MakerHasNewer(new[] { a }, http));
+        var unpinned = a with { Url = "https://hf.test/o/r/resolve/main/a.gguf" };
+        head.Down = false;
+        Assert.Equal(ModelStore.UpdateCheck.Offline, await ModelStore.MakerHasNewer(new[] { unpinned }, http));
+    }
+
+    /// <summary>Controleer op update reads no model file: a complete model asks the server, an update starts at once.</summary>
+    [Fact]
+    public async Task ControleerOpUpdateReadsNoFile()
+    {
+        var file = Pinned("m.gguf") with { Size = 100, Sha256 = new[] { TestModels.Sha(Data(100, 3)) } };
+        var c = new ModelCatalog { Models = new[] { new ModelInfo { Id = "m", Name = "T", Family = "qwen", Summary = "s", Files = new[] { file } } } };
+        Directory.CreateDirectory(Dir("m"));
+        File.WriteAllBytes(Local, Data(100, 3));
+        File.WriteAllText(Local + ".ok", TestModels.Sha(Data(100, 3)));
+        var head = new HeadServer();
+        head.Answers[file.Url] = (HttpStatusCode.Found, "x");
+        head.Answers[file.Url.Replace(Pin, "main")] = (HttpStatusCode.Found, "x");
+        using var store = Store(c);
+        store.HeadClient = new HttpClient(head);
+        // the model file locked against reading: a check that read it would fail
+        using (new FileStream(Local, FileMode.Open, FileAccess.Read, FileShare.None))
+            await store.CheckForUpdate("m");
+        Assert.Equal(L("Geen update beschikbaar."), store.CheckResult["m"].Text);
+        Assert.Empty(store.Checking);
+        Assert.Empty(store.Downloading);
+
+        // another version on disk: the update starts at once
+        File.WriteAllText(Local + ".ok", "def");
+        server.Files[file.Url] = Data(100, 3);
+        store.Refresh();
+        await store.CheckForUpdate("m");
+        Assert.True(store.CheckResult["m"].Good);
+        await store.WaitForDownload("m");
+        Assert.True(store.StatusOf("m").AllVerified);
+    }
+
+    /// <summary>WINAIMAGIC_NETWORK_TEST=1: the maker's real server, headers only. Both pin the maker's newest files (Qwen3.8's of
+    /// 2026-11-04 were taken over here before the Mac did, so where the Mac expects MakerHasNewer this PC has None).</summary>
+    [Fact]
+    public async Task TheMakersServer()
+    {
+        if (Environment.GetEnvironmentVariable("WINAIMAGIC_NETWORK_TEST") != "1") return;
+        var http = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(20) };
+        var c = ModelCatalog.Shared;
+        var ministral = await ModelStore.MakerHasNewer(c.Model("ministral-3-8b-q4")!.Files, http);
+        var qwen = await ModelStore.MakerHasNewer(c.Model("qwen3.8-flash-next-q4")!.Files, http);
+        Console.WriteLine($"MAKER ministral: {ministral}, qwen3.8: {qwen}");
+        Assert.Equal(ModelStore.UpdateCheck.None, ministral);
+        Assert.Equal(ModelStore.UpdateCheck.None, qwen);
     }
 
     [Fact]

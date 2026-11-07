@@ -11,7 +11,16 @@ namespace WinAIMagic.Chat;
 public sealed record Approval(Guid Conversation, ToolCall Call, string Title, string Detail)
 {
     public Guid Id { get; } = Guid.NewGuid();
+    /// <summary>What the card warns about (a sensitive setting, a plan that follows reading the web).</summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    /// <summary>A system plan: its steps, with the current value where the app could read it first.</summary>
+    public IReadOnlyList<PlanStep> Steps { get; init; } = [];
+    /// <summary>Needs administrator rights: Windows asks (UAC) after this yes, and "always" is not offered.</summary>
+    public bool Admin { get; init; }
 }
+
+/// <summary>One step of a system plan on the approval card.</summary>
+public sealed record PlanStep(string Title, string Command, string? Current, bool Admin);
 
 /// <summary>Allow, and whether that goes for the rest of this chat in this app session.</summary>
 public readonly record struct ApprovalAnswer(bool Allow, bool Always = false);
@@ -46,6 +55,8 @@ public sealed class ChatClient(HttpClient? http = null)
     /// <summary>The model the engine runs, for the system prompt.</summary>
     public string ModelName { get; set; } = "DeepSeek-V4.1-Flash";
     public Approval? PendingApproval { get; private set; }
+    /// <summary>The card's "make a restore point first" (admin plans); on again for every new admin card.</summary>
+    public bool Snapshot { get; set; } = true;
 
     /// <summary>The loop that Send started; done when Busy goes false.</summary>
     public Task Completion { get; private set; } = Task.CompletedTask;
@@ -73,7 +84,7 @@ public sealed class ChatClient(HttpClient? http = null)
     private Guid? currentConversation;
 
     /// <summary>Web questions need a few rounds; work in a folder (read, write, run, read the log, fix) needs many more.</summary>
-    private int MaxToolRounds => WorkspaceActive ? 200 : 20;
+    private int MaxToolRounds => WorkspaceActive || Settings.Shared.SystemManagement ? 200 : 20;
     private static bool WorkspaceActive => Settings.Shared.WorkspaceTools && WorkspaceTools.Workspace != null;
 
     public void Answer(Approval approval, bool allow, bool always = false)
@@ -86,11 +97,17 @@ public sealed class ChatClient(HttpClient? http = null)
         StateChanged?.Invoke();
     }
 
-    private async Task<bool> AskApproval(ToolCall call, Guid conversation, CancellationToken ct)
+    private Task<bool> AskApproval(ToolCall call, Guid conversation, CancellationToken ct)
     {
-        if (trusted.Contains(conversation)) return true;
         var (title, detail) = WorkspaceTools.ApprovalText(call);
-        var approval = new Approval(conversation, call, title, detail);
+        return Ask(new Approval(conversation, call, title, detail), ct);
+    }
+
+    /// <summary>"Always in this conversation" covers everything but admin rights: those are asked every time.</summary>
+    private async Task<bool> Ask(Approval approval, CancellationToken ct)
+    {
+        if (trusted.Contains(approval.Conversation) && !approval.Admin) return true;
+        if (approval.Admin) Snapshot = true;
         var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         approvalAnswer = answer;
         PendingApproval = approval;
@@ -165,6 +182,9 @@ public sealed class ChatClient(HttpClient? http = null)
         var sources = new List<Source>();
         int nudges = 0;
         int rounds = MaxToolRounds;
+        // only work in a folder needs the model's own KLAAR to end: an answer after reading the system or the web is finished
+        // when it does not announce a next step
+        bool changedFiles = false;
         try
         {
             for (int round = 0; round < rounds; round++)
@@ -229,7 +249,7 @@ public sealed class ChatClient(HttpClient? http = null)
                 if (result.ToolCalls.Count == 0)
                 {
                     bool cutOff = result.FinishReason == "length";
-                    if (!LooksUnfinished(reply.Text, reply.Reasoning, cutOff, WorkspaceActive || activities.Count > 0, activities.Count > 0)) return;
+                    if (!LooksUnfinished(reply.Text, reply.Reasoning, cutOff, WorkspaceActive || activities.Count > 0, changedFiles)) return;
                     if (nudges >= MaxNudges)
                     {
                         // it keeps stopping: say so, instead of just falling silent
@@ -249,7 +269,13 @@ public sealed class ChatClient(HttpClient? http = null)
                 foreach (var call in result.ToolCalls)
                 {
                     bool isWorkspace = WorkspaceTools.Names.Contains(call.Name);
-                    var step = new ToolActivity { Label = isWorkspace ? WorkspaceTools.Label(call) : WebTools.Label(call) };
+                    bool isSystem = SystemTools.Names.Contains(call.Name);
+                    bool isSkill = call.Name == Skills.ToolName;
+                    if (isWorkspace) changedFiles = true;
+                    var step = new ToolActivity
+                    {
+                        Label = isWorkspace ? WorkspaceTools.Label(call) : isSystem ? SystemTools.Label(call) : isSkill ? Skills.Label(call) : WebTools.Label(call),
+                    };
                     activities.Add(step);
                     store.Update(id, _ => reply.Activities = Copy(activities));
                     string text;
@@ -268,6 +294,16 @@ public sealed class ChatClient(HttpClient? http = null)
                             step.Denied = true;
                         }
                         else text = await WorkspaceTools.RunAsync(call, ct);
+                    }
+                    else if (isSystem)
+                    {
+                        var output = await RunSystem(call, id, store, ct);
+                        text = output.Text;
+                        if (output.Denied) step.Denied = true;
+                    }
+                    else if (isSkill)
+                    {
+                        text = Skills.Run(call);
                     }
                     else
                     {
@@ -305,6 +341,89 @@ public sealed class ChatClient(HttpClient? http = null)
         {
             if (ct.IsCancellationRequested) FillStopped(id, store);
         }
+    }
+
+    // MARK: - system management
+
+    /// <summary>system_read, system_change and system_undo, with the user's rights; a change always shows its plan first.</summary>
+    private async Task<(string Text, bool Denied)> RunSystem(ToolCall call, Guid id, ConversationStore store, CancellationToken ct)
+    {
+        var s = Settings.Shared;
+        var a = WorkspaceTools.Args(call);
+        switch (call.Name)
+        {
+            case "system_read":
+                {
+                    var command = (WorkspaceTools.Str(a, "command") ?? "").Trim();
+                    if (!SystemTools.IsReadOnly(command))
+                        return ("This command is not on the list of read-only commands (one program, without pipes, ;, &, redirection, $, (, ), {, } or [ ]). Read with a simpler command and sort the result yourself, or use system_change if it changes something.", false);
+                    switch (s.SystemRight(false))
+                    {
+                        case "deny":
+                            return ("The user's settings do not allow reading the system. Tell the user what you wanted to look at.", true);
+                        case "ask":
+                            if (!await Ask(new Approval(id, call, L("Systeem lezen"), command), ct))
+                                return ("The user did not allow this. Ask what they want instead, or continue without it.", true);
+                            break;
+                    }
+                    var output = await SystemTools.RunUser(command, 120, ct);
+                    return ((output.Output.Length == 0 ? "(no output)" : output.Output) + (output.Ok ? "" : "\n[the command failed]"), false);
+                }
+            case "system_change":
+                {
+                    (string Summary, List<SystemTools.Step> Steps) plan;
+                    try { plan = SystemTools.Plan(call); }
+                    catch (SystemTools.PlanException e) { return ("Error: " + e.Message, false); }
+                    bool admin = plan.Steps.Exists(x => x.Admin);
+                    var right = s.SystemRight(true);
+                    if (right == "deny")
+                        return ("The user's settings do not allow changing the system. Tell the user what you would change and how they can do it themselves.", true);
+                    if (right == "ask" || admin)
+                    {
+                        var current = await SystemTools.Preview(plan.Steps, ct);
+                        var approval = new Approval(id, call, plan.Summary, string.Join("\n", plan.Steps.Select(x => (x.Admin ? "[admin] " : "") + x.Apply)))
+                        {
+                            Warnings = SystemTools.Warnings(plan.Steps, ReadWeb(id, store)),
+                            Steps = plan.Steps.Select((x, i) => new PlanStep(x.Title, x.Apply, current[i], x.Admin)).ToList(),
+                            Admin = admin,
+                        };
+                        // AutoApprove (tests) skips the card, but never the UAC prompt of Windows
+                        if (!(s.AutoApprove && right == "allow") && !await Ask(approval, ct))
+                            return ("The user did not approve this plan. Ask what they want instead.", true);
+                    }
+                    var change = await SystemTools.Apply(plan.Summary, plan.Steps, admin && Snapshot, ct: ct);
+                    return (SystemTools.Report(change), false);
+                }
+            case "system_undo":
+                {
+                    var wanted = (WorkspaceTools.Str(a, "id") ?? "").Trim();
+                    var all = SystemTools.Load();
+                    if (all.Find(c => c.Id == wanted) is not { } change)
+                        return ($"There is no change with id {wanted}. Recent: " + string.Join(", ", all.Take(5).Select(c => $"{c.Id} ({c.Summary})")), false);
+                    if (change.Undone != null) return ($"Change {wanted} was already undone.", false);
+                    if (s.SystemRight(true) == "deny") return ("The user's settings do not allow changing the system.", true);
+                    var undoSteps = Enumerable.Range(0, change.Steps.Count).Reverse().Where(i => change.Results[i].Ran).ToList();
+                    var approval = new Approval(id, call, L($"Ongedaan maken: {change.Summary}"), string.Join("\n", undoSteps.Select(i => change.Steps[i].Undo)))
+                    {
+                        Warnings = SystemTools.Warnings(undoSteps.Select(i => change.Steps[i]).ToList(), false),
+                        Steps = undoSteps.Select(i => new PlanStep(L($"Terugzetten: {change.Steps[i].Title}"), change.Steps[i].Undo, null, change.Steps[i].Admin)).ToList(),
+                        Admin = change.Admin,
+                    };
+                    if (!await Ask(approval, ct)) return ("The user did not approve undoing it.", true);
+                    var done = await SystemTools.Undo(change, ct: ct);
+                    return ($"Undone {done.Id}:\n" + done.UndoReport, false);
+                }
+            default:
+                return ($"Unknown tool {call.Name}", false);
+        }
+    }
+
+    /// <summary>The current task (since the user's last question) read the web: a page could have put the plan in the model's mind.</summary>
+    private static bool ReadWeb(Guid id, ConversationStore store)
+    {
+        if (store.Find(id) is not { } c) return false;
+        int start = c.Messages.FindLastIndex(m => m.Role == ChatRole.User && m.Automatic != true);
+        return start >= 0 && c.Messages.Skip(start).Any(m => m.ToolCalls.Exists(t => WebTools.Names.Contains(t.Name)));
     }
 
     private static List<ToolActivity> Copy(List<ToolActivity> activities) => [.. activities.Select(a => a with { })];
@@ -541,6 +660,9 @@ public sealed class ChatClient(HttpClient? http = null)
         var tools = new JsonArray();
         if (s.WebSearch) foreach (var t in WebTools.Definitions) tools.Add(t!.DeepClone());
         if (s.WorkspaceTools && WorkspaceTools.Workspace != null) foreach (var t in WorkspaceTools.Definitions) tools.Add(t!.DeepClone());
+        // skills and system management come last: with them off the request starts the same as before
+        if (s.Skills && Skills.All.Count > 0) tools.Add(Skills.Definition);
+        if (s.SystemManagement) foreach (var t in SystemTools.Definitions) tools.Add(t!.DeepClone());
         return tools;
     }
 
@@ -563,6 +685,9 @@ public sealed class ChatClient(HttpClient? http = null)
             var noTools = DeveloperTools.HasDeveloperTools ? "" : " " + ChatTexts.NoDeveloperTools(DeveloperTools.Missing);
             system += "\n\n" + ChatTexts.KeepGoing + noTools;
         }
+        // Instellingen → Systeembeheer: nothing is added while they are off
+        if (s.SystemManagement) system += "\n\n" + SystemTools.PromptSection();
+        if (s.Skills && Skills.PromptSection(Skills.All) is { Length: > 0 } section) system += "\n\n" + section;
         if (s.SystemPrompt.Length > 0) system += "\n\n" + s.SystemPrompt;
         if (summary != null)
             system += "\n\n" + L("Samenvatting van het begin van dit gesprek (die berichten zijn weggelaten om ruimte te maken in je context):") + "\n" + summary;

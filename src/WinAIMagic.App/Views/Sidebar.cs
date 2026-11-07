@@ -46,7 +46,7 @@ public sealed partial class Sidebar : Grid
         {
             (PaneKind.Live, L("Live"), Glyph.Live), (PaneKind.Models, L("Modellen"), Glyph.Models), (PaneKind.Documents, L("Documenten"), Glyph.Document),
             (PaneKind.Images, L("Beeld"), Glyph.Image),
-            (PaneKind.Compare, L("Vergelijken"), Glyph.Compare), (PaneKind.Cluster, L("Cluster"), Glyph.Cluster), (PaneKind.System, L("Systeem"), Glyph.System),
+            (PaneKind.Compare, L("Vergelijken"), Glyph.Compare), (PaneKind.Cluster, L("Cluster"), Glyph.Cluster), (PaneKind.System, L("Systeem"), Glyph.System), (PaneKind.Help, L("Hulp"), Glyph.Help),
         })
         {
             var icon = Ui.Icon(glyph, 15, Theme.Secondary);

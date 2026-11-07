@@ -375,24 +375,62 @@ public sealed class ChatPage : IPage
     private Border ApprovalCard(Approval a)
     {
         var amber = new SolidColorBrush(Theme.Amber);
-        var head = Ui.H(8, Ui.Icon(a.Call.Name == "run_command" ? Glyph.Terminal : Glyph.Document, 15, amber), Ui.Label(a.Title, 15, null, FontWeights.SemiBold, display: true));
-        var detail = new Border
+        bool warned = a.Warnings.Count > 0;
+        var edge = warned ? Theme.Red : Theme.Amber;
+        var icon = a.Call.Name.StartsWith("system_", StringComparison.Ordinal) ? (a.Admin ? Glyph.Shield : Glyph.Gears)
+            : a.Call.Name == "run_command" ? Glyph.Terminal : Glyph.Document;
+        var head = Ui.Row("auto,*,auto", 8, Ui.Icon(icon, 15, amber), Ui.Label(a.Title, 15, null, FontWeights.SemiBold, wrap: true, display: true),
+            a.Admin ? Ui.H(4, Ui.Icon(Glyph.Key, 12, Theme.Solid(Theme.Amber)), Ui.Label(L("Beheerder"), 12, Theme.Solid(Theme.Amber), FontWeights.Bold)) : null);
+        var body = Ui.V(10, head);
+        if (warned)
+        {
+            var list = Ui.V(4, [.. a.Warnings.Select(w => (UIElement)Ui.Row("auto,*", 6, Ui.Icon(Glyph.Warning, 13, Theme.Solid(Theme.Red)), Ui.Label(w, 13, Theme.Solid(Theme.Red), wrap: true)))]);
+            var box = Ui.Rounded(Theme.Solid(Theme.Red, 0.12), 8, list);
+            box.Padding = new Thickness(10);
+            body.Children.Add(box);
+        }
+        UIElement content;
+        if (a.Steps.Count == 0)
+            content = new TextBlock { Text = a.Detail, FontFamily = Theme.Mono, FontSize = 13, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true, Margin = new Thickness(10) };
+        else
+        {
+            // a plan: each step with what is there now, where the app could read it first
+            var steps = Ui.V(8);
+            steps.Margin = new Thickness(10);
+            for (int i = 0; i < a.Steps.Count; i++)
+            {
+                var st = a.Steps[i];
+                var one = Ui.V(2, Ui.Label($"{i + 1}. {st.Title}" + (st.Admin ? "  🔑" : ""), 13, null, FontWeights.SemiBold, wrap: true));
+                if (st.Current is { } now) one.Children.Add(new TextBlock { Text = L($"Nu: {now}"), FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, MaxLines = 3, TextTrimming = TextTrimming.CharacterEllipsis });
+                one.Children.Add(new TextBlock { Text = st.Command, FontFamily = Theme.Mono, FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true });
+                steps.Children.Add(one);
+            }
+            content = steps;
+        }
+        // as high as what it shows, scrolling from 160 (a command) or 240 (a plan) on
+        body.Children.Add(new Border
         {
             CornerRadius = new CornerRadius(8), Background = Theme.Solid(Colors.Black, 0.35),
-            Child = new ScrollViewer
-            {
-                MaxHeight = 160, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, ZoomMode = ZoomMode.Disabled,
-                Content = new TextBlock { Text = a.Detail, FontFamily = Theme.Mono, FontSize = 13, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true, Margin = new Thickness(10) },
-            },
-        };
+            Child = new ScrollViewer { MaxHeight = a.Steps.Count == 0 ? 160 : 240, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, ZoomMode = ZoomMode.Disabled, Content = content },
+        });
+        if (a.Admin)
+        {
+            var snapshot = new CheckBox { Content = L("Maak eerst een herstelpunt, zodat je altijd terug kunt"), IsChecked = app.Chat.Snapshot };
+            snapshot.Checked += (_, _) => app.Chat.Snapshot = true;
+            snapshot.Unchecked += (_, _) => app.Chat.Snapshot = false;
+            body.Children.Add(snapshot);
+            body.Children.Add(Ui.Caption(L("Na Toestaan vraagt Windows om toestemming (UAC). Windows maakt hoogstens één herstelpunt per 24 uur.")));
+        }
+        // "always" never covers administrator rights
         var buttons = Ui.Row("auto,*,auto,auto", 8,
             Ui.Btn(L("Weigeren"), () => app.Chat.Answer(a, false)), null,
-            Ui.Btn(L("Altijd in dit gesprek"), () => app.Chat.Answer(a, true, true)),
-            Ui.Btn(L("Toestaan"), () => app.Chat.Answer(a, true), Glyph.Check, Theme.Amber));
+            a.Admin ? null : Ui.Btn(L("Altijd in dit gesprek"), () => app.Chat.Answer(a, true, true)),
+            Ui.Btn(L("Toestaan"), () => app.Chat.Answer(a, true), Glyph.Check, edge));
+        body.Children.Add(buttons);
         return new Border
         {
-            Child = Ui.V(10, head, detail, buttons), Padding = new Thickness(14), CornerRadius = new CornerRadius(16),
-            Background = new SolidColorBrush(Theme.Rgb(0x1D, 0x1B, 0x26)), BorderBrush = Theme.Solid(Theme.Amber, 0.6), BorderThickness = new Thickness(1.5),
+            Child = body, Padding = new Thickness(14), CornerRadius = new CornerRadius(16),
+            Background = new SolidColorBrush(Theme.Rgb(0x1D, 0x1B, 0x26)), BorderBrush = Theme.Solid(edge, 0.6), BorderThickness = new Thickness(1.5),
         };
     }
 

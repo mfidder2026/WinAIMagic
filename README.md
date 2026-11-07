@@ -27,7 +27,9 @@ WinAIMagic is the Windows version of [MacAIMagic](https://github.com/mfidder2026
 - **Compare** models with the same measurement on your own PC, and export the results.
 - **A local API** on `http://127.0.0.1:8080`: OpenAI (`/v1`), Anthropic (`/v1/messages`) and Responses (`/v1/responses`), so other tools can use your model.
 - **Choose where models live**, on any drive, and move them later without downloading again.
-- **Delete or update a model** on its card. When a newer WinAIMagic names a newer version of a model's files, the card offers **Update**, which downloads only the files that changed.
+- **Delete or update a model** on its card. A downloaded model has **Controleer op update**: in a few seconds, without reading the model's files, it compares them with this version's catalog and asks the maker's server. An update starts at once; otherwise the card says there is none.
+- **System management.** The model can look at this PC (one read-only PowerShell command at a time) and change its settings through a plan you approve, with the current value of each step on the card. Administrator steps share one Windows prompt (UAC), can make a restore point first, and the model can undo a change when you ask. Built-in **skills** give it tested commands per subject (appearance, energy, network, software, startup items, storage, security, diagnosis); add your own. Both are on by default under Settings, Systeembeheer.
+- **Help** in the app: a Hulp page, a ? at the top for the page on screen, and F1.
 - **Cluster** several PCs over USB4, Thunderbolt or ethernet for models on the second engine.
 
 Available in English, Dutch, German and French.
@@ -134,6 +136,7 @@ Beside what it holds of its own, the engine reads the model files from disk; 512
 | Ministral-3-8B Q4 | 5 GB | Apache 2.0 |
 | FLUX.2 Klein 4B (images) | 5 GB | Apache 2.0 |
 | Qwen3.6-35B-A3B Q4 | 22 GB | Qwen community licence, shown before download |
+| Qwen3.6-35B-A3B Heretic Q4 (Qwen3.6 without refusals) | 21 GB | Qwen community licence, shown before download |
 | GLM-5.3-Flash Compact 24 | 95 GB | MIT |
 | MiniMax-M3.1-Flash Compact | 93 GB | MiniMax community licence, shown before download |
 | GLM-5.3-Flash Compact | 109 GB | MIT |

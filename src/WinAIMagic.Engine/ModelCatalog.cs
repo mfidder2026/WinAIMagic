@@ -55,6 +55,8 @@ public sealed record ModelInfo
     [JsonPropertyName("license")] public string? License { get; init; }
     /// <summary>Only recommended for cards up to this size, as under `tier`: for a model on the second engine, which has no tier data.</summary>
     [JsonPropertyName("recommendMaxVramGb")] public double? RecommendMaxVramGb { get; init; }
+    /// <summary>False: a variant of another model (Qwen3.6 Heretic beside Qwen3.6), never the recommendation, even when it is smaller.</summary>
+    [JsonPropertyName("recommend")] public bool Recommend { get; init; } = true;
 
     /// <summary>No routed experts: every token reads all the weights, so nothing can stay behind on the SSD for long.</summary>
     [JsonIgnore] public bool IsPlain => Dense != null && Dense == Memory;

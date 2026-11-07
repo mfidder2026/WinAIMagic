@@ -11,7 +11,7 @@ using Xunit;
 
 namespace WinAIMagic.Chat.Tests;
 
-/// <summary>Each test: its own app data, default settings, Dutch, no web, and no folder.</summary>
+/// <summary>Each test: its own app data, default settings, Dutch, no web, no folder, and no skills or system management.</summary>
 public abstract class ChatTest : IDisposable
 {
     protected readonly string Root;
@@ -25,6 +25,9 @@ public abstract class ChatTest : IDisposable
         Settings.Shared = Settings.Load();
         Settings.Shared.Language = "nl";
         Settings.Shared.WebSearch = false;
+        // skills and system management are on by default; the older tests describe the requests without them
+        Settings.Shared.Skills = false;
+        Settings.Shared.SystemManagement = false;
         WorkspaceTools.Current = null;
         DeveloperTools.MissingOverride = [];
         CommandRunner.ShellOverride = null;

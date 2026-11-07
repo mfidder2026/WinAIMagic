@@ -75,6 +75,13 @@ public sealed class Settings : INotifyPropertyChanged
     public string RightRead { get => Get("allow"); set => Set(value); }
     public string RightWrite { get => Get("ask"); set => Set(value); }
     public string RightRun { get => Get("ask"); set => Set(value); }
+    /// <summary>Instellingen → Systeembeheer, both on by default. Skills: markdown instructions per subject that the model loads
+    /// when it needs them. System management: the model reads this PC's settings and changes them through a plan the user approves.</summary>
+    public bool Skills { get => Get(true); set => Set(value); }
+    public bool SystemManagement { get => Get(true); set => Set(value); }
+    /// <summary>Reading the system (diagnosis) and changing it: "allow", "ask" or "deny". Admin changes always ask.</summary>
+    public string RightSystemRead { get => Get("allow"); set => Set(value); }
+    public string RightSystemChange { get => Get("ask"); set => Set(value); }
     /// <summary>Tests: allow what would be asked.</summary>
     public bool AutoApprove { get => Get(false); set => Set(value); }
     /// <summary>Speculative decoding with the model's multi-token prediction head (GLM, Qwen).</summary>
@@ -98,6 +105,12 @@ public sealed class Settings : INotifyPropertyChanged
     public string Right(WorkspaceRight kind)
     {
         var value = kind == WorkspaceRight.Read ? RightRead : kind == WorkspaceRight.Write ? RightWrite : RightRun;
+        return value == "ask" && AutoApprove ? "allow" : value;
+    }
+
+    public string SystemRight(bool change)
+    {
+        var value = change ? RightSystemChange : RightSystemRead;
         return value == "ask" && AutoApprove ? "allow" : value;
     }
 

@@ -8,7 +8,7 @@ using static WinAIMagic.Core.Support.Lang;
 
 namespace WinAIMagic.App.Views;
 
-/// <summary>Instellingen: the tabs Chat and Engine (560 x 520). A choice counts at once.</summary>
+/// <summary>Instellingen: the tabs Chat, Engine and Systeembeheer (560 x 520). A choice counts at once.</summary>
 public static class SettingsDialog
 {
     private static bool open;
@@ -47,14 +47,17 @@ public static class SettingsDialog
         var bar = new SelectorBar();
         var chat = new SelectorBarItem { Text = L("Chat"), Icon = Ui.Icon(Glyph.Chat) };
         var engine = new SelectorBarItem { Text = L("Engine"), Icon = Ui.Icon(Glyph.Cpu) };
+        var system = new SelectorBarItem { Text = L("Systeembeheer"), Icon = Ui.Icon(Glyph.Gears) };
         bar.Items.Add(chat);
         bar.Items.Add(engine);
-        bar.SelectedItem = tab == 1 ? engine : chat;
+        bar.Items.Add(system);
+        bar.SelectedItem = tab == 1 ? engine : tab == 2 ? system : chat;
         var scroll = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 8, 14, 0) }.At(1);
-        scroll.Content = tab == 1 ? EngineTab(app) : ChatTab();
+        UIElement Content() => bar.SelectedItem == engine ? EngineTab(app) : bar.SelectedItem == system ? SystemTab(app) : ChatTab();
+        scroll.Content = Content();
         bar.SelectionChanged += (_, _) =>
         {
-            scroll.Content = bar.SelectedItem == engine ? EngineTab(app) : ChatTab();
+            scroll.Content = Content();
             scroll.ChangeView(null, 0, null, true);
         };
         host.Children.Add(bar.At(0));
@@ -149,6 +152,33 @@ public static class SettingsDialog
                 Row(L("Poort"), port),
                 Secret(L("API-sleutel (leeg = alleen deze pc)"), s.ApiKey, v => s.ApiKey = v),
                 Note(L("Wijzigingen gelden na het herstarten van de engine. Gebruik 0.0.0.0 alleen met een API-sleutel."))));
+    }
+
+    /// <summary>Skills and system management: both on by default; off, the model gets the same tools and prompt as before.</summary>
+    private static StackPanel SystemTab(AppState app)
+    {
+        var s = Settings.Shared;
+        var warnChange = Note(L("Let op: het model kan dan zonder te vragen instellingen van je gebruiker wijzigen."), Theme.Solid(Theme.Amber));
+        void Warn() => warnChange.Show(s.RightSystemChange == "allow");
+        Warn();
+        var help = Ui.IconBtn(Glyph.Help, () => app.OpenHelp("sysadmin"), L("Hulp bij dit onderdeel"));
+        return Tab(
+            Ui.Row("*,auto", 12, Note(L("Het model kan deze pc voor je bekijken en instellen. Een wijziging keur je eerst goed, en het model kan hem weer ongedaan maken.")), help),
+            Section(L("Skills"),
+                Toggle(L("Skills: instructies per onderwerp, met geteste commando's"), s.Skills, v => s.Skills = v),
+                Ui.Row("*,auto", 12,
+                    Note(L("Eigen skills: een map met een SKILL.md erin. Een eigen skill met dezelfde naam vervangt de ingebouwde.")),
+                    Ui.Btn(L("Open map"), () =>
+                    {
+                        Directory.CreateDirectory(Paths.UserSkills);
+                        Process.Start(new ProcessStartInfo(Paths.UserSkills) { UseShellExecute = true });
+                    }))),
+            Section(L("Deze pc"),
+                Toggle(L("Het model mag deze pc bekijken en instellen"), s.SystemManagement, v => s.SystemManagement = v),
+                Row(L("Systeem lezen (diagnose)"), Pick(Rights(), s.RightSystemRead, v => s.RightSystemRead = v)),
+                Row(L("Systeem wijzigen (een plan dat je goedkeurt)"), Pick(Rights(), s.RightSystemChange, v => { s.RightSystemChange = v; Warn(); })),
+                Note(L("Wijzigingen met beheerdersrechten vragen altijd eerst, en daarna vraagt Windows om toestemming (UAC). Gevoelige instellingen krijgen een waarschuwing. Vraag het model om een wijziging ongedaan te maken.")),
+                warnChange));
     }
 
     // the same choice stands beside the engine's Start button on the models page

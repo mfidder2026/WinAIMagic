@@ -398,6 +398,26 @@
       "license": "qwen-community"
     },
     {
+      "id": "qwen3.6-35b-a3b-heretic-q4",
+      "name": "Qwen3.6-35B-A3B Heretic Q4",
+      "family": "qwen",
+      "summary": "35B MoE · 3B actief · 4 bit · 21 GB in het geheugen · Qwen3.6 zonder weigeringen (Heretic)",
+      "vision": "qwen3.6",
+      "files": [
+        {
+          "local": "qwen3.6-35b-a3b-heretic-q4.gguf",
+          "size": 21233608512,
+          "sha256": "b82f9f2155eb9c07139d48cc3a37880cf9d0edcca345ef6ad829b62941ccbb82",
+          "url": "https://huggingface.co/llmfan46/Qwen3.6-35B-A3B-uncensored-heretic-GGUF/resolve/f70be2db155a4192a59c559ece01572f3cd508ab/Qwen3.6-35B-A3B-uncensored-heretic-Q4_K_M.gguf"
+        }
+      ],
+      "memory": 21222615552,
+      "dense": 1719101952,
+      "engine": "llama",
+      "license": "qwen-community",
+      "recommend": false
+    },
+    {
       "id": "ministral-3-8b-q4",
       "name": "Ministral-3-8B Q4",
       "family": "mistral",

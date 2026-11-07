@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.9.12
+# Parity with MacAIMagic 1.9.13
 
-How this version relates to MacAIMagic at commit `82723b8`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `2631fc9`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -9,6 +9,9 @@ How this version relates to MacAIMagic at commit `82723b8`, the last Mac commit 
 | `MacAIMagicApp`, `AppState` | `App/App.xaml.cs`, `App/AppState.cs`, `App/ShellWindow.cs` | Done |
 | `Chat/ChatClient`, `ChatModels` | `Chat/ChatClient`, `ChatModels`, `ChatTexts`, `StreamThrottle` | Done, tested against real GLM |
 | `Chat/WorkspaceTools` | `Chat/WorkspaceTools`, `CommandRunner`, `KillOnCloseJob` | Done, sandbox extended for Windows |
+| `Chat/Skills`, `skills/*` | `Chat/Skills`, `Core/Resources/skills/*` | Done, Windows skills with the same names |
+| `Chat/SystemTools` | `Chat/SystemTools` | Adapted: PowerShell allowlist, UAC, restore point, registry exports; admin steps not run with a real UAC prompt |
+| `Support/Help`, `help/*` | `Core/Support/HelpCenter`, `App/Views/HelpPage`, `Core/Resources/help/*` | Done, topics written for Windows |
 | `Chat/WebTools`, `WorkspaceNotes` | Same names | Done; web parsers tested on fixtures only |
 | `Documents/Zip`, `XNode`, `DocxPackage`, `DocxModel`, `DocxBuilder`, `DocxFields`, `DocxCompose`, `MarkdownBlocks` | `Documents/` same names | Done |
 | `Documents/DocumentStudio`, `DocumentModels` | `Studio/` same names | Done; one real document on GLM, the fast model beside it only measured by hand |
@@ -22,6 +25,65 @@ How this version relates to MacAIMagic at commit `82723b8`, the last Mac commit 
 | `Views/*` | `App/Views/*` | Done, in code rather than XAML |
 
 ## Taken over since the first port
+
+### Up to `2631fc9` (1.9.13 and the agent features): Controleer op update, skills, system management, help, Qwen3.6 Heretic
+
+- **Taken over, `a09ad3c`, Controleer op update:**
+  - A model that is here and of the catalog's version has **Controleer op update** on its card.
+  - It reads no model file. It compares size and the sha256 in each .ok with this version's catalog, then sends HEAD requests (no redirect followed) for the pinned address and the same file on `main`.
+  - An update of the catalog's files starts at once. Otherwise the card says "Geen update beschikbaar", or that the maker has newer files this version does not use yet, or (no answer) that the files match this version.
+  - Tests:
+    - the Mac's names: AnOldOkIsTrustedOnItsSize, TheMakersServer;
+    - added here: TheMakerHasNewerFilesOrNot and ControleerOpUpdateReadsNoFile, with the model file locked against reading during the check.
+  - TheMakersServer was run for real (WINAIMAGIC_NETWORK_TEST=1): Ministral None, Qwen3.8 None. The Mac expects MakerHasNewer for Qwen3.8 because it still pins the files from before 2026-11-04; this catalog took the new ones over earlier.
+  - In the app (Debug build, own data folder, a hard link to the owner's Ministral), the button said "Geen update beschikbaar." after asking the real server.
+- **Adapted, `8b578c1`, `e3c8c55`, `c882c76`, `2631fc9`, skills and system management:** the same design as the Mac (plan, approval, run, check, undo), with these Windows counterparts.
+  - *Settings:* tab **Systeembeheer** with `Skills` and `SystemManagement`, both on by default. The rights are `RightSystemRead` (allow) and `RightSystemChange` (ask), with the warning for allow and a ? that opens the help. With both off, the model gets the same tools and system prompt as before (test SkillsGoInThePromptOnlyWhenOn).
+  - *Skills:*
+    - The same SKILL.md format; the eight built-in skills have the Mac's names, with `platform: windows`.
+    - They ship embedded in the app (`src/WinAIMagic.Core/Resources/skills`). Your own go in `Skills` in the app data folder, and one with the same name replaces the built-in one.
+    - Only names and descriptions go in the prompt, sorted; `use_skill` gives the text.
+    - Every read command in the skills was run on this PC, read-only. `Get-Counter` fails on a Windows that is not in English (the counters have translated names), so diagnose reads the load with `Win32_PerfFormattedData_*` instead. `powercfg /requests` and `manage-bde -status` need administrator rights, and the skills say so.
+  - *system_read:* one PowerShell command from an allowlist:
+    - any `Get-` cmdlet except Get-Credential;
+    - `powercfg` queries; `ipconfig` without `/release`/`/renew`;
+    - `winget list|show|search`, and `upgrade` without a package;
+    - `reg query`, `netsh … show`, `sc query`, and similar.
+    - `$`, backtick, `@`, `;`, `|`, `&`, `<`, `>`, `(`, `)`, `{`, `}`, `[`, `]` outside quotes are refused. `$` and backtick are refused inside quotes too, since PowerShell expands them there.
+    - A check written as `… 2>$null`, `2>nul`, `-ErrorAction SilentlyContinue` or `|| echo "…"` is read without that tail (`e3c8c55` in PowerShell form).
+  - *system_change:*
+    - Admin steps run together after **one UAC prompt**: the elevated PowerShell runs a script that writes each step's output and status to a log, because an elevated process gives no output back. No in the UAC prompt (error 1223) means nothing changed.
+    - The Mac's bash script runs every command even after one fails. Here the script stops at the first failing step, so the steps after it really are not run (test AdminStepsShareOnePrompt, which runs the same script without UAC).
+    - The card's checkbox makes a **restore point** first (`Checkpoint-Computer`, through Windows PowerShell 5.1 because PowerShell 7 does not have it). A missing restore point does not stop the plan, and the report says whether one was made. Windows makes at most one per 24 hours, and the card says so.
+  - *Undo:*
+    - Every registry key a user step writes (`reg add/delete`, `*-ItemProperty -Path`) is exported before the change.
+    - On undo, a key that still differs is imported again. Values the change added are removed, because `reg import` only adds. Explorer is restarted when a step restarted it.
+    - Test ApplyAndUndoRoundTrip, on `HKCU\Software\WinAIMagicTest`, with a deliberately wrong undo and an added value.
+  - *Warnings, not blocks:*
+    - firewall, Defender, SmartScreen, BitLocker, UAC, users, bcdedit;
+    - permanent deletion, execution policy, hibernation off, a step that elevates itself, iex;
+    - Windows services, proxy, hosts, Windows Update, restart;
+    - and, as on the Mac, a plan after the web or a step without undo.
+  - *The record:* `Changes\<id>\plan.json` in the Mac's JSON format.
+  - *The rest as on the Mac:*
+    - there is no list of changes in the app; undo goes only through `system_undo`, with "Terugzetten:" on each step of its card (`2631fc9`);
+    - an admin card has no "Altijd" button;
+    - only work in a folder needs the model's KLAAR to end (`c882c76`);
+    - system tools do not count for WINAIMAGIC.md.
+  - *Checked in the app* with two scripts added to the fake engine (Debug only), on the test key:
+    - the card showed the step with "Nu:", and after Toestaan the value had changed and the change was recorded;
+    - the admin card showed Beheerder, the restore point checkbox, no Altijd, and the UAC line. After Weigeren nothing changed.
+  - *Not run:* a real UAC prompt with admin steps, a real restore point, and a plan from a real model. Those change this PC's settings, which the owner does themselves.
+- **Adapted, help:**
+  - A **Hulp** page in the sidebar, a ? in the title bar for the page on screen, F1, and a ? in the Systeembeheer tab.
+  - 18 topics in `help/nl` and `help/en`, embedded in the app, written for Windows: VRAM + RAM + SSD, two engines, UAC and a restore point, the app data folder, Ctrl, no Time Machine. Front matter icons are Segoe Fluent names.
+  - The Mac's search scoring and block parsing, and its test names: BothLanguagesHaveTheSameTopics, EveryPageHasItsTopic, Search, Blocks.
+- **Adapted, `c882c76`, Qwen3.6-35B-A3B Heretic Q4:**
+  - The same file at the same commit, with memory and dense from the Mac. `check_catalog.py` found it on the server, headers only.
+  - It is marked `"recommend": false`. Here a model that streams is recommended by the smallest size, and Heretic is 1 GB smaller than Qwen3.6, so it would have become the recommendation on 8 to 16 GB cards. On the Mac the order kept the original.
+  - Licence: the Qwen community licence of the model it comes from, shown before the download. The Mac's commit says Apache-2.0, after the maker's page.
+  - Computed here: it fits in VRAM + RAM wherever Qwen3.6 does (8 GB card with 32 GB RAM). Not downloaded or run here.
+- **Not needed:** `15c5e32` (the Mac's 1.9.13 release).
 
 ### Up to `82723b8` (1.9.12): delete a model, recognise a newer version
 

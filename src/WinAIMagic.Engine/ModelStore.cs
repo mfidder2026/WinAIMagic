@@ -271,6 +271,88 @@ public sealed class ModelStore : IDisposable
 
     public void StartDownload(string id) => StartDownload(id, false);
 
+    public enum UpdateCheck { Update, MakerHasNewer, None, Offline }
+
+    private readonly HashSet<string> checking = new();
+    private readonly Dictionary<string, (string Text, bool Good)> checkResults = new();
+    /// <summary>Models being checked for an update: seconds, a look at the disk and the server, no file is read.</summary>
+    public IReadOnlySet<string> Checking { get { lock (gate) return new HashSet<string>(checking); } }
+    /// <summary>What the last check said, on the card until the next one.</summary>
+    public IReadOnlyDictionary<string, (string Text, bool Good)> CheckResult { get { lock (gate) return new Dictionary<string, (string, bool)>(checkResults); } }
+    /// <summary>HEAD requests that do not follow a redirect: the maker's server names a file's identity in the redirect itself.
+    /// Tests give their own.</summary>
+    internal HttpClient HeadClient { get; set; } = new(new SocketsHttpHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(20) };
+
+    /// <summary>Controleer op update: the files on this PC against this version's catalog (size and the sha256 in their .ok), then the
+    /// maker's server, whether the maker published newer files. An update of the catalog's files is downloaded at once; the maker's
+    /// newer files are not: the app runs the version it was measured with, and a next version takes them over.</summary>
+    public Task CheckForUpdate(string id)
+    {
+        var model = Catalog.Model(id);
+        if (model == null) return Task.CompletedTask;
+        lock (gate)
+        {
+            if (checking.Contains(id) || downloads.ContainsKey(id)) return Task.CompletedTask;
+            checking.Add(id);
+            checkResults.Remove(id);
+        }
+        Changed?.Invoke();
+        var status = StatusOf(id);
+        return Task.Run(async () =>
+        {
+            var outcome = status.UpdateAvailable || !status.IsComplete ? UpdateCheck.Update
+                : await MakerHasNewer(model.Files.Concat(model.Draft is { } d ? new[] { d } : Array.Empty<ModelFile>()), HeadClient);
+            ulong bytes = status.UpdateAvailable ? status.UpdateBytes : status.Expected - Math.Min(status.Have, status.Expected);
+            var result = outcome switch
+            {
+                UpdateCheck.Update => (L($"Update gevonden ({bytes.GbShort()}): die wordt nu gedownload."), true),
+                UpdateCheck.MakerHasNewer => (L("Geen update voor deze versie van WinAIMagic. De maker heeft wel nieuwere bestanden gepubliceerd; de app gebruikt de versie waarmee hij getest is, en een volgende versie van de app neemt de nieuwe over."), true),
+                UpdateCheck.None => (L("Geen update beschikbaar."), true),
+                _ => (L("De server is niet bereikbaar. De bestanden op deze pc kloppen met deze versie van WinAIMagic."), false),
+            };
+            lock (gate)
+            {
+                checking.Remove(id);
+                checkResults[id] = result;
+            }
+            if (outcome == UpdateCheck.Update) StartDownload(id);
+            else Changed?.Invoke();
+        });
+    }
+
+    /// <summary>Asks the server about the maker's newest files against the ones the catalog names: headers only, no download.
+    /// An address pinned to a commit is compared with the same file on main.</summary>
+    public static async Task<UpdateCheck> MakerHasNewer(IEnumerable<ModelFile> files, HttpClient http)
+    {
+        bool answered = false;
+        foreach (var f in files)
+        {
+            if (!PinnedCommit.IsMatch(f.Url)) continue;
+            var newest = PinnedCommit.Replace(f.Url, "/resolve/main/");
+            if (await Head(http, f.Url) is not { } pinned || await Head(http, newest) is not { } latest) continue;
+            answered = true;
+            if (latest.Status is 404 or 410 || latest.Identity != pinned.Identity) return UpdateCheck.MakerHasNewer;
+        }
+        return answered ? UpdateCheck.None : UpdateCheck.Offline;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex PinnedCommit = new("/resolve/[0-9a-f]{40}/");
+
+    /// <summary>The status and identity (the sha256 of a large file, git's own of a small one) of an address, without following it.</summary>
+    private static async Task<(int Status, string Identity)?> Head(HttpClient http, string url)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Head, url);
+            req.Headers.UserAgent.ParseAdd("winaimagic-update-check");
+            using var resp = await http.SendAsync(req);
+            string Header(string name) => resp.Headers.TryGetValues(name, out var v) ? v.FirstOrDefault() ?? "" : "";
+            var etag = Header("x-linked-etag") is { Length: > 0 } linked ? linked : resp.Headers.ETag?.Tag ?? Header("etag");
+            return ((int)resp.StatusCode, etag.Trim('"', 'W', '/'));
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or InvalidOperationException) { return null; }
+    }
+
     /// <summary>Only the image files of a model that is already here, with the same pinned checks.</summary>
     public void StartVisionDownload(string id) => StartDownload(id, true);
 

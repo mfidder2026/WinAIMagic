@@ -242,7 +242,9 @@ public class ThreeTierTests : EngineTest
         Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["qwen3.6-35b-a3b-q4"], small));
         // larger than memory is what the app is for: everything else streams on 32 GB, nothing is too big
         Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["ministral-3-8b-q4"], small));
-        foreach (var m in ModelCatalog.Shared.Models.Where(m => m.Id is not ("qwen3.6-35b-a3b-q4" or "ministral-3-8b-q4")))
+        // Heretic is Qwen3.6 without refusals, a little smaller: it fits where Qwen3.6 does
+        Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["qwen3.6-35b-a3b-heretic-q4"], small));
+        foreach (var m in ModelCatalog.Shared.Models.Where(m => m.Id is not ("qwen3.6-35b-a3b-q4" or "qwen3.6-35b-a3b-heretic-q4" or "ministral-3-8b-q4")))
             Assert.Equal(MemoryPlanner.Fit.Streams, MemoryPlanner.FitFor(m, small));
         Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["deepseek-v4.1-flash-compact"], big));
         Assert.Equal(MemoryPlanner.Fit.Streams, MemoryPlanner.FitFor(byId["deepseek-v4.1-flash-q4"], big));

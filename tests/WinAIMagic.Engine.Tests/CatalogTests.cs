@@ -123,7 +123,7 @@ public class CatalogTests : EngineTest
     [Fact]
     public void CatalogLoads()
     {
-        Assert.Equal(9, C.Models.Count);
+        Assert.Equal(10, C.Models.Count);
         foreach (var m in C.Models)
         {
             Assert.NotEmpty(m.Files);

@@ -98,12 +98,14 @@ public sealed partial class ShellWindow : Window
         var pill = new StatusPill(app);
         var add = Ui.IconBtn(Glyph.NewChat, app.NewConversation, L("Nieuw gesprek"));
         var gear = Ui.IconBtn(Glyph.Settings, () => SettingsDialog.Show(app), L("Instellingen"));
+        var help = Ui.IconBtn(Glyph.Help, app.OpenHelpHere, L("Hulp bij dit onderdeel"));
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(help, L("Hulp bij dit onderdeel"));
         double inset = AppWindow.TitleBar.RightInset / Math.Max(GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96.0, 1);
-        titleBar = Ui.Row($"{SidebarWidth + Theme.PagePadding},auto,*,auto,auto,{Math.Max(inset, 138) + 8}", 4, null, pill, null, add, gear).At(0, 0, 1, 2);
+        titleBar = Ui.Row($"{SidebarWidth + Theme.PagePadding},auto,*,auto,auto,auto,{Math.Max(inset, 138) + 8}", 4, null, pill, null, add, help, gear).At(0, 0, 1, 2);
         titleBar.Height = BarHeight;
         titleBar.VerticalAlignment = VerticalAlignment.Top;
         titleBar.Background = new SolidColorBrush(Colors.Transparent);
-        titleControls = [pill, add, gear];
+        titleControls = [pill, add, help, gear];
         root.Children.Add(titleBar);
         SetTitleBar(titleBar);
         titleBar.Loaded += (_, _) => UpdateCaption();
@@ -113,6 +115,10 @@ public sealed partial class ShellWindow : Window
         var shortcut = new Microsoft.UI.Xaml.Input.KeyboardAccelerator { Key = Windows.System.VirtualKey.N, Modifiers = Windows.System.VirtualKeyModifiers.Control };
         shortcut.Invoked += (_, e) => { app.NewConversation(); e.Handled = true; };
         root.KeyboardAccelerators.Add(shortcut);
+        // F1: the help for the page on screen
+        var f1 = new Microsoft.UI.Xaml.Input.KeyboardAccelerator { Key = Windows.System.VirtualKey.F1 };
+        f1.Invoked += (_, e) => { app.OpenHelpHere(); e.Handled = true; };
+        root.KeyboardAccelerators.Add(f1);
         return root;
     }
 
@@ -158,6 +164,7 @@ public sealed partial class ShellWindow : Window
                 PaneKind.Compare => new ComparePage(app),
                 PaneKind.Cluster => new ClusterPage(app),
                 PaneKind.System => new SystemPage(app),
+                PaneKind.Help => new HelpPage(app),
                 PaneKind.Chat => new ChatPage(app),
                 _ => new ModelsPage(app),
             };
@@ -179,7 +186,7 @@ public sealed partial class ShellWindow : Window
 
     private async Task StartUp()
     {
-        string? pageArg = Arg("page") switch { "Documenten" => "Documents", "Beeld" => "Images", "Vergelijken" => "Compare", "Modellen" => "Models", "Systeem" => "System", var p => p };
+        string? pageArg = Arg("page") switch { "Documenten" => "Documents", "Beeld" => "Images", "Vergelijken" => "Compare", "Modellen" => "Models", "Systeem" => "System", "Hulp" => "Help", var p => p };
         Pane? forced = Enum.TryParse<PaneKind>(pageArg, true, out var kind) ? new Pane(kind, kind == PaneKind.Chat ? app.Store.Selection : null) : null;
         // first run: the models until one is there
         bool ready = app.Host.Store.StatusOf(app.Host.SelectedModelId).IsComplete;

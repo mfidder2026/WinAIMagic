@@ -15,5 +15,8 @@
   <ItemGroup>
     <EmbeddedResource Include="i18n\*.json" LogicalName="i18n.%(Filename).json" />
     <EmbeddedResource Include="Resources\*.json" LogicalName="Resources.%(Filename).json" />
+    <!-- skills/<name>/SKILL.md and help/<language>/<NN-id>.md, read with BundledTexts -->
+    <EmbeddedResource Include="Resources\skills\**\SKILL.md" LogicalName="skills/%(RecursiveDir)SKILL.md" />
+    <EmbeddedResource Include="Resources\help\**\*.md" LogicalName="help/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

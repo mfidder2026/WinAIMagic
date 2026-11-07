@@ -67,5 +67,7 @@ public static class Glyph
         Memory = "", Cpu = "", Bolt = "", Network = "", Refresh = "", Eye = "", Fast = "", Speed = "",
         Heat = "", Star = "", Chat = "", ChevronDown = "", ChevronUp = "", Key = "";
     public const string Think = "\uEA80", Globe = "\uE774", Image = "\uEB9F", Up = "\uE74A", Bullets = "\uE8FD", Blocked = "\uE733", Power = "\uE7E8",
-        Clock = "\uE823", Compress = "\uE73F", ChevronRight = "\uE76C", Close = "\uE711", Terminal = "\uE756", Code = "\uE943";
+        Clock = "\uE823", Compress = "\uE73F", ChevronRight = "\uE76C", Close = "\uE711", Terminal = "\uE756", Code = "\uE943",
+        Help = "\uE897", Shield = "\uEA18", Home = "\uE80F", Library = "\uE8F1", Info = "\uE946", Lightbulb = "\uE82F", Lock = "\uE72E",
+        Keyboard = "\uE765", Repair = "\uE90F", Search = "\uE721", Gears = "\uE9F5";
 }

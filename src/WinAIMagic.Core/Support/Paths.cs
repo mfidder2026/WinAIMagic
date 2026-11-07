@@ -43,6 +43,11 @@ public static class Paths
     public static string ImageLog => Path.Combine(AppData, "image.log");
     public static string GeneralNotes => Path.Combine(AppData, "WINAIMAGIC.md");
 
+    /// <summary>The user's own skills (a folder per skill with SKILL.md); one with the name of a built-in skill replaces it.</summary>
+    public static string UserSkills => Path.Combine(AppData, "Skills");
+    /// <summary>One folder per system change the model made: the plan, the values before and after, and exports for undo.</summary>
+    public static string Changes => Path.Combine(AppData, "Changes");
+
     /// <summary>Documents\WinAIMagic, through the Known Folder API so a OneDrive redirection is followed.</summary>
     public static string DocumentsRoot
     {

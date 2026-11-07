@@ -8,7 +8,7 @@ using WinAIMagic.Studio;
 
 namespace WinAIMagic.App;
 
-public enum PaneKind { Live, Models, Documents, Images, Compare, Cluster, System, Chat }
+public enum PaneKind { Live, Models, Documents, Images, Compare, Cluster, System, Help, Chat }
 
 public readonly record struct Pane(PaneKind Kind, Guid? Conversation = null);
 
@@ -80,6 +80,20 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
         try { a(); }
         catch (Exception e) { App.Log(e); }
     }
+
+    /// <summary>The help topic to show; set by a ? button or F1, read by the help page.</summary>
+    public string HelpTopic { get; private set; } = "start";
+    public event Action? HelpRequested;
+
+    public void OpenHelp(string topic)
+    {
+        HelpTopic = topic;
+        Pane = new Pane(PaneKind.Help);
+        HelpRequested?.Invoke();
+    }
+
+    /// <summary>The help for the page on screen.</summary>
+    public void OpenHelpHere() => OpenHelp(Core.Support.HelpCenter.TopicFor(Pane.Kind.ToString()));
 
     public void Notify()
     {
