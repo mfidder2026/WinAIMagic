@@ -22,7 +22,7 @@ Only paired accounts get an answer. The bot does not react to anyone else, so th
 - When the model is not loaded, it loads for your question. The bot says "Loading the model…"; a large model takes a few minutes. Afterwards it stays loaded.
 - **Photos** go to the model when Images is on.
 - **Text files** up to 1 MB are read along.
-- **Voice messages** WinAIMagic cannot understand on Windows yet.
+- **Voice messages** are understood by the speech model on the PC (Settings → Agent → Speech); you first see what it heard.
 
 ## Approving
 Does the model want to change something, such as writing a file, running a command or using a connector that writes? Then Telegram shows a card with **Allow**, **Deny** and **Always in this conversation**, with the same rights as the chat on the PC.

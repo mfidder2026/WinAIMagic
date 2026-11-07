@@ -61,6 +61,21 @@ if (Has("--diffusion-model"))
     return 0;
 }
 
+// The speech engine: writes what it "heard" into <-of>.txt. The model file holds what happens: "kapot" always fails, "kaart stuk"
+// fails on the card; else the text says the language, where it ran and how many samples the WAV held.
+if (Has("-otxt"))
+{
+    string how = File.Exists(Arg("-m")) ? File.ReadAllText(Arg("-m")).Trim() : "";
+    if (how == "kapot" || (how == "kaart stuk" && !Has("-ng")))
+    {
+        Console.WriteLine("whisper_init: failed to allocate memory, error 2");
+        return 1;
+    }
+    long samples = (new FileInfo(Arg("-f")).Length - 44) / 2;
+    File.WriteAllText(Arg("-of") + ".txt", how == "stil" ? "[BLANK_AUDIO]\n" : $" [muziek]\n hallo in {Arg("-l")}\n op de {(Has("-ng") ? "processor" : "kaart")}, {samples} samples\n", new UTF8Encoding(false));
+    return 0;
+}
+
 string marker = Arg("--marker");
 void Mark(string how)
 {

@@ -18,6 +18,7 @@ using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
 using WinAIMagic.Chat;
 using WinAIMagic.Core.Support;
+using WinAIMagic.Engine;
 using static WinAIMagic.Core.Support.Lang;
 using Automation = Microsoft.UI.Xaml.Automation.AutomationProperties;
 
@@ -42,13 +43,12 @@ public sealed partial class Composer : Grid
     private readonly Grid ringHost = new() { Visibility = Visibility.Collapsed, IsHitTestVisible = false };
     private readonly Storyboard turn = new();
     private readonly Button image, send, stop, mic;
+    private readonly TeachingTip micProblem;
     private readonly TextBlock loading = Ui.Caption(L("Model laden, je vraag gaat daarna vanzelf"));
     /// <summary>A question sent while the model is not loaded: it loads first, and the question goes when it is there.</summary>
     private bool waitingForModel;
     /// <summary>The text before speaking started: what is heard comes after it.</summary>
     private string beforeSpeaking = "";
-    /// <summary>Stops listening and sends after a pause in speaking.</summary>
-    private CancellationTokenSource? silence;
     private readonly ToggleButton think, web, folder;
     private readonly TextBlock folderName = Ui.Label("", 12, null, FontWeights.Medium);
     private readonly RightsButton rights;
@@ -112,17 +112,19 @@ public sealed partial class Composer : Grid
 
         mic = Small(Ui.Icon(Glyph.Mic, 15), ToggleListening, L("Inspreken"));
         Automation.SetName(mic, L("Inspreken"));
-        var micProblem = new TeachingTip { Target = mic, IsLightDismissEnabled = true };
+        micProblem = new TeachingTip { Target = mic, IsLightDismissEnabled = true };
         mic.Loaded += (_, _) => { if (micProblem.XamlRoot == null) micProblem.XamlRoot = mic.XamlRoot; };
+        // the one action the tip has: downloading the speech model
+        micProblem.ActionButtonClick += (_, _) =>
+        {
+            micProblem.IsOpen = false;
+            if (app.SpeechModel is { } m) app.Host.Store.StartDownload(m.Id);
+        };
         Speech.Shared.Changed += () => app.Ui.TryEnqueue(() =>
         {
             Refresh();
-            if (Speech.Shared.Problem is { } why && !micProblem.IsOpen)
-            {
-                micProblem.Subtitle = why;
-                micProblem.IsOpen = true;
-                Speech.Shared.Problem = null;
-            }
+            if (Speech.Shared.Problem is { } why && !micProblem.IsOpen) TellAboutMic(why, offerDownload: false);
+            Speech.Shared.Problem = null;
         });
         Children.Add(micProblem);
         var tools = Ui.H(6, image, Pair(think, ThinkMenu()), web, Pair(folder, FolderMenu()), rights);
@@ -224,9 +226,15 @@ public sealed partial class Composer : Grid
         imageNote.SetIfChanged(tell ? noImages! : "");
         imageNote.Show(tell);
         mic.Show(s.FeatureVoice);
-        var listening = Speech.Shared.Listening;
-        mic.Foreground = listening ? new SolidColorBrush(Theme.Red) : Theme.Secondary;
-        mic.Tip(listening ? L("Stop met luisteren") : L("Inspreken (via Windows-dictee)"));
+        var speech = Speech.Shared;
+        var listening = speech.Listening;
+        mic.Foreground = listening ? new SolidColorBrush(Theme.Red) : speech.Understanding ? Theme.Solid(Theme.Violet) : Theme.Secondary;
+        // the button breathes with the voice, so it is clear that the microphone hears something
+        mic.Opacity = listening ? 0.55 + Math.Min(0.45, speech.Level * 6) : 1;
+        mic.Tip(listening ? L("Stop met luisteren (na twee seconden stilte gaat de vraag vanzelf)")
+            : speech.Understanding ? L("Verstaan…")
+            : app.SpeechDownload is { } fraction ? L($"Het spraakmodel wordt gedownload: {fraction:P0}")
+            : L("Inspreken (verstaan op deze pc)"));
         loading.Show(waitingForModel);
         bool working = Working;
         send.Show(!working);
@@ -245,7 +253,7 @@ public sealed partial class Composer : Grid
             else turn.Stop();
         }
         var model = app.ChatModel;
-        var hint = L($"Vraag {model?.ShortName ?? "DeepSeek"} iets…");
+        var hint = Speech.Shared.Listening ? L("Luisteren…") : Speech.Shared.Understanding ? L("Verstaan…") : L($"Vraag {model?.ShortName ?? "DeepSeek"} iets…");
         if (box.PlaceholderText != hint) box.PlaceholderText = hint;
     }
 
@@ -253,26 +261,34 @@ public sealed partial class Composer : Grid
     {
         var speech = Speech.Shared;
         if (speech.Listening) { speech.StopListening(); return; }
-        beforeSpeaking = box.Text.Length == 0 ? "" : box.Text.TrimEnd() + " ";
-        _ = speech.StartListening(heard => app.Ui.TryEnqueue(() =>
+        if (speech.Understanding) return;
+        if (app.SpeechModel is not { } model) return;
+        if (!app.SpeechModelReady)
         {
-            if (!speech.Listening) return;
+            if (app.SpeechDownload is { } fraction) TellAboutMic(L($"Het spraakmodel wordt gedownload ({fraction:P0}). Daarna kun je inspreken."), offerDownload: false);
+            else TellAboutMic(L($"Om in te spreken is eerst het spraakmodel nodig ({model.Name}, {model.TotalSize.Gb()}). Het verstaat je op deze pc: wat je zegt gaat nergens heen."), offerDownload: true);
+            return;
+        }
+        beforeSpeaking = box.Text.Length == 0 ? "" : box.Text.TrimEnd() + " ";
+        // a pause of two seconds after speaking: the question is done, and it goes by itself
+        _ = speech.StartListening((heard, done) => app.Ui.TryEnqueue(() =>
+        {
             box.Text = beforeSpeaking + heard;
             box.SelectionStart = box.Text.Length;
-            // a pause of two seconds after speaking: the question is done, and it goes by itself
-            silence?.Cancel();
-            var wait = silence = new CancellationTokenSource();
-            _ = Task.Delay(2000, wait.Token).ContinueWith(t =>
-            {
-                if (!t.IsCanceled) app.Ui.TryEnqueue(() => { if (speech.Listening && ReferenceEquals(silence, wait)) Send(); });
-            }, TaskScheduler.Default);
+            if (done) Send();
         }));
+    }
+
+    private void TellAboutMic(string text, bool offerDownload)
+    {
+        micProblem.Subtitle = text;
+        micProblem.ActionButtonContent = offerDownload ? L("Download") : null;
+        micProblem.IsOpen = true;
     }
 
     private async void Send()
     {
         if (Speech.Shared.Listening) Speech.Shared.StopListening();
-        silence?.Cancel();
         if (!CanSend || conversation is not { } id) return;
         if (!app.EngineState.IsRunning)
         {

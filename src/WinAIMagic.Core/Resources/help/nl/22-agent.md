@@ -1,7 +1,7 @@
 ---
 title: Agent: e-mail, browser, programma's en spraak
 icon: Robot
-keywords: agent e-mail mail outlook concept versturen browser website surfen formulier klikken programma besturen ui automation spraak microfoon inspreken voorlezen stem dictee
+keywords: agent e-mail mail outlook concept versturen browser website surfen formulier klikken programma besturen ui automation spraak microfoon inspreken voorlezen stem dictee spraakmodel whisper
 ---
 Onder **Instellingen → Agent** laat je het model ook buiten de chat werken. Alles staat standaard uit, en elke wijziging komt eerst op een kaart.
 
@@ -37,7 +37,9 @@ Zet **Het model mag deze programma's besturen** aan en voeg met **Programma toev
 Zet **Spraak** aan.
 - **Voorlezen**: de luidspreker onder een antwoord leest het voor, met de stemmen van Windows, op deze pc. Met **Lees antwoorden vanzelf voor** gebeurt dat na elk antwoord in het venster.
 - **Stem**: kies een stem in de taal van de app. Meer stemmen komen met een taal in Windows Instellingen → Tijd en taal → Spraak.
-- **Inspreken**: druk op de microfoon naast het invoerveld en spreek je vraag in. Na twee seconden stilte gaat je vraag vanzelf weg; staat het model nog niet aan, dan laadt het eerst. Inspreken gebruikt **Windows-dictee**, en dat gaat via de online spraakdienst van Microsoft. Het werkt pas als je in Windows Instellingen → Privacy en beveiliging → Spraak de online spraakherkenning aanzet, en de microfoon toegang heeft.
-- **Telegram**: spraakberichten kan WinAIMagic op Windows nog niet verstaan.
+- **Inspreken**: druk op de microfoon naast het invoerveld en spreek je vraag in. Na twee seconden stilte gaat je vraag vanzelf weg; staat het model nog niet aan, dan laadt het eerst. Druk je zelf op stoppen, dan komt de tekst in het invoerveld en kun je hem nog aanpassen.
+- **Spraakmodel**: inspreken heeft het spraakmodel nodig (Whisper, 0,6 GB). Download het onder Instellingen → Agent → Spraak, of met de knop die verschijnt als je de eerste keer op de microfoon drukt. Het model verstaat je op deze pc: wat je zegt gaat nergens heen. Met een videokaart duurt een vraag een paar seconden; zonder, of als het geladen model de kaart vult, doet de processor het en duurt het iets langer.
+- **Microfoon**: geeft hij alleen stilte, kijk dan of bureaublad-apps hem mogen gebruiken in Windows Instellingen → Privacy en beveiliging → Microfoon.
+- **Telegram**: spraakberichten verstaat hetzelfde spraakmodel, ook op deze pc.
 
 Een getypte vraag terwijl het model niet geladen is, laadt het model ook eerst; de vraag gaat daarna vanzelf.

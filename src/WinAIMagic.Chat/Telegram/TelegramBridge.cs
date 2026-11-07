@@ -86,8 +86,7 @@ public sealed class TelegramBridge
         {
             if (Transcribe is not { } transcribe)
             {
-                // Windows' own speech recognition reads no recordings
-                await Try(() => bot.Send(chatId, L("Spraakberichten kan WinAIMagic op Windows nog niet verstaan. Typ je vraag, of stuur een foto.")));
+                await Try(() => bot.Send(chatId, L("Spraakberichten kan WinAIMagic hier niet verstaan. Typ je vraag, of stuur een foto.")));
                 return;
             }
             if (!Settings.Shared.FeatureVoice)

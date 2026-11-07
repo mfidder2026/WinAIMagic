@@ -22,7 +22,7 @@ Alleen gekoppelde accounts krijgen antwoord. Op berichten van anderen reageert d
 - Is het model niet geladen, dan laadt het bij je vraag. De bot zegt "Model laden…"; bij een groot model duurt dat een paar minuten. Daarna blijft het model geladen.
 - **Foto's** gaan naar het model als Afbeeldingen aan staat.
 - **Tekstbestanden** tot 1 MB leest het model mee.
-- **Spraakberichten** kan WinAIMagic op Windows nog niet verstaan.
+- **Spraakberichten** verstaat het spraakmodel op de pc (Instellingen → Agent → Spraak); je krijgt eerst te zien wat het hoorde.
 
 ## Goedkeuren
 Wil het model iets wijzigen, zoals een bestand schrijven, een commando uitvoeren of een connector met schrijfrechten gebruiken? Dan krijg je in Telegram een kaart met **Toestaan**, **Weigeren** en **Altijd in dit gesprek**. Dat gebeurt volgens dezelfde rechten als in de chat op de pc.

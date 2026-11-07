@@ -41,6 +41,7 @@ public static class Paths
     public static string EngineLog => Path.Combine(AppData, "engine.log");
     public static string EngineFastLog => Path.Combine(AppData, "engine-fast.log");
     public static string ImageLog => Path.Combine(AppData, "image.log");
+    public static string SpeechLog => Path.Combine(AppData, "speech.log");
     public static string GeneralNotes => Path.Combine(AppData, "WINAIMAGIC.md");
 
     /// <summary>The user's own skills (a folder per skill with SKILL.md); one with the name of a built-in skill replaces it.</summary>

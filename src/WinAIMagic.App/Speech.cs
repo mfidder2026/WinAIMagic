@@ -1,30 +1,25 @@
 using Windows.Media.Core;
 using Windows.Media.Playback;
-using Windows.Media.SpeechRecognition;
 using Windows.Media.SpeechSynthesis;
 using WinAIMagic.Chat.Agent;
 using WinAIMagic.Core.Support;
+using WinAIMagic.Engine;
 using static WinAIMagic.Core.Support.Lang;
 
 namespace WinAIMagic.App;
 
-/// <summary>Speech (Instellingen → Agent): reading answers aloud with Windows' own voices, on this PC, and speaking a question
-/// through Windows' dictation. Windows dictates through Microsoft's online speech service, so that needs "Online speech
-/// recognition" switched on in Windows; reading aloud stays on the PC.</summary>
+/// <summary>Speech (Instellingen → Agent): reading answers aloud with Windows' own voices, and speaking a question, which the speech
+/// engine turns into text. Both stay on this PC.</summary>
 public sealed class Speech
 {
     public static Speech Shared { get; } = new();
 
     private readonly MediaPlayer player = new();
     private SpeechSynthesizer? synth;
-    private SpeechRecognizer? recognizer;
-    private string confirmed = "";
 
     /// <summary>The answer being read aloud now.</summary>
     public Guid? Speaking { get; private set; }
     public bool Listening { get; private set; }
-    /// <summary>What was heard so far (while listening).</summary>
-    public string Heard { get; private set; } = "";
     /// <summary>Why listening did not work, in words for the user.</summary>
     public string? Problem { get; set; }
     /// <summary>Speaking, listening, what was heard or a problem changed. On any thread.</summary>
@@ -84,81 +79,98 @@ public sealed class Speech
 
     // speaking a question
 
-    /// <summary>Starts listening; every change of what was heard goes to onText. Stop with StopListening.</summary>
-    public async Task StartListening(Action<string> onText)
+    /// <summary>Speech to text with the speech engine (AppState.Hear): the samples in, the text or why not.</summary>
+    public Func<short[], Task<(string? Text, string? Error)>>? Hear { get; set; }
+    /// <summary>The recording is with the speech engine now.</summary>
+    public bool Understanding { get; private set; }
+    /// <summary>The loudness of the last piece of sound, 0 to 1, while listening.</summary>
+    public double Level { get; private set; }
+
+    private Microphone? mic;
+    private readonly List<short> recorded = new();
+    private SpeechPause pause = new();
+    private Action<string, bool>? onHeard;
+    /// <summary>The longest question: two minutes.</summary>
+    private const int MostSamples = Audio.Rate * 120;
+
+    /// <summary>Starts listening. When a question is done (two seconds of quiet after speaking) or stopped, the speech engine makes text of
+    /// it and onHeard gets it, with true when it was the pause: then the question goes by itself. onHeard comes on any thread.</summary>
+    public Task StartListening(Action<string, bool> onHeard)
     {
         Problem = null;
-        Heard = confirmed = "";
+        if (Listening || Understanding) return Task.CompletedTask;
+        lock (recorded) recorded.Clear();
+        pause = new SpeechPause();
+        this.onHeard = onHeard;
+        var m = new Microphone();
+        m.OnPiece = Piece;
+        if (m.Start() is int code)
+        {
+            m.Dispose();
+            Problem = code == 2 || code == 6
+                ? L("Er is geen microfoon gevonden. Sluit er een aan, of kies hem in Windows Instellingen → Systeem → Geluid.")
+                : L($"De microfoon kon niet worden geopend (fout {code}). Zet in Windows Instellingen → Privacy en beveiliging → Microfoon de toegang voor bureaublad-apps aan.");
+            Changed?.Invoke();
+            return Task.CompletedTask;
+        }
+        mic = m;
+        Listening = true;
+        Changed?.Invoke();
+        return Task.CompletedTask;
+    }
+
+    private void Piece(short[] piece)
+    {
+        bool done, full;
+        lock (recorded)
+        {
+            recorded.AddRange(piece);
+            full = recorded.Count >= MostSamples;
+        }
+        Level = Audio.Level(piece);
+        done = pause.Add(Level, TimeSpan.FromSeconds(piece.Length / (double)Audio.Rate));
+        Changed?.Invoke();
+        if (done || full) _ = Finish(send: done);
+    }
+
+    /// <summary>Stops listening; what was said goes to the speech engine and into the field, without sending.</summary>
+    public void StopListening() => _ = Finish(send: false);
+
+    private async Task Finish(bool send)
+    {
+        short[] samples;
+        lock (recorded)
+        {
+            if (!Listening) return;
+            Listening = false;
+            samples = recorded.ToArray();
+            recorded.Clear();
+        }
+        var m = mic;
+        mic = null;
+        // the microphone's own thread may be the one asking
+        _ = Task.Run(() => m?.Dispose());
+        Level = 0;
+        bool silent = !pause.HeardSpeech && samples.Length > 0 && Audio.Level(samples) < 0.0005;
+        if (silent)
+        {
+            Problem = L("De microfoon gaf alleen stilte. Staat hij uit, of mogen bureaublad-apps hem niet gebruiken (Windows Instellingen → Privacy en beveiliging → Microfoon)?");
+            Changed?.Invoke();
+            return;
+        }
+        if (Hear is not { } hear) return;
+        Understanding = true;
+        Changed?.Invoke();
         try
         {
-            var language = SpeechRecognizer.SupportedTopicLanguages.FirstOrDefault(l => l.LanguageTag.Equals(Lang, StringComparison.OrdinalIgnoreCase))
-                ?? SpeechRecognizer.SupportedTopicLanguages.FirstOrDefault(l => l.LanguageTag.StartsWith(Lang[..2], StringComparison.OrdinalIgnoreCase));
-            if (language == null)
-            {
-                Problem = L("Windows-dictee is er niet voor deze taal op deze pc.");
-                Changed?.Invoke();
-                return;
-            }
-            var r = new SpeechRecognizer(language);
-            r.Constraints.Add(new SpeechRecognitionTopicConstraint(SpeechRecognitionScenario.Dictation, "dictation"));
-            var compiled = await r.CompileConstraintsAsync();
-            if (compiled.Status != SpeechRecognitionResultStatus.Success) throw new InvalidOperationException(compiled.Status.ToString());
-            r.HypothesisGenerated += (_, e) =>
-            {
-                Heard = (confirmed + " " + e.Hypothesis.Text).Trim();
-                onText(Heard);
-                Changed?.Invoke();
-            };
-            r.ContinuousRecognitionSession.ResultGenerated += (_, e) =>
-            {
-                if (e.Result.Status != SpeechRecognitionResultStatus.Success || e.Result.Text.Length == 0) return;
-                confirmed = (confirmed + " " + e.Result.Text).Trim();
-                Heard = confirmed;
-                onText(Heard);
-                Changed?.Invoke();
-            };
-            r.ContinuousRecognitionSession.Completed += (_, e) =>
-            {
-                if (e.Status != SpeechRecognitionResultStatus.Success && Heard.Length == 0 && Listening)
-                    Problem = Explain(e.Status.ToString(), 0);
-                Listening = false;
-                Changed?.Invoke();
-            };
-            await r.ContinuousRecognitionSession.StartAsync();
-            recognizer = r;
-            Listening = true;
+            var (text, error) = await hear(samples);
+            if (text is { Length: > 0 }) onHeard?.Invoke(text, send);
+            else Problem = error ?? L("Er werd niets verstaan.");
         }
-        catch (Exception e) when (e is System.Runtime.InteropServices.COMException or UnauthorizedAccessException or InvalidOperationException)
+        finally
         {
-            Problem = Explain(e.Message, e.HResult);
-            App.Log(e);
+            Understanding = false;
+            Changed?.Invoke();
         }
-        Changed?.Invoke();
-    }
-
-    /// <summary>The recognizer's error in plain words, with what to do. The user changes Windows' settings, not the app.</summary>
-    public static string Explain(string message, int hresult)
-    {
-        // 0x80045509: the online speech privacy policy is not accepted
-        if (hresult == unchecked((int)0x80045509) || message.Contains("privacy", StringComparison.OrdinalIgnoreCase))
-            return L("Windows-dictee staat uit. Zet in Windows Instellingen → Privacy en beveiliging → Spraak de online spraakherkenning aan, en probeer het opnieuw. Wat je zegt gaat dan via de spraakdienst van Microsoft.");
-        if (hresult == unchecked((int)0x80070005) || message.Contains("denied", StringComparison.OrdinalIgnoreCase))
-            return L("De microfoon is niet toegestaan. Zet in Windows Instellingen → Privacy en beveiliging → Microfoon de toegang voor bureaublad-apps aan.");
-        if (message.Contains("TimeoutExceeded") || message.Contains("NoMatch"))
-            return L("Er werd niets verstaan. Spreek iets dichter bij de microfoon, en druk pas daarna op stoppen.");
-        return L($"De spraakherkenning stopte: {message}");
-    }
-
-    public async void StopListening()
-    {
-        if (!Listening) return;
-        Listening = false;
-        Changed?.Invoke();
-        var r = recognizer;
-        recognizer = null;
-        if (r == null) return;
-        try { await r.ContinuousRecognitionSession.StopAsync(); }
-        catch (Exception e) when (e is System.Runtime.InteropServices.COMException or InvalidOperationException) { }
-        r.Dispose();
     }
 }

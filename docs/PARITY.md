@@ -33,9 +33,17 @@ How this version relates to MacAIMagic at commit `19213aa`, the last Mac commit 
 | `Chat/Agent/AgentTools`, `MailTools` | `Chat/Agent/AgentTools`, `MailTools` (`OutlookMail`) | Adapted: classic Outlook through COM instead of the Mail app; without it a draft goes through mailto: |
 | `Chat/Agent/BrowserTools` | `Chat/Agent/BrowserTools`, `App/BrowserWindow` (WebView2) | Done; the page script is the Mac's, its arguments go in as JSON |
 | `Chat/Agent/ComputerTools` | `Chat/Agent/ComputerTools` (UI Automation, SendInput) | Adapted: programs by .exe path, a Windows never-list, no Alt+F4 or Windows key |
-| `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices (on the PC); dictation through Windows dictation (Microsoft's online service); no SpeechAnalyzer |
+| `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Windows only, after `19213aa`: speech on the PC
+
+- Speaking a question and Telegram voice messages now go to the speech engine (a third engine, beside the image engine, `wam-speech.exe` per backend) with Whisper large-v3-turbo (5 bit, 0.6 GB, in the catalog under `speech`, downloaded from the Agent tab or from the microphone's tip). Windows dictation is gone: it went through Microsoft's online service and its recognizer read no recordings. The Mac already recognizes on the device (SpeechAnalyzer), so this brings Windows to the same place.
+- The microphone through winmm at 16 kHz, in memory; the end of a question is two seconds of quiet after at least 0.3 s of speech, against a floor that follows the room (`SpeechPause`). A stop by hand puts the text in the field without sending.
+- Telegram voice messages (Ogg Opus) are decoded in C# (Concentus) straight to 16 kHz.
+- Where it runs: on the card when 1.6 GB of it is free at that moment (a loaded model may fill it), else on the processor, and a card that refuses falls back to the processor. On the processor the model's window is cut to the recording plus 2 s.
+- Measured on the test PC (RTX 5060 Ti 16 GB, i9-10900K), a Dutch question of 5.7 s spoken by Windows' voice Frank, through the C# code, word for word right apart from a comma: processor 13 s with the full window and 3 to 4.3 s with the cut one; Vulkan 1.4 to 2.4 s (19 s the first time, while the card builds its shaders); CUDA 1.2 to 2.3 s. Not measured: a real microphone, a card beside a loaded model, an 8 GB card or a PC without a card.
 
 ### Up to `19213aa` (1.12.0 and 1.13.0): Telegram, tables, Agent (mail, browser, programs, speech)
 
@@ -242,8 +250,6 @@ The same gaps still exist in MacAIMagic.
 ## Not done yet
 
 **Features**
-
-- **Speech on the PC itself:** dictation goes through Microsoft's online service, and Telegram voice messages are not understood. An on-device recognizer (such as Whisper as an engine of its own) would fix both.
 
 - **AMD:** no HIP engine ships, so AMD cards use the second engine through Vulkan (limited mode).
 - **Images on DeepSeek and MiniMax:** wired (their vision tower goes into the pack, the engine runs it), but those models are not on the reference PC, so this has not run with a real image. GLM on the main engine and Qwen3.6 on the second engine have.

@@ -94,7 +94,11 @@ public sealed record ModelCatalog
     /// <summary>The models that make images, on a page of their own: their files in the order the image engine takes them (the image model, the
     /// text model, the decoder). `Models` is what can chat.</summary>
     [JsonPropertyName("images")] public IReadOnlyList<ModelInfo> Images { get; init; } = Array.Empty<ModelInfo>();
+    /// <summary>The speech model: speaking a question and Telegram voice messages, with the speech engine. Not a model to chat with or compare.</summary>
+    [JsonPropertyName("speech")] public IReadOnlyList<ModelInfo> Speech { get; init; } = Array.Empty<ModelInfo>();
     [JsonIgnore] public IEnumerable<ModelInfo> All => Models.Concat(Images);
+    /// <summary>Everything the model folder can hold: what the store downloads, checks and deletes.</summary>
+    [JsonIgnore] public IEnumerable<ModelInfo> Stored => All.Concat(Speech);
 
     public static ModelCatalog Shared { get; } = Load();
 
@@ -105,6 +109,8 @@ public sealed record ModelCatalog
     }
 
     public ModelInfo? Model(string id) => All.FirstOrDefault(m => m.Id == id);
+    /// <summary>Also the speech model.</summary>
+    public ModelInfo? Find(string id) => Stored.FirstOrDefault(m => m.Id == id);
     public VisionInfo? VisionFor(ModelInfo model) => Vision.FirstOrDefault(v => v.Id == model.Vision);
     public TieredVisionInfo? TieredVisionFor(ModelInfo model) => TieredVision.FirstOrDefault(v => v.Id == model.Vision);
 }

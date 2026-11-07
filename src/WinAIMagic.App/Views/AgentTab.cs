@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using WinAIMagic.Chat.Agent;
 using WinAIMagic.Core.Support;
+using WinAIMagic.Engine;
 using static WinAIMagic.App.Views.SettingsDialog;
 using static WinAIMagic.Core.Support.Lang;
 
@@ -46,8 +47,39 @@ public sealed class AgentTab
                 Toggle(L("Spraak (inspreken en voorlezen)"), s.FeatureVoice, v => s.FeatureVoice = v),
                 Toggle(L("Lees antwoorden vanzelf voor"), s.SpeakAnswers, v => s.SpeakAnswers = v),
                 Row(L("Stem"), voicePick),
-                Note(L("Met de microfoon naast het invoerveld spreek je een vraag in; na twee seconden stilte gaat hij vanzelf. De luidspreker onder een antwoord leest het voor, met de stemmen van Windows, op deze pc. Meer stemmen komen met een taal in Windows Instellingen → Tijd en taal → Spraak.")),
-                Note(L("Inspreken gebruikt Windows-dictee. Dat gaat via de online spraakdienst van Microsoft en werkt pas als je in Windows Instellingen → Privacy en beveiliging → Spraak de online spraakherkenning aanzet. Spraakberichten uit Telegram kan WinAIMagic op Windows nog niet verstaan."), Theme.Solid(Theme.Amber))));
+                SpeechModelRow(),
+                Note(L("Met de microfoon naast het invoerveld spreek je een vraag in; na twee seconden stilte gaat hij vanzelf. Het spraakmodel verstaat je op deze pc, ook spraakberichten uit Telegram: wat je zegt gaat nergens heen. De luidspreker onder een antwoord leest het voor, met de stemmen van Windows, ook op deze pc. Meer stemmen komen met een taal in Windows Instellingen → Tijd en taal → Spraak."))));
+    }
+
+    /// <summary>The speech model: what it is, and downloading or removing it.</summary>
+    private FrameworkElement SpeechModelRow()
+    {
+        var store = app.Host.Store;
+        var model = app.SpeechModel;
+        if (model == null) return new Grid();
+        var state = Ui.Caption("");
+        var bar = new ProgressBar { Minimum = 0, Maximum = 1, Width = 160 };
+        var download = Ui.Btn(L("Download"), () => store.StartDownload(model.Id), Glyph.Download, Theme.Violet);
+        var pause = Ui.Btn(L("Pauzeer"), () => store.StopDownload(model.Id));
+        var remove = Ui.Btn(L("Verwijder"), () => { if (store.DeleteModel(model.Id) is { } why) state.Text = why; });
+        var row = Ui.Row("*,auto", 12, Ui.V(2, Ui.Label(L($"Spraakmodel: {model.Name}"), 14), state), Ui.H(8, bar, download, pause, remove));
+        void Refresh()
+        {
+            bool ready = app.SpeechModelReady;
+            var fraction = app.SpeechDownload;
+            string? error = store.LastError.TryGetValue(model.Id, out var e) ? e : null;
+            state.Text = error ?? (ready ? L($"Gedownload, {model.TotalSize.Gb()}. Verstaat 99 talen, op deze pc.")
+                : fraction is { } f ? L($"Downloaden… {f:P0} van {model.TotalSize.Gb()}")
+                : L($"Nodig om in te spreken, {model.TotalSize.Gb()}. Zonder dit model werkt alleen voorlezen."));
+            bar.Show(fraction != null);
+            if (fraction is { } p) bar.Value = p;
+            download.Show(!ready && fraction == null);
+            pause.Show(fraction != null);
+            remove.Show(ready);
+        }
+        Refresh();
+        app.Watch(row, Refresh);
+        return row;
     }
 
     private void RefreshApps()

@@ -41,6 +41,7 @@ REPO = "mfidder2026/WinAIMagic"
 # what the portable app leaves out and the NVIDIA pack holds, relative to the engine folder
 NVIDIA_FOLDERS = ["cuda", "tiered/bin"]
 IMAGE_EXE = "wam-image.exe"
+SPEECH_EXE = "wam-speech.exe"
 ISCC = Path(os.environ["LOCALAPPDATA"]) / "Programs" / "Inno Setup 6" / "ISCC.exe"
 BUILD = ROOT / "build"
 
@@ -89,6 +90,8 @@ def llama():
                 shutil.copy2(CUDA_BIN / dll, dst / dll)
         # the image engine, per backend (scripts/build-image.bat)
         shutil.copy2(BUILD / f"image-{backend}" / "bin" / "sd-cli.exe", dst / IMAGE_EXE)
+        # the speech engine, per backend (scripts/build-speech.bat)
+        shutil.copy2(BUILD / f"speech-{backend}" / "bin" / "whisper-cli.exe", dst / SPEECH_EXE)
 
 
 def python():
@@ -121,6 +124,9 @@ def notices():
                ("ggml (engine)", ROOT / "engine/tiered/third_party/ggml/LICENSE"),
                ("stable-diffusion.cpp (image engine)", ROOT / "engine/image-engine/LICENSE"),
                ("ggml (image engine)", ROOT / "engine/image-engine/ggml/LICENSE"),
+               ("whisper.cpp (speech engine)", ROOT / "engine/speech-engine/LICENSE"),
+               ("ggml (speech engine)", ROOT / "engine/speech-engine/ggml/LICENSE"),
+               ("Concentus (Opus decoder)", Path.home() / ".nuget/packages/concentus/2.2.2/LICENSE"),
                ("Python", ENGINE / "python/LICENSE.txt")]
     for name, path in sources:
         if path.exists():
@@ -132,6 +138,8 @@ def notices():
         path = third / rel
         if path.exists():
             parts.append(f"\n## {name} (image engine)\n\n```\n{path.read_text(encoding='utf-8', errors='replace').strip()}\n```\n")
+    parts.append("\n## Whisper speech model\n\nThe speech model the app downloads (Whisper large-v3-turbo, in the format of the speech "
+                 "engine) is published by OpenAI under the MIT licence.\n")
     parts.append("\n## NVIDIA CUDA Toolkit runtime libraries\n\ncuBLAS and cuBLASLt are redistributed under the NVIDIA CUDA Toolkit EULA "
                  "(Attachment A). They are used only by this application.\n")
     parts.append("\n## Python packages\n\nnumpy, jinja2, regex, pyyaml, pillow, psutil, jsonschema, tqdm, requests: "
@@ -153,7 +161,7 @@ def scan():
         rel = p.relative_to(APP).as_posix()
         # the image engine is another project: the word only occurs in the vocabularies of its text models, among
         # thousands of others, and never as the name the brief keeps out
-        if rel.startswith("engine/python/Lib") or p.name == IMAGE_EXE:
+        if rel.startswith("engine/python/Lib") or p.name in (IMAGE_EXE, SPEECH_EXE):
             continue
         if p.suffix.lower() in (".py", ".json", ".txt", ".md", ".jinja", ".pdb", ".exe"):
             data = p.read_bytes()

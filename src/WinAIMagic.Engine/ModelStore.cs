@@ -124,7 +124,7 @@ public sealed class ModelStore : IDisposable
     public void Refresh()
     {
         var next = new Dictionary<string, ModelStatus>();
-        foreach (var m in Catalog.All)
+        foreach (var m in Catalog.Stored)
         {
             var dir = Paths.ModelDir(m.Id);
             FileStatus F(string d, string name, ulong size, IReadOnlyList<string> sha) => FileStatusOf(d, name, size, sha);
@@ -220,7 +220,7 @@ public sealed class ModelStore : IDisposable
     /// (brief 2.2). Nothing is lost: a pack that named them is built again, its staleness check sees that.</summary>
     private void AdoptUpstreamNames()
     {
-        foreach (var m in Catalog.All)
+        foreach (var m in Catalog.Stored)
         {
             var dir = Paths.ModelDir(m.Id);
             if (!Directory.Exists(dir)) continue;
@@ -264,7 +264,7 @@ public sealed class ModelStore : IDisposable
         {
             if (!File.Exists(ListFile)) return;
             var list = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(ListFile)) ?? new();
-            foreach (var id in list) if (Catalog.Model(id) != null) StartDownload(id);
+            foreach (var id in list) if (Catalog.Find(id) != null) StartDownload(id);
         }
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { }
     }
@@ -288,7 +288,7 @@ public sealed class ModelStore : IDisposable
     /// newer files are not: the app runs the version it was measured with, and a next version takes them over.</summary>
     public Task CheckForUpdate(string id)
     {
-        var model = Catalog.Model(id);
+        var model = Catalog.Find(id);
         if (model == null) return Task.CompletedTask;
         lock (gate)
         {
@@ -358,7 +358,7 @@ public sealed class ModelStore : IDisposable
 
     private void StartDownload(string id, bool visionOnly)
     {
-        var model = Catalog.Model(id);
+        var model = Catalog.Find(id);
         if (model == null) return;
         if (FolderMissing)
         {
@@ -475,7 +475,7 @@ public sealed class ModelStore : IDisposable
     /// shared between models and stays. On return: null, or why not.</summary>
     public string? DeleteModel(string id)
     {
-        if (Catalog.Model(id) == null) return L("Dit model staat niet in de catalogus.");
+        if (Catalog.Find(id) == null) return L("Dit model staat niet in de catalogus.");
         if (FolderMissing) return FolderMissingMessage;
         if (Downloading.Contains(id)) return L("Dit model wordt nog gedownload. Pauzeer de download eerst.");
         lock (gate) { wanted.Remove(id); errors.Remove(id); messages.Remove(id); }

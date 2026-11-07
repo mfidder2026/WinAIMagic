@@ -9,4 +9,8 @@
     <ProjectReference Include="..\WinAIMagic.Core\WinAIMagic.Core.csproj" />
     <InternalsVisibleTo Include="WinAIMagic.Engine.Tests" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Telegram voice messages are Opus in Ogg: a decoder in C#, MIT/BSD -->
+    <PackageReference Include="Concentus" Version="2.2.2" />
+  </ItemGroup>
 </Project>

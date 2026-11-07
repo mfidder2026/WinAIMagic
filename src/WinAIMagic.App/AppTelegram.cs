@@ -18,6 +18,7 @@ public sealed partial class AppState
         () => BaseUrl, () => EngineState.IsRunning, EnsureModelForChat, ShortStatus)
     {
         AdminNotice = (title, body, conversation) => Notifier.Post(title, body, conversation),
+        Transcribe = HearFile,
     };
 
     /// <summary>A question (typed, spoken or from Telegram) loads the model: it counts as the user's, a task does not stop it.</summary>
@@ -34,6 +35,7 @@ public sealed partial class AppState
     {
         // the browser agent's window lives on the UI thread too
         WinAIMagic.Chat.Agent.BrowserTools.Shared.Host ??= browser = new BrowserWindow(Ui);
+        SetUpSpeech();
         Telegram.Owner = SynchronizationContext.Current;
         _ = TelegramBridge;
         Telegram.Changed += () => Ui.TryEnqueue(Notify);

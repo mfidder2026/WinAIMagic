@@ -1,7 +1,7 @@
 ---
 title: Agent: e-mail, browser, programs and speech
 icon: Robot
-keywords: agent e-mail mail outlook draft send browser website browse form click program control ui automation speech microphone dictate read aloud voice dictation
+keywords: agent e-mail mail outlook draft send browser website browse form click program control ui automation speech microphone dictate read aloud voice dictation speech model whisper
 ---
 Under **Settings → Agent** you let the model work outside the chat too. Everything is off by default, and every change comes on a card first.
 
@@ -37,7 +37,9 @@ Switch on **The model may control these programs** and add the programs it may u
 Switch on **Speech**.
 - **Reading aloud**: the speaker under an answer reads it aloud with Windows' own voices, on this PC. With **Read answers aloud by themselves** that happens after every answer in the window.
 - **Voice**: choose a voice in the app's language. More voices come with a language in Windows Settings → Time & language → Speech.
-- **Speaking**: press the microphone next to the input field and say your question. After two seconds of silence it goes by itself; when the model is not loaded yet, it loads first. Speaking uses **Windows dictation**, which goes through Microsoft's online speech service. It only works once you switch on online speech recognition in Windows Settings → Privacy & security → Speech, and the microphone is allowed.
-- **Telegram**: voice messages WinAIMagic cannot understand on Windows yet.
+- **Speaking**: press the microphone next to the input field and say your question. After two seconds of silence it goes by itself; when the model is not loaded yet, it loads first. When you press stop yourself, the text goes into the input field and you can still change it.
+- **Speech model**: speaking needs the speech model (Whisper, 0.6 GB). Download it under Settings → Agent → Speech, or with the button that appears the first time you press the microphone. The model understands you on this PC: what you say goes nowhere. With a graphics card a question takes a few seconds; without one, or when the loaded model fills the card, the processor does it and it takes a little longer.
+- **Microphone**: when it gives only silence, check that desktop apps may use it in Windows Settings → Privacy & security → Microphone.
+- **Telegram**: voice messages are understood by the same speech model, also on this PC.
 
 A typed question while the model is not loaded also loads the model first; the question goes by itself afterwards.
