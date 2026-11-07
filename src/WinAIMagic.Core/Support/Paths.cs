@@ -48,6 +48,15 @@ public static class Paths
     /// <summary>One folder per system change the model made: the plan, the values before and after, and exports for undo.</summary>
     public static string Changes => Path.Combine(AppData, "Changes");
 
+    /// <summary>Scheduled tasks (Taken).</summary>
+    public static string Tasks => Path.Combine(AppData, "tasks.json");
+    /// <summary>The heartbeat's checklist.</summary>
+    public static string Heartbeat => Path.Combine(AppData, "HEARTBEAT.md");
+    /// <summary>The connectors, in the mcpServers format of Claude Desktop.</summary>
+    public static string McpConfig => Path.Combine(AppData, "mcp.json");
+    /// <summary>A log per connector (its stderr, what failed).</summary>
+    public static string McpLogs => Path.Combine(AppData, "Connectors");
+
     /// <summary>Documents\WinAIMagic, through the Known Folder API so a OneDrive redirection is followed.</summary>
     public static string DocumentsRoot
     {

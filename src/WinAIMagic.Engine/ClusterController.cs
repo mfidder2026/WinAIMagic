@@ -128,16 +128,18 @@ public sealed class ClusterController : IDisposable
     }
 
     /// <summary>Before a start: every selected helper that does not answer on its port stays out of this start, and Problem says
-    /// why in plain words. Returns the helpers that answered.</summary>
+    /// why in plain words; one that answers again takes part again (as on the Mac). Returns the helpers that answered.</summary>
     public IReadOnlyList<Helper> CheckBeforeStart(TimeSpan? timeout = null)
     {
-        var active = Active;
-        var down = active.Where(h => !(ReachOverride?.Invoke(h.Host, h.Port) ?? Reachable(h.Host, h.Port, timeout ?? TimeSpan.FromSeconds(3)))).ToList();
+        List<Helper> chosen;
+        lock (gate) chosen = IsHelperRole ? [] : helpers.Where(h => selected.Contains(h.Id)).ToList();
+        var answers = chosen.AsParallel().Select(h => (h.Id, Up: ReachOverride?.Invoke(h.Host, h.Port) ?? Reachable(h.Host, h.Port, timeout ?? TimeSpan.FromSeconds(3)))).ToList();
+        var down = chosen.Where(h => answers.Any(a => a.Id == h.Id && !a.Up)).ToList();
         lock (gate)
-            foreach (var h in down)
+            foreach (var (id, up) in answers)
             {
-                int i = helpers.FindIndex(x => x.Id == h.Id);
-                if (i >= 0) helpers[i] = helpers[i] with { Unreachable = true };
+                int i = helpers.FindIndex(x => x.Id == id);
+                if (i >= 0) helpers[i] = helpers[i] with { Unreachable = !up };
             }
         var names = string.Join(", ", down.Select(h => h.Name + " (" + h.Id + ")"));
         Problem = down.Count == 0 ? null

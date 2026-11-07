@@ -9,3 +9,5 @@ keywords: privacy veiligheid lokaal cloud gegevens wachtwoord sleutel prompt-inj
 - **Wachtwoorden en sleutels**: de app vraagt nooit om je wachtwoord. Zijn beheerdersrechten nodig, dan vraagt Windows zelf om toestemming (UAC). API-sleutels staan versleuteld in de instellingen.
 - **Prompt-injectie**: een webpagina of bestand kan tekst bevatten die het model probeert te sturen. Daarom keur je wijzigingen zelf goed, en geeft de app een waarschuwing als een plan volgt op het lezen van het web.
 - **Netwerk**: de API en cluster-helpers luisteren standaard alleen op deze pc of op de directe kabel.
+- **Connectors**: een connector op internet stuurt wat het model meegeeft naar die dienst; een connector op deze pc niet. Tokens staan in Windows Referentiebeheer.
+- **Taken**: een taak of heartbeat werkt met dezelfde rechten als een gesprek. Een wijziging wacht altijd op jouw goedkeuring, ook als je er niet bij bent.

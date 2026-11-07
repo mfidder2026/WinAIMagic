@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.9.13
+# Parity with MacAIMagic 1.11.0
 
-How this version relates to MacAIMagic at commit `2631fc9`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `bcaeacd`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -11,6 +11,12 @@ How this version relates to MacAIMagic at commit `2631fc9`, the last Mac commit 
 | `Chat/WorkspaceTools` | `Chat/WorkspaceTools`, `CommandRunner`, `KillOnCloseJob` | Done, sandbox extended for Windows |
 | `Chat/Skills`, `skills/*` | `Chat/Skills`, `Core/Resources/skills/*` | Done, Windows skills with the same names |
 | `Chat/SystemTools` | `Chat/SystemTools` | Adapted: PowerShell allowlist, UAC, restore point, registry exports; admin steps not run with a real UAC prompt |
+| `Chat/ModelGate`, `Chat/WorkSteps` | `Chat/ModelGate`, `Chat/WorkSteps` | Done; a queue per engine (base address), the folder per run as an AsyncLocal |
+| `Chat/MCP/*` (`MCPClient`, `HTTPTransport`, `MCPOAuth`, `MCPManager`) | `Chat/Mcp/*` (`McpClient`, `HttpTransport`, `McpOAuth`, `McpManager`, `McpModels`) | Adapted: cmd /c for what is no .exe, Credential Manager instead of Keychain; tested on the Mac's fake servers, not against a real service |
+| `Chat/MCP/CalendarConnector` | none | Not available: macOS calendar and reminders (EventKit) |
+| `Chat/Tasks`, `TaskTool`, `TaskRunner` (Heartbeat) | `Chat/Tasks` (TaskSchedule, TaskStore, TaskTool, Heartbeat), `App/AppTasks` | Done; the timer catches up after sleep, no wake event |
+| `Support/Notifier`, `Views/MenuBarView` | `App/Notifier` (Windows notifications), `App/TrayIcon` (notification area, Start with Windows) | Adapted |
+| `Views/TasksView`, `TasksSettingsView`, `ConnectorsView`, `StepsCard` | `App/Views/TasksPage`, `SettingsDialog` (tab Taken), `ConnectorsTab`, `ChatPage` (steps) | Done; the connector editor and log open inside the tab (no second dialog over Instellingen) |
 | `Support/Help`, `help/*` | `Core/Support/HelpCenter`, `App/Views/HelpPage`, `Core/Resources/help/*` | Done, topics written for Windows |
 | `Chat/WebTools`, `WorkspaceNotes` | Same names | Done; web parsers tested on fixtures only |
 | `Documents/Zip`, `XNode`, `DocxPackage`, `DocxModel`, `DocxBuilder`, `DocxFields`, `DocxCompose`, `MarkdownBlocks` | `Documents/` same names | Done |
@@ -25,6 +31,35 @@ How this version relates to MacAIMagic at commit `2631fc9`, the last Mac commit 
 | `Views/*` | `App/Views/*` | Done, in code rather than XAML |
 
 ## Taken over since the first port
+
+### Up to `bcaeacd` (1.10.0 and 1.11.0): conversations at once, a step list, tasks and heartbeat, connectors
+
+- **Taken over, `e807ec2`, conversations at once:**
+  - Each conversation has its own run, approval card, stop button and loaded connectors (`ChatClient.IsBusy`, `ApprovalFor`, `Stop(id)`). The folder of a run and its conversation travel as `AsyncLocal` values, so two runs never use each other's folder (`WorkspaceTools.Current` was a plain static: the first run against two folders wrote into the wrong one, caught by the test).
+  - `ModelGate` queues the conversations, first come first served, only while the model writes. Here there is one gate per engine address, so the second engine is not held up by the main one. Nothing yet sends a second conversation to the second engine.
+  - The sidebar shows a ring for a conversation at work and an amber dot for one waiting for approval; its menu has Stoppen, and Verwijderen is grey while it runs. The chat says "Wacht op het model: het schrijft nu in 'X'".
+  - Tests with the Mac's names: ModelGateTests (TurnsInOrder, AStopWhileWaitingLeavesTheQueue), ConcurrentChatTests (ATaskWaitingForApprovalDoesNotHoldUpAnotherChat, StoppingOneConversationLeavesTheOther). The Mac's `fake_engine.py` is a C# handler here (`SlowEngine`), with the same scripts and the count of requests at once.
+- **Taken over, `85f0399`, the step list:** `task_list` with the same arguments, offered with a work folder, system management or a connector; the card above the input with a spinner at the step in progress, folding; a finished list goes with the next question. Tests WorkStepsTests.Parse and ConcurrentChatTests.TheModelsStepListIsKept.
+- **Taken over, `2483a24`:** the done-word (KLAAR, DONE, FERTIG, TERMINÉ) is taken off the final answer; "Klaar!" in ordinary writing stays (test DoneWordIsNotShown). The editor checks of the connector form (a name, a command or an https address, a name not taken; arguments and environment are multi-line, so Enter is no save). The tests already had a conversations file of their own here (`Paths.AppData` per test).
+- **Taken over, `1dbfeda`, `09aacfc`, `763b52d`, `cb2371a`, `1cf0094`, tasks and heartbeat:**
+  - The same schedules and rules (once; daily or weekdays; weekly; every N hours within active hours, also past midnight; 12 hours to catch up; a single run switches itself off), with clock times in the PC's time zone. The Mac's TasksTests run here with their names (Europe/Amsterdam around 29 March and 25 October 2026), plus TaskToolTests, HeartbeatTests and a test of `schedule_task` through the card (TheModelPlansATaskThroughTheCard).
+  - The planner looks every 30 seconds. There is no wake event here (the system events package is not in this app): after sleep the next tick comes within 30 s and a missed run is made up for then.
+  - Each run is a conversation "⏱ title · date"; the model is loaded when needed and stopped again afterwards if a task loaded it and the user did not use it (Instellingen → Taken). During a run the PC does not sleep (`SetThreadExecutionState`, not the screen).
+  - Notifications are Windows notifications (Windows App SDK); a click opens the conversation. A copy with `--data` registers none and shows a balloon on the tray icon instead.
+  - The page **Taken** (between Beeld and Cluster, in the owner's order) with Nu uitvoeren, "Model laden…" while it loads, Bewerken, Verwijderen and Laatste uitvoeringen. The editor is a dialog.
+  - The heartbeat as on the Mac (off by default, `HEARTBEAT.md` whose example counts as empty, NIETS leaves no conversation), with its settings in the tab **Taken**.
+- **Adapted, `663afe1`, the background:** a tray icon instead of the menu bar (status, next task, the heartbeat, Open, Taken, Nu controleren, Alles stoppen, WinAIMagic afsluiten). With tasks or a heartbeat on, closing the window hides it and the model stops unless something runs; without, the app quits as before. **Opstarten met Windows** writes the user's Run key (off by default; `--background` starts straight in the tray); no test switches it.
+- **Adapted, `04e001a`, connectors (MCP):**
+  - `mcp.json` in the app data folder in Claude Desktop's format with the Mac's extra fields; `keychain:<name>` values come from the Windows Credential Manager (split over several credentials when a value is longer than one holds). Import from `%APPDATA%\Claude\claude_desktop_config.json` and `%USERPROFILE%\.claude.json`, switched off.
+  - Stdio: a program found as an .exe starts directly, anything else (npx.cmd, uvx shims, a .bat) through `cmd /d /s /c`, in a Job Object so it stops with the app. Streamable HTTP with JSON or SSE, the session id and a DELETE at the end; OAuth as on the Mac with a listener on 127.0.0.1.
+  - Loading on demand (`use_connector`), kept per conversation, the same tool names, rights, card with the arguments as JSON and the warnings.
+  - Presets: Bestanden (npx), Web ophalen (uvx) and GitHub (a token). **Agenda en Herinneringen** is the Mac's own (EventKit) and is listed as not available on Windows.
+  - Tests with the Mac's names on its own fake servers (`fake_mcp_stdio.py`, `fake_mcp_http.py`): HandshakeToolsAndCalls, StoppedProgramFailsInsteadOfHanging, JsonAndServerSentEvents, UnauthorizedWithoutOAuthSaysSo, OAuthLoginEndToEnd, ToolNamesAndDecisions, ConfigFileRoundTripInClaudeDesktopFormat, ManagerWithStdioConnector, ServerSentEventsParsing, PKCEAndMetadataAddresses. Added here: AProgramThatIsNoExeStartsThroughCmd, ArgumentsAreQuotedAsTheyAreReadBack, SecretsInTheCredentialManager (a real write, read and delete), ImportFromClaudeComesInSwitchedOff, and TheModelLoadsAConnectorAndAsksBeforeAChange (the chat loads the fake connector, runs the read-only tool without a card and asks for the destructive one).
+  - Not run: a real online service, GitHub with a token, the npx and uvx presets (they download packages), a real model choosing a connector.
+- **Taken over, `66cd607`:** a helper that answers again takes part again (Windows kept it marked); the reachability check now asks every chosen helper at once.
+- **Checked in the app** (Debug build, own data folder, fake engine): the sidebar order; conversation A waited on its approval card while B got its answer, with the amber dot at A; the step list (1/3, a struck-through step); "maak een taak" gave the card "Taak plannen: Schijfoverzicht / Elke werkdag om 08:00" and the task on the Taken page with its next run; Nu uitvoeren made "⏱ Schijfoverzicht" under Laatste uitvoeringen; the Connectors tab added a connector to the fake stdio server, Test verbinding said "Werkt: 3 tools", and it was saved in `mcp.json`; the Taken tab; closing the window with a task on left the app running with the window hidden. The connector list first failed to come back after the editor (an element reused in the tree); fixed before this commit.
+- **Not checked:** a Windows notification on screen and its click, the tray menu by hand, Start with Windows, a task starting on its own at its time, a heartbeat with a real model, connectors with a real model.
+- **Not needed:** `ed32830` and `bcaeacd` (the Mac's releases), and the rest of `66cd607` (it took Windows over).
 
 ### Up to `2631fc9` (1.9.13 and the agent features): Controleer op update, skills, system management, help, Qwen3.6 Heretic
 

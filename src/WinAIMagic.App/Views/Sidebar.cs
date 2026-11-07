@@ -19,7 +19,7 @@ public sealed partial class Sidebar : Grid
     private readonly TextBlock modelName = Ui.Label("", 12, Theme.Secondary);
     private readonly StackPanel chats = new() { Spacing = 2 };
     private readonly Dictionary<PaneKind, (Button Button, FontIcon Icon)> nav = new();
-    private readonly Dictionary<Guid, (Button Button, TextBlock Title, TextBlock Time)> chatRows = new();
+    private readonly Dictionary<Guid, (Button Button, TextBlock Title, TextBlock Time, ProgressRing Busy, Microsoft.UI.Xaml.Shapes.Ellipse Waiting)> chatRows = new();
     private string chatOrder = "";
     private Pane pane;
 
@@ -44,9 +44,10 @@ public sealed partial class Sidebar : Grid
         list.Margin = new Thickness(10, 2, 10, 8);
         foreach (var (kind, title, glyph) in new[]
         {
+            // the owner's order (as on the Mac)
             (PaneKind.Live, L("Live"), Glyph.Live), (PaneKind.Models, L("Modellen"), Glyph.Models), (PaneKind.Documents, L("Documenten"), Glyph.Document),
-            (PaneKind.Images, L("Beeld"), Glyph.Image),
-            (PaneKind.Compare, L("Vergelijken"), Glyph.Compare), (PaneKind.Cluster, L("Cluster"), Glyph.Cluster), (PaneKind.System, L("Systeem"), Glyph.System), (PaneKind.Help, L("Hulp"), Glyph.Help),
+            (PaneKind.Images, L("Beeld"), Glyph.Image), (PaneKind.Tasks, L("Taken"), Glyph.Tasks), (PaneKind.Cluster, L("Cluster"), Glyph.Cluster),
+            (PaneKind.Compare, L("Vergelijken"), Glyph.Compare), (PaneKind.System, L("Systeem"), Glyph.System), (PaneKind.Help, L("Hulp"), Glyph.Help),
         })
         {
             var icon = Ui.Icon(glyph, 15, Theme.Secondary);
@@ -90,7 +91,8 @@ public sealed partial class Sidebar : Grid
     private void Update()
     {
         modelName.SetIfChanged(app.Host.SelectedModel?.Name ?? "");
-        var list = app.Store.Conversations;
+        // a heartbeat check with nothing to report yet is not shown
+        var list = app.Store.Conversations.Where(c => c.Hidden != true).ToList();
         var order = string.Join(",", list.Select(c => c.Id));
         if (order != chatOrder)
         {
@@ -101,14 +103,30 @@ public sealed partial class Sidebar : Grid
             {
                 var id = c.Id;
                 TextBlock title = Ui.Label("", 13), time = Ui.Label("", 11, Theme.Tertiary);
-                var row = Row(Ui.V(1, title, time), () => app.Pane = new Pane(PaneKind.Chat, id));
-                ((StackPanel)row.Content).MaxWidth = 210;
+                // at work, or waiting for the user's approval
+                var busy = new ProgressRing { Width = 12, Height = 12, IsActive = false, Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Center };
+                busy.Tip(L("Bezig"));
+                var waiting = new Microsoft.UI.Xaml.Shapes.Ellipse { Width = 7, Height = 7, Fill = Theme.Solid(Theme.Amber), Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Center };
+                waiting.Tip(L("Wacht op jouw goedkeuring"));
+                var texts = Ui.V(1, title, time);
+                var content = Ui.Row("*,auto", 6, texts, new Grid { Children = { busy, waiting } });
+                content.Width = 210;
+                var row = Row(content, () => app.Pane = new Pane(PaneKind.Chat, id));
                 var menu = new MenuFlyout();
+                var stop = new MenuFlyoutItem { Text = L("Stoppen"), Icon = Ui.Icon(Glyph.Stop) };
+                stop.Click += (_, _) => app.Chat.Stop(id);
                 var delete = new MenuFlyoutItem { Text = L("Verwijderen"), Icon = Ui.Icon(Glyph.Trash) };
                 delete.Click += (_, _) => Delete(id);
+                menu.Items.Add(stop);
                 menu.Items.Add(delete);
+                menu.Opening += (_, _) =>
+                {
+                    bool working = app.Chat.IsBusy(id);
+                    stop.Visibility = working ? Visibility.Visible : Visibility.Collapsed;
+                    delete.IsEnabled = !working;
+                };
                 row.ContextFlyout = menu;
-                chatRows[id] = (row, title, time);
+                chatRows[id] = (row, title, time, busy, waiting);
                 chats.Children.Add(row);
             }
             Mark(pane);
@@ -119,6 +137,10 @@ public sealed partial class Sidebar : Grid
             if (row.Title.Text != c.DisplayTitle) Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(row.Button, c.DisplayTitle);
             row.Title.SetIfChanged(c.DisplayTitle);
             row.Time.SetIfChanged(Ago(c.Updated));
+            bool asks = app.Chat.ApprovalFor(c.Id) != null, working = !asks && app.Chat.IsBusy(c.Id);
+            row.Waiting.Visibility = asks ? Visibility.Visible : Visibility.Collapsed;
+            row.Busy.Visibility = working ? Visibility.Visible : Visibility.Collapsed;
+            if (row.Busy.IsActive != working) row.Busy.IsActive = working;
         }
     }
 

@@ -31,6 +31,9 @@ WinAIMagic is the Windows version of [MacAIMagic](https://github.com/mfidder2026
 - **System management.** The model can look at this PC (one read-only PowerShell command at a time) and change its settings through a plan you approve, with the current value of each step on the card. Administrator steps share one Windows prompt (UAC), can make a restore point first, and the model can undo a change when you ask. Built-in **skills** give it tested commands per subject (appearance, energy, network, software, startup items, storage, security, diagnosis); add your own. Both are on by default under Settings, Systeembeheer.
 - **Help** in the app: a Hulp page, a ? at the top for the page on screen, and F1.
 - **The app knows itself.** Ask in the chat for what you want done in WinAIMagic ("download the model that suits this PC", "turn thinking off", "make a skill for C64 assembler", "make an image of ...") and the model does it after your approval on a card. It reads the app's own help and state for that. Its own rights, API keys and the server address it cannot change.
+- **Connectors (MCP).** Tools of other programs and services, in the mcpServers format of Claude Desktop: Files, Fetch web and GitHub ready to add, your own, or imported from Claude Desktop and Claude Code. The model loads a connector only when it needs it; read-only tools run, others ask first per connector. Online services log in with OAuth in your own browser, and tokens go into the Windows Credential Manager.
+- **Tasks and heartbeat.** The model runs a task at a set moment (once, daily or weekdays, weekly, every few hours), planned on the Tasks page or by asking in a chat, each run a conversation of its own with a Windows notification. A heartbeat now and then goes through a checklist and only speaks up when there is something (off by default). With tasks or a heartbeat on, closing the window keeps the app in the notification area; it can start with Windows.
+- **Conversations at once.** Each conversation has its own run, approval card and stop button; they take turns for the model. Larger work shows a step list above the input field.
 - **Cluster** several PCs over USB4, Thunderbolt or ethernet for models on the second engine.
 
 Available in English, Dutch, German and French.
@@ -150,7 +153,7 @@ Read the model licences before using a model commercially. Only Ministral, Qwen3
 
 ## Privacy
 
-Only web search and model downloads go out, and web search can be turned off. There is no telemetry and no update check.
+Only web search, model downloads and connectors on the internet you add yourself go out, and web search can be turned off. There is no telemetry and no update check.
 
 ## Build from source
 

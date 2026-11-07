@@ -29,8 +29,10 @@ public partial class App : Application
         TakeModelFolderFromSetup();
         var state = new AppState();
         window = new ShellWindow(state, args);
-        Program.Woken += () => state.Ui.TryEnqueue(() => window.BringToFront());
+        Program.Woken += () => state.Ui.TryEnqueue(() => window.ShowFromTray());
         window.Activate();
+        // started with Windows: straight to the notification area, when there is something to do in the background
+        if (args.Contains("--background") && state.HasBackgroundWork && Settings.Shared.StayInTray) window.HideToTray(stopModel: false);
     }
 
     /// <summary>Inno Setup writes the system's ANSI code page; a folder name with an accent is not valid UTF-8 then.</summary>

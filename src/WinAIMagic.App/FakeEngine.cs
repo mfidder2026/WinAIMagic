@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 namespace WinAIMagic.App;
 
 /// <summary>Hidden, debug builds only (--fake-engine): a scripted stand-in for the engine on a local port, so the chat can be tried
-/// without a model. The last question picks the script: stappen, schrijf, systeemwijziging, beheerder, commando, 4000 code, 4000 tekst, fout, nudge, amber, rood, traag.</summary>
+/// without a model. The last question picks the script: stappen, schrijf, systeemwijziging, beheerder, plan, taak, commando, 4000 code, 4000 tekst, fout, nudge, amber, rood, traag.</summary>
 internal static class FakeEngine
 {
     public static Uri Start()
@@ -195,6 +195,17 @@ internal static class FakeEngine
                 }),
             };
             await ToolCall(s, "system_change", plan.ToJsonString(), "call_s");
+            finish = "tool_calls";
+        }
+        else if (ask.Contains("plan") && tools == 0)
+        {
+            // the step list above the composer
+            await ToolCall(s, "task_list", "{\"steps\":[{\"title\":\"Eerst kijken\",\"status\":\"done\"},{\"title\":\"Dan bouwen\",\"status\":\"doing\"},{\"title\":\"Testen\",\"status\":\"todo\"}]}", "call_p");
+            finish = "tool_calls";
+        }
+        else if (ask.Contains("taak") && tools == 0)
+        {
+            await ToolCall(s, "schedule_task", "{\"title\":\"Schijfoverzicht\",\"prompt\":\"Hoeveel ruimte is er vrij op C:?\",\"when\":\"weekdays\",\"time\":\"08:00\"}", "call_t");
             finish = "tool_calls";
         }
         else if (ask.Contains("commando") && tools == 0)

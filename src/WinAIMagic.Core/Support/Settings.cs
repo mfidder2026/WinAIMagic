@@ -84,6 +84,21 @@ public sealed class Settings : INotifyPropertyChanged
     /// <summary>Reading the system (diagnosis) and changing it: "allow", "ask" or "deny". Admin changes always ask.</summary>
     public string RightSystemRead { get => Get("allow"); set => Set(value); }
     public string RightSystemChange { get => Get("ask"); set => Set(value); }
+    /// <summary>Instellingen → Taken: the model a task started stops again when the tasks are done and the user did not use it meanwhile.</summary>
+    public bool TasksStopModel { get => Get(true); set => Set(value); }
+    /// <summary>Now and then the model goes through HEARTBEAT.md, and only speaks up when there is something (off by default).</summary>
+    public bool Heartbeat { get => Get(false); set => Set(value); }
+    public int HeartbeatMinutes { get => Get(60); set => Set(value); }
+    public int HeartbeatFrom { get => Get(8); set => Set(value); }
+    public int HeartbeatTo { get => Get(22); set => Set(value); }
+    /// <summary>A heartbeat may load the model; off, it only checks while the model is loaded anyway.</summary>
+    public bool HeartbeatMayLoad { get => Get(false); set => Set(value); }
+    /// <summary>When the last heartbeat ran (ISO 8601); empty: never.</summary>
+    public string HeartbeatLast { get => Get(""); set => Set(value); }
+    /// <summary>With the window closed the app stays in the notification area while there are tasks or a heartbeat.</summary>
+    public bool StayInTray { get => Get(true); set => Set(value); }
+    /// <summary>Closing the window stops the model (unless something is running), so its memory is free again.</summary>
+    public bool StopModelOnClose { get => Get(true); set => Set(value); }
     /// <summary>Tests: allow what would be asked.</summary>
     public bool AutoApprove { get => Get(false); set => Set(value); }
     /// <summary>Speculative decoding with the model's multi-token prediction head (GLM, Qwen).</summary>

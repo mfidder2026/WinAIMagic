@@ -174,6 +174,8 @@ public sealed class HelpPage : IPage
         "Keyboard" => Glyph.Keyboard,
         "Lock" => Glyph.Lock,
         "Repair" => Glyph.Repair,
+        "Connect" => Glyph.Connect,
+        "Tasks" => Glyph.Tasks,
         _ => Glyph.Help,
     };
 }

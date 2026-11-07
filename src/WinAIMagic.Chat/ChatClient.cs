@@ -45,7 +45,21 @@ public sealed class ChatClient(HttpClient? http = null)
     /// <summary>How many times in a row the model is told to go on without it doing anything in between.</summary>
     public const int MaxNudges = 3;
 
-    public bool Busy { get; private set; }
+    /// <summary>Any conversation at work.</summary>
+    public bool Busy { get { lock (sync) return runs.Count > 0; } }
+    /// <summary>This conversation has a run going: each works on its own, and they take turns for the model (Gate).</summary>
+    public bool IsBusy(Guid conversation) { lock (sync) return runs.ContainsKey(conversation); }
+    /// <summary>The conversations with a run going.</summary>
+    public IReadOnlyList<Guid> Running { get { lock (sync) return [.. runs.Keys]; } }
+    /// <summary>The conversation a run works for, carried through every await of that run.</summary>
+    public static Guid? RunConversation => runConversation.Value;
+    private static readonly AsyncLocal<Guid?> runConversation = new();
+    /// <summary>A conversation got a question (the user's, or a task's).</summary>
+    public event Action<Guid>? Sent;
+    /// <summary>A conversation's run ended (the scheduler hears of its tasks this way).</summary>
+    public event Action<Guid>? Finished;
+    /// <summary>A run waits for the user's approval (a task in the background gives a notification).</summary>
+    public event Action<Approval>? ApprovalAsked;
     /// <summary>Summarizing the start of a conversation to free context.</summary>
     public bool Compacting { get; private set; }
     /// <summary>Writing down what this task taught the model, for WINAIMAGIC.md.</summary>
@@ -54,14 +68,40 @@ public sealed class ChatClient(HttpClient? http = null)
     public int ContextLimit { get; set; } = 65_536;
     /// <summary>The model the engine runs, for the system prompt.</summary>
     public string ModelName { get; set; } = "DeepSeek-V4.1-Flash";
-    public Approval? PendingApproval { get; private set; }
+    /// <summary>A question waiting for an answer, of any conversation.</summary>
+    public Approval? PendingApproval { get { lock (sync) return approvals.Values.FirstOrDefault(); } }
+    /// <summary>The approval this conversation waits for.</summary>
+    public Approval? ApprovalFor(Guid conversation) { lock (sync) return approvals.GetValueOrDefault(conversation); }
     /// <summary>The card's "make a restore point first" (admin plans); on again for every new admin card.</summary>
     public bool Snapshot { get; set; } = true;
 
-    /// <summary>The loop that Send started; done when Busy goes false.</summary>
+    /// <summary>The loop that Send started last; done when that conversation's run ends.</summary>
     public Task Completion { get; private set; } = Task.CompletedTask;
+    /// <summary>This conversation's run, or a finished task.</summary>
+    public Task CompletionOf(Guid conversation) { lock (sync) return runs.GetValueOrDefault(conversation)?.Task ?? Task.CompletedTask; }
 
-    /// <summary>Busy, Compacting, Learning or PendingApproval changed.</summary>
+    /// <summary>The engine's queue for one base address (the main and the second engine each have their own).</summary>
+    public ModelGate Gate(Uri baseUrl)
+    {
+        lock (sync)
+        {
+            var key = baseUrl.GetLeftPart(UriPartial.Authority);
+            if (!gates.TryGetValue(key, out var gate)) gates[key] = gate = new ModelGate();
+            return gate;
+        }
+    }
+
+    /// <summary>The conversation the model is writing for while this one waits its turn; null when it does not wait.</summary>
+    public Guid? WaitingBehind(Guid conversation)
+    {
+        Uri? url;
+        lock (sync) url = runs.GetValueOrDefault(conversation)?.BaseUrl;
+        if (url == null) return null;
+        var gate = Gate(url);
+        return gate.Waiting.Contains(conversation) && gate.Holder is { } other && other != conversation ? other : null;
+    }
+
+    /// <summary>Busy, Compacting, Learning, an approval or a queue changed.</summary>
     public event Action? StateChanged;
     /// <summary>New text in a message (conversation, message, content, reasoning): at most every 0.1 s, never synchronous
     /// with the stream, on the thread Send was called on. The store has the text already.</summary>
@@ -74,28 +114,53 @@ public sealed class ChatClient(HttpClient? http = null)
     /// counts as no.</summary>
     public Func<Approval, CancellationToken, Task<ApprovalAnswer>>? AskUser { get; set; }
 
-    private CancellationTokenSource? cts;
-    private TaskCompletionSource<bool>? approvalAnswer;
+    private sealed class RunState(CancellationTokenSource cts, Uri baseUrl)
+    {
+        public CancellationTokenSource Cts { get; } = cts;
+        public Uri BaseUrl { get; } = baseUrl;
+        public Task Task { get; set; } = Task.CompletedTask;
+    }
+
+    private readonly object sync = new();
+    private readonly Dictionary<Guid, RunState> runs = [];
+    private readonly Dictionary<Guid, Approval> approvals = [];
+    private readonly Dictionary<Guid, TaskCompletionSource<bool>> answers = [];
+    private readonly Dictionary<string, ModelGate> gates = [];
+    /// <summary>The connectors each running conversation loaded.</summary>
+    private readonly Dictionary<Guid, List<string>> loaded = [];
+    /// <summary>The connectors of the conversation that runs, for its requests.</summary>
+    private List<string> LoadedConnectors
+    {
+        get { lock (sync) return RunConversation is { } id && loaded.TryGetValue(id, out var l) ? [.. l] : []; }
+        set { lock (sync) if (RunConversation is { } id) loaded[id] = [.. value]; }
+    }
+    private static McpManager? Connectors => McpManager.Shared;
+    /// <summary>Where schedule_task puts what the model plans (the app's tasks); null: no such tool.</summary>
+    public TaskStore? Tasks { get; set; }
     /// <summary>Conversations where the user chose "always allow", for this app session.</summary>
     private readonly HashSet<Guid> trusted = [];
     /// <summary>The notes as they were before this conversation's lessons went in: the model knows those already, and a changed
     /// system prompt would make the engine read the whole conversation again. An edit by the user counts at once.</summary>
     private (Guid Conversation, DateTime? Modified, string? Text)? frozenNotes;
-    private Guid? currentConversation;
 
     /// <summary>Web questions need a few rounds; work in a folder (read, write, run, read the log, fix) needs many more.</summary>
-    private int MaxToolRounds => WorkspaceActive || Settings.Shared.SystemManagement ? 200 : 20;
+    private int MaxToolRounds => WorkspaceActive || Settings.Shared.SystemManagement || LoadedConnectors.Count > 0 ? 200 : 20;
     private static bool WorkspaceActive => Settings.Shared.WorkspaceTools && WorkspaceTools.Workspace != null;
 
     public void Answer(Approval approval, bool allow, bool always = false)
     {
-        if (always) trusted.Add(approval.Conversation);
-        var waiting = approvalAnswer;
-        approvalAnswer = null;
-        PendingApproval = null;
+        TaskCompletionSource<bool>? waiting;
+        lock (sync)
+        {
+            if (always) trusted.Add(approval.Conversation);
+            answers.Remove(approval.Id, out waiting);
+            if (approvals.TryGetValue(approval.Conversation, out var a) && a.Id == approval.Id) approvals.Remove(approval.Conversation);
+        }
         waiting?.TrySetResult(allow);
         StateChanged?.Invoke();
     }
+
+    private bool IsPending(Approval approval) { lock (sync) return answers.ContainsKey(approval.Id); }
 
     private Task<bool> AskApproval(ToolCall call, Guid conversation, CancellationToken ct)
     {
@@ -106,14 +171,18 @@ public sealed class ChatClient(HttpClient? http = null)
     /// <summary>"Always in this conversation" covers everything but admin rights: those are asked every time.</summary>
     private async Task<bool> Ask(Approval approval, CancellationToken ct)
     {
-        if (trusted.Contains(approval.Conversation) && !approval.Admin) return true;
+        lock (sync) if (trusted.Contains(approval.Conversation) && !approval.Admin) return true;
         if (approval.Admin) Snapshot = true;
         var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        approvalAnswer = answer;
-        PendingApproval = approval;
+        lock (sync)
+        {
+            answers[approval.Id] = answer;
+            approvals[approval.Conversation] = approval;
+        }
         StateChanged?.Invoke();
+        ApprovalAsked?.Invoke(approval);
         // Stop is a no, also when it comes in just before the question stands
-        using var stop = ct.Register(() => { if (PendingApproval == approval) Answer(approval, false); });
+        using var stop = ct.Register(() => { if (IsPending(approval)) Answer(approval, false); });
         if (ct.IsCancellationRequested) answer.TrySetResult(false);
         if (AskUser is { } ask) _ = Bridge(ask, approval, ct);
         return await answer.Task;
@@ -124,35 +193,61 @@ public sealed class ChatClient(HttpClient? http = null)
         ApprovalAnswer given;
         try { given = await ask(approval, ct); }
         catch (Exception e) when (e is OperationCanceledException or InvalidOperationException) { given = new ApprovalAnswer(false); }
-        if (PendingApproval == approval) Answer(approval, given.Allow, given.Always);
+        if (IsPending(approval)) Answer(approval, given.Allow, given.Always);
     }
 
+    /// <summary>Stops this conversation's run; the others go on.</summary>
+    public void Stop(Guid conversation)
+    {
+        RunState? run;
+        Approval? waiting;
+        lock (sync)
+        {
+            run = runs.GetValueOrDefault(conversation);
+            waiting = approvals.GetValueOrDefault(conversation);
+        }
+        run?.Cts.Cancel();
+        if (waiting != null) Answer(waiting, false);
+    }
+
+    /// <summary>Stops every run.</summary>
     public void Stop()
     {
-        cts?.Cancel();
-        if (PendingApproval is { } a) Answer(a, false);
+        foreach (var id in Running) Stop(id);
     }
 
     public void Send(string text, IReadOnlyList<Attachment> attachments, Guid conversation, ConversationStore store, Uri baseUrl)
     {
-        if (Busy) return;
+        if (IsBusy(conversation)) return;
         FillStopped(conversation, store);   // a conversation that ended in a crash: its question must be answered first
         store.Update(conversation, c =>
         {
             c.Messages.Add(new ChatMessage { Role = ChatRole.User, Text = text, Attachments = [.. attachments] });
+            // a finished list goes with the next question
+            if (c.Steps is { } steps && steps.TrueForAll(s => s.IsDone)) c.Steps = null;
             if (c.Title == Conversation.DefaultTitle)
             {
                 var t = text.Length == 0 ? (attachments.FirstOrDefault()?.Filename ?? "Afbeelding") : text;
                 c.Title = TextLimit.Prefix(t, 48).Replace("\n", " ");
             }
         });
-        cts = new CancellationTokenSource();
-        SetBusy(true);
-        Completion = RunAndLearn(conversation, store, baseUrl, SynchronizationContext.Current, cts.Token);
+        var cts = new CancellationTokenSource();
+        var run = new RunState(cts, baseUrl);
+        lock (sync) runs[conversation] = run;
+        StateChanged?.Invoke();
+        Sent?.Invoke(conversation);
+        // this conversation's folder for the tools and the system prompt, for the whole run
+        var folder = store.Find(conversation)?.Workspace ?? "";
+        var task = RunAndLearn(conversation, folder, run, store, baseUrl, SynchronizationContext.Current, cts.Token);
+        run.Task = task;
+        Completion = task;
     }
 
-    private async Task RunAndLearn(Guid id, ConversationStore store, Uri baseUrl, SynchronizationContext? owner, CancellationToken ct)
+    private async Task RunAndLearn(Guid id, string folder, RunState run, ConversationStore store, Uri baseUrl, SynchronizationContext? owner, CancellationToken ct)
     {
+        // both flow through every await of this run and no further: two runs never see each other's folder
+        runConversation.Value = id;
+        WorkspaceTools.Current = folder;
         try
         {
             await Run(id, store, baseUrl, owner, ct);
@@ -165,18 +260,22 @@ public sealed class ChatClient(HttpClient? http = null)
         }
         finally
         {
-            SetBusy(false);
+            lock (sync)
+            {
+                if (runs.GetValueOrDefault(id) == run) runs.Remove(id);
+                loaded.Remove(id);
+            }
+            StateChanged?.Invoke();
             store.Save();
+            Finished?.Invoke(id);
         }
     }
 
-    private void SetBusy(bool value) { Busy = value; StateChanged?.Invoke(); }
-
     private async Task Run(Guid id, ConversationStore store, Uri baseUrl, SynchronizationContext? owner, CancellationToken ct)
     {
-        // this conversation's folder for the tools and the system prompt
-        WorkspaceTools.Current = store.Find(id)?.Workspace ?? "";
-        currentConversation = id;
+        LoadedConnectors = store.Find(id)?.Connectors ?? [];
+        // connectors loaded before (or always loaded) run again, so their tools are in the request
+        if (Connectors is { } connectors) await connectors.EnsureRunningAsync(LoadedConnectors, ct);
         if (KeepsNotes && WorkspaceTools.Workspace is { } folder) WorkspaceNotes.CreateIfNeeded(folder);
         var activities = new List<ToolActivity>();
         var sources = new List<Source>();
@@ -249,7 +348,12 @@ public sealed class ChatClient(HttpClient? http = null)
                 if (result.ToolCalls.Count == 0)
                 {
                     bool cutOff = result.FinishReason == "length";
-                    if (!LooksUnfinished(reply.Text, reply.Reasoning, cutOff, WorkspaceActive || activities.Count > 0, changedFiles)) return;
+                    if (!LooksUnfinished(reply.Text, reply.Reasoning, cutOff, WorkspaceActive || activities.Count > 0, changedFiles))
+                    {
+                        // KLAAR is a word for the app, not for the user
+                        store.Update(id, _ => reply.Text = WithoutDoneWord(reply.Text));
+                        return;
+                    }
                     if (nudges >= MaxNudges)
                     {
                         // it keeps stopping: say so, instead of just falling silent
@@ -272,11 +376,20 @@ public sealed class ChatClient(HttpClient? http = null)
                     bool isSystem = SystemTools.Names.Contains(call.Name);
                     bool isSkill = call.Name == Skills.ToolName;
                     bool isApp = AppTools.Names.Contains(call.Name);
+                    bool isSteps = call.Name == WorkSteps.ToolName;
+                    bool isSchedule = call.Name == TaskTool.ToolName;
+                    bool isLoadConnector = call.Name == McpManager.LoadTool;
+                    var connectorTool = Connectors?.Route(call.Name);
                     if (isWorkspace) changedFiles = true;
+                    var callArgs = WorkspaceTools.Args(call);
                     var step = new ToolActivity
                     {
                         Label = isWorkspace ? WorkspaceTools.Label(call) : isSystem ? SystemTools.Label(call) : isSkill ? Skills.Label(call)
-                            : isApp ? AppTools.Label(call) : WebTools.Label(call),
+                            : isApp ? AppTools.Label(call)
+                            : isSteps ? WorkSteps.Label(WorkSteps.Parse(callArgs))
+                            : isSchedule ? L($"Taak plannen: {WorkspaceTools.Str(callArgs, "title") ?? ""}")
+                            : isLoadConnector ? L($"Connector laden: {WorkspaceTools.Str(callArgs, "name") ?? ""}")
+                            : connectorTool is { } r ? McpManager.Label(r) : WebTools.Label(call),
                     };
                     activities.Add(step);
                     store.Update(id, _ => reply.Activities = Copy(activities));
@@ -306,6 +419,39 @@ public sealed class ChatClient(HttpClient? http = null)
                     else if (isSkill)
                     {
                         text = Skills.Run(call);
+                    }
+                    else if (isSteps)
+                    {
+                        if (WorkSteps.Parse(callArgs) is { } steps)
+                        {
+                            store.Update(id, c => c.Steps = steps);
+                            text = WorkSteps.Summary(steps);
+                        }
+                        else text = "Error: give steps as a list of {title, status} with status todo, doing or done.";
+                    }
+                    else if (isSchedule)
+                    {
+                        var output = await ScheduleTask(call, id, ct);
+                        text = output.Text;
+                        if (output.Denied) step.Denied = true;
+                    }
+                    else if (isLoadConnector && Connectors is { } mcp)
+                    {
+                        var output = await mcp.LoadAsync(WorkspaceTools.Str(callArgs, "name") ?? "", ct);
+                        text = output.Text;
+                        if (output.Name is { } name && !LoadedConnectors.Contains(name))
+                        {
+                            var now = LoadedConnectors;
+                            now.Add(name);
+                            LoadedConnectors = now;
+                            store.Update(id, c => c.Connectors = now);
+                        }
+                    }
+                    else if (connectorTool is { } route)
+                    {
+                        var output = await RunConnector(call, route, id, store, ct);
+                        text = output.Text;
+                        if (output.Denied) step.Denied = true;
                     }
                     else if (isApp)
                     {
@@ -468,6 +614,46 @@ public sealed class ChatClient(HttpClient? http = null)
         }
     }
 
+    /// <summary>A connector's tool, with the connector's right: read-only tools run, others ask first unless the right says allow.</summary>
+    private async Task<(string Text, bool Denied)> RunConnector(ToolCall call, McpRoute route, Guid id, ConversationStore store, CancellationToken ct)
+    {
+        var args = WorkspaceTools.Args(call);
+        bool afterWeb = ReadWeb(id, store);
+        var decision = McpManager.Decision(route.Server.RightValue, route.Tool, Settings.Shared.AutoApprove);
+        // after reading the web a page could have chosen this call: then even "allow" asks
+        if (decision == "allow" && afterWeb && route.Tool.ReadOnly != true && !Settings.Shared.AutoApprove) decision = "ask";
+        switch (decision)
+        {
+            case "deny":
+                return ($"The user's settings do not allow the connector {route.Server.Name}. Tell the user what you wanted to do.", true);
+            case "ask":
+                var warnings = new List<string>();
+                var name = route.Server.Name;
+                if (route.Tool.Destructive == true) warnings.Add(L($"Deze tool kan gegevens wijzigen of verwijderen bij {name}."));
+                if (route.Server.IsRemote) warnings.Add(L($"Wat hieronder staat gaat naar {name} op internet."));
+                if (afterWeb) warnings.Add(L("Dit volgt op het lezen van het web. Een webpagina kan het model instructies geven: controleer of dit is wat jij wilde."));
+                var approval = new Approval(id, call, $"{name}: {route.Tool.Title ?? route.Tool.Name}", McpManager.Pretty(args)) { Warnings = warnings };
+                if (!await Ask(approval, ct)) return ("The user did not allow this. Ask what they want instead, or continue without it.", true);
+                break;
+        }
+        return (await Connectors!.CallAsync(route, args, ct), false);
+    }
+
+    /// <summary>schedule_task: always with the card first; the task gets this conversation's folder.</summary>
+    private async Task<(string Text, bool Denied)> ScheduleTask(ToolCall call, Guid id, CancellationToken ct)
+    {
+        if (Tasks is not { } store) return ("Tasks are not available here.", true);
+        ScheduledTask task;
+        try { task = TaskTool.Parse(WorkspaceTools.Args(call), DateTimeOffset.Now); }
+        catch (TaskTool.Problem e) { return ($"Error: {e.Message}. Call schedule_task again with that fixed.", false); }
+        if (Settings.Shared.WorkspaceTools && WorkspaceTools.Workspace is { } ws) task.Workspace = ws;
+        var approval = new Approval(id, call, L($"Taak plannen: {task.Title}"), task.Schedule.Description + "\n\n" + task.Prompt);
+        if (!await Ask(approval, ct)) return ("The user did not want this task. Ask what they want instead.", true);
+        store.Upsert(task);
+        var next = store.Task(task.Id)?.NextRun is { } n ? n.ToLocalTime().ToString("f", AppLanguages.Current.Culture()) : "-";
+        return ($"Planned \"{task.Title}\" ({task.Schedule.Description}); the first run is {next}. The user finds it under Taken in the sidebar.", false);
+    }
+
     /// <summary>The current task (since the user's last question) read the web: a page could have put the plan in the model's mind.</summary>
     private static bool ReadWeb(Guid id, ConversationStore store)
     {
@@ -537,7 +723,7 @@ public sealed class ChatClient(HttpClient? http = null)
                 ["thinking_budget_tokens"] = 0,    // GLM's template ignores enable_thinking and always opens with <think>
             };
             // the same tools as the conversation, so its start stays the same for the engine; it must only write here
-            var tools = CurrentTools();
+            var tools = RunTools();
             if (tools.Count > 0) { body["tools"] = tools; body["tool_choice"] = "none"; }
             var answer = await CompleteAsync(body, baseUrl, 900, ct);
             if (answer == null || ct.IsCancellationRequested) return;
@@ -560,7 +746,7 @@ public sealed class ChatClient(HttpClient? http = null)
 
     private string? NotesForPrompt(string ws)
     {
-        if (frozenNotes is { } f && f.Conversation == currentConversation && f.Modified == WorkspaceNotes.Modified(ws)) return f.Text;
+        if (frozenNotes is { } f && f.Conversation == RunConversation && f.Modified == WorkspaceNotes.Modified(ws)) return f.Text;
         return WorkspaceNotes.ForPrompt(ws);
     }
 
@@ -606,6 +792,22 @@ public sealed class ChatClient(HttpClient? http = null)
         var last = parts.Length == 0 ? "" : " " + parts[^1].ToLowerInvariant();
         if (Invitations.Any(i => last.Contains(i, StringComparison.Ordinal))) return false;
         return Announcements.Any(a => last.Contains(a, StringComparison.Ordinal));
+    }
+
+    private static readonly string[] DoneWords = ["KLAAR", "DONE", "FERTIG", "TERMINÉ", "TERMINE"];
+
+    /// <summary>The answer without the done-word the model was asked to start with: "KLAAR — morgen staat er niets" becomes
+    /// "Morgen staat er niets". Only the word in capitals counts: "Klaar! Het bestand is er" is ordinary language.</summary>
+    public static string WithoutDoneWord(string text)
+    {
+        int i = 0;
+        while (i < text.Length && (char.IsWhiteSpace(text[i]) || text[i] == '*')) i++;
+        int end = i;
+        while (end < text.Length && char.IsLetter(text[end])) end++;
+        if (!DoneWords.Contains(text[i..end])) return text;
+        while (end < text.Length && (char.IsWhiteSpace(text[end]) || "*.:!—–-,".Contains(text[end]))) end++;
+        if (end >= text.Length) return text;
+        return char.ToUpper(text[end], AppLanguages.Current.Culture()) + text[(end + 1)..];
     }
 
     // MARK: - compacting
@@ -714,6 +916,25 @@ public sealed class ChatClient(HttpClient? http = null)
         if (s.AppTools) foreach (var t in AppTools.Definitions(s.Skills)) tools.Add(t!.DeepClone());
         if (s.Skills && Skills.All.Count > 0) tools.Add(Skills.Definition);
         if (s.SystemManagement) foreach (var t in SystemTools.Definitions) tools.Add(t!.DeepClone());
+        if (OffersSteps) tools.Add(WorkSteps.Definition);
+        return tools;
+    }
+
+    /// <summary>The step list is there when the model can do work of several steps: in a folder, on the system, with connectors.</summary>
+    private static bool OffersSteps =>
+        WorkspaceActive || Settings.Shared.SystemManagement || Connectors?.Enabled.Count > 0;
+
+    /// <summary>This run's tools: the settings' ones, planning a task, and the connectors this conversation loaded.</summary>
+    internal JsonArray RunTools()
+    {
+        var tools = CurrentTools();
+        if (Tasks != null) tools.Add(TaskTool.Definition);
+        // connectors: only when one is switched on, and then the tools of those this conversation loaded
+        if (Connectors is { } mcp && mcp.Enabled.Count > 0)
+        {
+            tools.Add(McpManager.LoadDefinition);
+            foreach (var t in mcp.Definitions(LoadedConnectors)) tools.Add(t);
+        }
         return tools;
     }
 
@@ -740,6 +961,9 @@ public sealed class ChatClient(HttpClient? http = null)
         if (s.AppTools) system += "\n\n" + AppTools.PromptSection(s.Skills);
         if (s.SystemManagement) system += "\n\n" + SystemTools.PromptSection();
         if (s.Skills && Skills.PromptSection(Skills.All) is { Length: > 0 } section) system += "\n\n" + section;
+        if (OffersSteps)
+            system += "\n\n" + L("Werk je aan een taak van drie stappen of meer, zet die dan eerst op met task_list en werk de lijst bij als een stap begint of klaar is. De gebruiker ziet de lijst boven het invoerveld.");
+        if (Connectors?.PromptSection() is { Length: > 0 } connectors) system += "\n\n" + connectors;
         if (s.SystemPrompt.Length > 0) system += "\n\n" + s.SystemPrompt;
         if (summary != null)
             system += "\n\n" + L("Samenvatting van het begin van dit gesprek (die berichten zijn weggelaten om ruimte te maken in je context):") + "\n" + summary;
@@ -816,7 +1040,7 @@ public sealed class ChatClient(HttpClient? http = null)
         }
         // no limit asked: said out loud, because the tiered server otherwise applies its own default
         else body["thinking_budget_tokens"] = -1;
-        var tools = CurrentTools();
+        var tools = RunTools();
         if (tools.Count > 0) body["tools"] = tools;
         return body;
     }
@@ -835,6 +1059,8 @@ public sealed class ChatClient(HttpClient? http = null)
     /// <summary>A request without streaming; the answer's text, or null when anything went wrong: the callers go on without it.</summary>
     private async Task<string?> CompleteAsync(JsonObject body, Uri baseUrl, int timeoutSeconds, CancellationToken ct)
     {
+        var gate = Gate(baseUrl);
+        if (!await gate.AcquireAsync(RunConversation ?? Guid.NewGuid(), ct).ConfigureAwait(false)) return null;
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
         limit.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
         try
@@ -846,6 +1072,7 @@ public sealed class ChatClient(HttpClient? http = null)
             return json?["choices"]?[0]?["message"]?["content"] is JsonValue v && v.TryGetValue<string>(out var text) ? text : null;
         }
         catch (Exception e) when (e is HttpRequestException or OperationCanceledException or JsonException or IOException or InvalidOperationException) { return null; }
+        finally { gate.Release(); }
     }
 
     internal sealed class StreamResult
@@ -869,11 +1096,16 @@ public sealed class ChatClient(HttpClient? http = null)
 
     private async Task<StreamResult> StreamAsync(List<ChatMessage> history, string? summary, Uri baseUrl, StreamThrottle throttle, CancellationToken ct)
     {
+        // the model writes for one conversation at a time; the others wait here (and a stop while waiting is a stop)
+        var body = StreamBody(history, summary);
+        var gate = Gate(baseUrl);
+        if (!await gate.AcquireAsync(RunConversation ?? Guid.NewGuid(), ct).ConfigureAwait(false)) throw new OperationCanceledException(ct);
+        StateChanged?.Invoke();
         using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
         idle.CancelAfter(RequestTimeout);
         try
         {
-            using var req = Post(StreamBody(history, summary), baseUrl);
+            using var req = Post(body, baseUrl);
             using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, idle.Token).ConfigureAwait(false);
             if ((int)resp.StatusCode != 200)
             {
@@ -912,6 +1144,7 @@ public sealed class ChatClient(HttpClient? http = null)
         {
             throw new TimeoutException($"The engine did not answer for {RequestTimeout.TotalSeconds:0} s.");
         }
+        finally { gate.Release(); }
     }
 
     private void ReadChunk(JsonElement chunk, StreamResult result, SortedDictionary<int, (string Id, StringBuilder Name, StringBuilder Arguments)> calls, StreamThrottle throttle)

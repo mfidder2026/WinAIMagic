@@ -29,6 +29,12 @@ public class ClusterCheckTests : EngineTest
         Assert.Contains("firewall", c.Problem);
         Assert.True(c.Helpers.Single(h => h.Id == "10.0.0.3:50060").Unreachable);
 
+        // it answers again: it takes part again
+        c.ReachOverride = (_, _) => true;
+        Assert.Equal(2, c.CheckBeforeStart().Count);
+        Assert.Null(c.Problem);
+        Assert.False(c.Helpers.Single(h => h.Id == "10.0.0.3:50060").Unreachable);
+
         // all answer: no problem left
         using var ok = Cluster((_, _) => true);
         ok.AddManual("10.0.0.4");

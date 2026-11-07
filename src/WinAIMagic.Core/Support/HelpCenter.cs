@@ -113,6 +113,7 @@ public static class HelpCenter
         "Images" => "images",
         "Compare" => "compare",
         "Cluster" => "cluster",
+        "Tasks" => "tasks",
         "System" => "system",
         "Help" => "start",
         "Chat" => "chat",

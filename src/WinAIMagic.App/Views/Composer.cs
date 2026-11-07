@@ -93,7 +93,7 @@ public sealed partial class Composer : Grid
         rights = new RightsButton();
 
         send = Ui.Btn("", Send, Glyph.Up, Theme.Accent);
-        stop = Ui.Btn("", app.Chat.Stop, Glyph.Stop, Colors.White);
+        stop = Ui.Btn("", () => { if (conversation is { } id) app.Chat.Stop(id); }, Glyph.Stop, Colors.White);
         foreach (var (b, name) in new[] { (send, L("Versturen")), (stop, L("Stop")) })
         {
             b.Width = b.Height = 32;
@@ -165,7 +165,9 @@ public sealed partial class Composer : Grid
         ShowAttachments();
     }
 
-    private bool CanSend => app.EngineState.IsRunning && !app.Chat.Busy && (box.Text.Trim().Length > 0 || attachments.Count > 0)
+    private bool Working => conversation is { } id && app.Chat.IsBusy(id);
+
+    private bool CanSend => app.EngineState.IsRunning && !Working && (box.Text.Trim().Length > 0 || attachments.Count > 0)
         && (attachments.Count == 0 || app.Host.WhyNoImages == null);
 
     /// <summary>The state of the buttons.</summary>
@@ -195,7 +197,7 @@ public sealed partial class Composer : Grid
         bool tell = noImages != null && (triedImage || attachments.Count > 0);
         imageNote.SetIfChanged(tell ? noImages! : "");
         imageNote.Show(tell);
-        bool working = app.Chat.Busy;
+        bool working = Working;
         send.Show(!working);
         stop.Show(working);
         bool can = CanSend;

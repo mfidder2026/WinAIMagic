@@ -1,7 +1,7 @@
 ---
 title: Instellingen
 icon: Settings
-keywords: instellingen taal voorkeuren context vision MTP poort adres VRAM-reserve wisselbestand backend systeembeheer skills
+keywords: instellingen taal voorkeuren context vision MTP poort adres VRAM-reserve wisselbestand backend systeembeheer skills connectors taken heartbeat systeemvak opstarten
 ---
 Open de instellingen met het tandwiel rechtsboven.
 
@@ -19,3 +19,9 @@ Open de instellingen met het tandwiel rechtsboven.
 
 ## Systeembeheer
 **Skills** en **Deze pc**: of het model deze pc mag bekijken en instellen, en de rechten om het systeem te lezen en te wijzigen. Ze staan standaard aan. De ? in dat tabblad opent *Systeembeheer*.
+
+## Connectors
+Gereedschap van andere programma's en diensten, met rechten per connector (zie *Connectors*).
+
+## Taken
+De **heartbeat** (aan of uit, hoe vaak, tussen welke uren, en of het model ervoor mag laden), **Op de achtergrond** (in het systeemvak blijven, het model stoppen als het venster dichtgaat, opstarten met Windows) en of het model na een taak weer stopt (zie *Taken en heartbeat*).

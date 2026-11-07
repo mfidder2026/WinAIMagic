@@ -98,8 +98,10 @@ public static class WorkspaceTools
 
     // MARK: - paths
 
-    /// <summary>The conversation's own folder while the chat client runs its tools; falls back to the last chosen folder.</summary>
-    public static string? Current { get; set; }
+    /// <summary>The conversation's own folder while the chat client runs its tools; falls back to the last chosen folder.
+    /// Each run carries its own (an AsyncLocal, the Mac's TaskLocal), so two runs at once never use each other's folder.</summary>
+    public static string? Current { get => current.Value; set => current.Value = value; }
+    private static readonly AsyncLocal<string?> current = new();
 
     public static string? Workspace
     {

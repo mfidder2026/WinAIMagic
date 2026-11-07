@@ -33,6 +33,11 @@ public sealed class ChatPage : IPage
     private readonly Border otherBanner, noticeBanner;
     private readonly TextBlock noticeText = Ui.Caption("", new SolidColorBrush(Theme.Amber), 13);
     private readonly Border approvalHost = new() { MaxWidth = 860, Margin = new Thickness(24, 4, 24, 0), Visibility = Visibility.Collapsed };
+    private readonly Border gateBanner;
+    private readonly TextBlock gateText = Ui.Caption("", new SolidColorBrush(Theme.Amber), 13);
+    private readonly Border stepsHost = new() { MaxWidth = 860, Margin = new Thickness(24, 4, 24, 0), Visibility = Visibility.Collapsed };
+    private string stepsKey = "";
+    private bool stepsOpen = true;
     private readonly Dictionary<Guid, ChatMessage> visible = new();
     private readonly Dictionary<Guid, RowMemory> memory = new();
     private readonly TextBlock emptyTitle = Ui.Label("", 36, Theme.Brand, FontWeights.Bold, display: true);
@@ -50,7 +55,7 @@ public sealed class ChatPage : IPage
     public ChatPage(AppState app)
     {
         this.app = app;
-        foreach (var h in new[] { GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto, GridLength.Auto, GridLength.Auto, GridLength.Auto })
+        foreach (var h in new[] { GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto, GridLength.Auto, GridLength.Auto, GridLength.Auto, GridLength.Auto, GridLength.Auto })
             root.RowDefinitions.Add(new RowDefinition { Height = h });
 
         // the bar on top
@@ -80,7 +85,11 @@ public sealed class ChatPage : IPage
         root.Children.Add(noticeBanner.At(2));
         root.Children.Add(engineBanner.At(3));
         root.Children.Add(otherBanner.At(4));
-        root.Children.Add(approvalHost.At(5));
+        // this conversation waits while the model writes for another one of ours (a task, another chat)
+        gateBanner = Banner(Ui.Row("auto,*", 8, Ui.Icon(Glyph.Hourglass, 13, new SolidColorBrush(Theme.Amber)), gateText), Theme.Amber);
+        root.Children.Add(gateBanner.At(5));
+        root.Children.Add(stepsHost.At(6));
+        root.Children.Add(approvalHost.At(7));
 
         Composer = new Composer(app, () =>
         {
@@ -88,7 +97,7 @@ public sealed class ChatPage : IPage
             list.StickToEnd = true;
             FollowEnd();
         });
-        root.Children.Add(Composer.At(6));
+        root.Children.Add(Composer.At(8));
 
         root.PreviewKeyDown += OnKey;
         root.DragOver += (_, e) =>
@@ -168,7 +177,7 @@ public sealed class ChatPage : IPage
         if (key is SummaryKey s)
             return new SummaryRow(summaryText ?? "", Shift, () => Memory(s.Conversation).Summary, on => Memory(s.Conversation).Summary = on);
         var id = (Guid)key;
-        return new MessageRow(visible[id], Memory(id), Shift, app.Chat.Busy && id == lastMessage);
+        return new MessageRow(visible[id], Memory(id), Shift, shown is { } c && app.Chat.IsBusy(c) && id == lastMessage);
     }
 
     private RowMemory Memory(Guid id)
@@ -258,6 +267,8 @@ public sealed class ChatPage : IPage
         UpdateSpeed();
         UpdateEngineBanner();
         otherBanner.Show(app.EngineState.IsRunning && app.Host.Metrics.EngineBusy && !app.Chat.Busy);
+        UpdateGate(c);
+        UpdateSteps(c);
         UpdateApproval(c);
         Composer.Refresh();
     }
@@ -269,7 +280,7 @@ public sealed class ChatPage : IPage
     {
         var last = c.Messages[^1].Id;
         lastMessage = last;
-        bool busy = app.Chat.Busy;
+        bool busy = app.Chat.IsBusy(c.Id);
         var keys = new List<object>(c.Messages.Count);
         visible.Clear();
         summaryText = c.Summary;
@@ -357,10 +368,58 @@ public sealed class ChatPage : IPage
 
     // MARK: - the model's question
 
+    private void UpdateGate(Conversation? c)
+    {
+        var other = c == null ? null : app.Chat.WaitingBehind(c.Id);
+        gateBanner.Show(other != null);
+        if (other is not { } o) return;
+        var title = app.Store.Find(o)?.DisplayTitle ?? "";
+        gateText.SetIfChanged(L($"Wacht op het model: het schrijft nu in '{title}'. Daarna is dit gesprek aan de beurt."));
+    }
+
+    /// <summary>The model's step list for this conversation: what it does now and what is done. A finished list goes with the next question.</summary>
+    private void UpdateSteps(Conversation? c)
+    {
+        var steps = c?.Steps;
+        bool busy = c != null && app.Chat.IsBusy(c.Id);
+        var key = steps == null ? "" : $"{c!.Id}|{busy}|{stepsOpen}|{Settings.Shared.Language}|" + string.Join("|", steps.Select(x => x.Status + x.Title));
+        if (key == stepsKey) return;
+        stepsKey = key;
+        stepsHost.Show(steps is { Count: > 0 });
+        if (steps is not { Count: > 0 }) { stepsHost.Child = null; return; }
+        int done = steps.Count(x => x.IsDone), all = steps.Count;
+        var now = steps.FirstOrDefault(x => x.Status == "doing");
+        var head = Ui.Row("auto,auto,auto,*,auto", 6, Ui.Icon(Glyph.Steps, 14, new SolidColorBrush(Theme.Cyan)), Ui.Label(L("Stappen"), 13, null, FontWeights.SemiBold),
+            Ui.Label($"{done}/{all}", 12, Theme.Secondary), !stepsOpen && now != null ? Ui.Label(now.Title, 12, Theme.Secondary) : null,
+            Ui.Icon(stepsOpen ? Glyph.ChevronDown : Glyph.ChevronRight, 11, Theme.Secondary));
+        var toggle = ChatUi.Plain(head, () => { stepsOpen = !stepsOpen; UpdateSteps(app.Store.Find(c.Id)); }, L($"Stappen: {done} van {all} klaar"));
+        toggle.HorizontalAlignment = HorizontalAlignment.Stretch;
+        toggle.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        var body = Ui.V(4, toggle);
+        if (stepsOpen)
+            foreach (var st in steps)
+            {
+                UIElement mark = st.Status switch
+                {
+                    "done" => Ui.Icon(Glyph.CircleDone, 13, new SolidColorBrush(Theme.Mint)),
+                    "doing" when busy => new Spinner(13),
+                    "doing" => Ui.Icon(Glyph.Circle, 13, new SolidColorBrush(Theme.Amber)),
+                    _ => Ui.Icon(Glyph.Circle, 13, Theme.Tertiary),
+                };
+                var text = Ui.Label(st.Title, 13, st.IsDone ? Theme.Secondary : null, wrap: true);
+                if (st.IsDone) text.TextDecorations = Windows.UI.Text.TextDecorations.Strikethrough;
+                body.Children.Add(Ui.Row("auto,*", 8, mark, text));
+            }
+        stepsHost.Child = new Border
+        {
+            Child = body, Padding = new Thickness(12, 8, 12, 8), CornerRadius = new CornerRadius(12),
+            Background = Theme.Solid(Colors.White, 0.06), BorderBrush = Theme.Hairline, BorderThickness = new Thickness(1),
+        };
+    }
+
     private void UpdateApproval(Conversation? c)
     {
-        var a = app.Chat.PendingApproval;
-        if (a != null && a.Conversation != c?.Id) a = null;
+        var a = c == null ? null : app.Chat.ApprovalFor(c.Id);
         if (a == approvalShown) return;
         bool wasOpen = approvalShown != null;
         approvalShown = a;
@@ -378,7 +437,8 @@ public sealed class ChatPage : IPage
         bool warned = a.Warnings.Count > 0;
         var edge = warned ? Theme.Red : Theme.Amber;
         var icon = a.Call.Name.StartsWith("system_", StringComparison.Ordinal) ? (a.Admin ? Glyph.Shield : Glyph.Gears)
-            : a.Call.Name == "run_command" ? Glyph.Terminal : Glyph.Document;
+            : a.Call.Name == "run_command" ? Glyph.Terminal : a.Call.Name == TaskTool.ToolName ? Glyph.Tasks
+            : a.Call.Name.Contains("__", StringComparison.Ordinal) ? Glyph.Connect : Glyph.Document;
         var head = Ui.Row("auto,*,auto", 8, Ui.Icon(icon, 15, amber), Ui.Label(a.Title, 15, null, FontWeights.SemiBold, wrap: true, display: true),
             a.Admin ? Ui.H(4, Ui.Icon(Glyph.Key, 12, Theme.Solid(Theme.Amber)), Ui.Label(L("Beheerder"), 12, Theme.Solid(Theme.Amber), FontWeights.Bold)) : null);
         var body = Ui.V(10, head);
@@ -504,7 +564,7 @@ public sealed partial class ContextMeter : Button
     private void Fill()
     {
         counts.Text = L($"{current?.ContextTokens ?? 0} van {Math.Max(app.Chat.ContextLimit, 1)} tokens gebruikt in dit gesprek");
-        compact.IsEnabled = !app.Chat.Busy && !app.Chat.Compacting && app.EngineState.IsRunning;
+        compact.IsEnabled = !(current != null && app.Chat.IsBusy(current.Id)) && !app.Chat.Compacting && app.EngineState.IsRunning;
     }
 
     private async void Compact()

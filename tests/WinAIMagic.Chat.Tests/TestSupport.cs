@@ -30,6 +30,9 @@ public abstract class ChatTest : IDisposable
         Settings.Shared.SystemManagement = false;
         Settings.Shared.AppTools = false;
         WorkspaceTools.Current = null;
+        // connectors: none, and secrets in memory (only SecretsInTheCredentialManager uses the real one)
+        McpManager.Shared = null;
+        McpSecrets.Store = new McpSecrets.Memory();
         DeveloperTools.MissingOverride = [];
         CommandRunner.ShellOverride = null;
         WebTools.Http = new HttpClient(new FakeWeb());

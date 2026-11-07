@@ -138,7 +138,7 @@ public class ChatRequestTests : ChatTest
         Settings.Shared.WebSearch = true;
         Assert.Equal(new[] { "web_search", "fetch_url" }, ToolNames());
         WorkspaceTools.Current = NewFolder("work");
-        Assert.Equal(new[] { "web_search", "fetch_url", "list_dir", "read_file", "write_file", "edit_file", "run_command" }, ToolNames());
+        Assert.Equal(new[] { "web_search", "fetch_url", "list_dir", "read_file", "write_file", "edit_file", "run_command", "task_list" }, ToolNames());
         Settings.Shared.WorkspaceTools = false;
         Assert.Equal(new[] { "web_search", "fetch_url" }, ToolNames());
 

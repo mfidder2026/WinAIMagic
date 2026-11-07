@@ -8,13 +8,13 @@ using WinAIMagic.Studio;
 
 namespace WinAIMagic.App;
 
-public enum PaneKind { Live, Models, Documents, Images, Compare, Cluster, System, Help, Chat }
+public enum PaneKind { Live, Models, Documents, Images, Tasks, Compare, Cluster, System, Help, Chat }
 
 public readonly record struct Pane(PaneKind Kind, Guid? Conversation = null);
 
 /// <summary>Ties the parts together, like AppState.swift; the engine half lives in EngineHost. Everything that reaches the screens
 /// comes through here on the UI thread, at most every 0.1 s: the parts' events fire on background threads.</summary>
-public sealed class AppState : INotifyPropertyChanged, IDisposable
+public sealed partial class AppState : INotifyPropertyChanged, IDisposable
 {
     public EngineHost Host { get; }
     public ConversationStore Store { get; } = new();
@@ -280,7 +280,9 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
         var start = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false };
         foreach (var a in args) start.ArgumentList.Add(a);
         System.Diagnostics.Process.Start(start);
-        Window.Close();
+        // really quit, also with tasks on (closing would otherwise leave this copy in the notification area)
+        if (Window is ShellWindow shell) shell.Quit();
+        else Window.Close();
     }
 
     // MARK: - the documents module
@@ -312,6 +314,7 @@ public sealed class AppState : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         Closing?.Invoke();
+        StopTasks();
         Chat.Stop();
         studio?.Stop();
         studio?.Save();

@@ -77,7 +77,7 @@ public class SkillsTests : ChatTest
         Assert.Contains(ChatClient.CurrentTools(), t => t!["function"]!["name"]!.GetValue<string>() == "use_skill");
         Settings.Shared.SystemManagement = true;
         var names = ChatClient.CurrentTools().Select(t => t!["function"]!["name"]!.GetValue<string>()).ToList();
-        Assert.Equal(["use_skill", "system_read", "system_change", "system_undo"], names);
+        Assert.Equal(["use_skill", "system_read", "system_change", "system_undo", "task_list"], names);
     }
 }
 

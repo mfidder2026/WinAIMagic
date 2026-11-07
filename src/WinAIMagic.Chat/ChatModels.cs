@@ -70,6 +70,14 @@ public sealed class Conversation
     /// <summary>Compacted: a summary of the messages up to and including SummaryUpTo, sent instead of them.</summary>
     public string? Summary { get; set; }
     public Guid? SummaryUpTo { get; set; }
+    /// <summary>Connectors whose tools the model loaded in this conversation (use_connector); they stay in its requests.</summary>
+    public List<string>? Connectors { get; set; }
+    /// <summary>The model's list of steps for a larger piece of work (task_list), shown above the composer.</summary>
+    public List<WorkStep>? Steps { get; set; }
+    /// <summary>The scheduled task this conversation is a run of (Taken), if any.</summary>
+    public Guid? Task { get; set; }
+    /// <summary>Not in the sidebar: a heartbeat check that had nothing to report is removed, one that has stays under Taken.</summary>
+    public bool? Hidden { get; set; }
 
     /// <summary>The title in the chosen language while it is still the default.</summary>
     [JsonIgnore]
@@ -164,6 +172,13 @@ public sealed class ConversationStore
             StartInLastFolder();
             Selection = Conversations[0].Id;
         }
+        Changed?.Invoke(null);
+    }
+
+    /// <summary>A conversation the app makes itself (a task's run, a heartbeat check), at the top of the list.</summary>
+    public void Insert(Conversation c)
+    {
+        lock (gate) Conversations.Insert(0, c);
         Changed?.Invoke(null);
     }
 

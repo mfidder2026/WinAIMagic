@@ -9,3 +9,5 @@ keywords: privacy safety local cloud data password key prompt injection UAC
 - **Passwords and keys**: the app never asks for your password. When administrator rights are needed, Windows itself asks for permission (UAC). API keys are stored encrypted in the settings.
 - **Prompt injection**: a web page or file can contain text that tries to steer the model. That is why you approve changes yourself, and the app warns when a plan follows reading the web.
 - **Network**: the API and cluster helpers only listen on this PC or on the direct cable by default.
+- **Connectors**: a connector on the internet sends what the model passes along to that service; one on this PC does not. Tokens are in the Windows Credential Manager.
+- **Tasks**: a task or heartbeat works with the same rights as a conversation. A change always waits for your approval, also when you are not there.

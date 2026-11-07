@@ -8,7 +8,7 @@ using static WinAIMagic.Core.Support.Lang;
 
 namespace WinAIMagic.App.Views;
 
-/// <summary>Instellingen: the tabs Chat, Engine and Systeembeheer (560 x 520). A choice counts at once.</summary>
+/// <summary>Instellingen: the tabs Chat, Engine, Systeembeheer, Connectors and Taken (600 x 520). A choice counts at once.</summary>
 public static class SettingsDialog
 {
     private static bool open;
@@ -17,7 +17,7 @@ public static class SettingsDialog
     {
         if (open) return;
         open = true;
-        var host = new Grid { Width = 560, Height = 520 };
+        var host = new Grid { Width = 600, Height = 520 };
         var dialog = Ui.Dialog(app);
         dialog.CloseButtonText = L("Sluiten");
         dialog.Content = host;
@@ -48,12 +48,17 @@ public static class SettingsDialog
         var chat = new SelectorBarItem { Text = L("Chat"), Icon = Ui.Icon(Glyph.Chat) };
         var engine = new SelectorBarItem { Text = L("Engine"), Icon = Ui.Icon(Glyph.Cpu) };
         var system = new SelectorBarItem { Text = L("Systeembeheer"), Icon = Ui.Icon(Glyph.Gears) };
+        var connectors = new SelectorBarItem { Text = L("Connectors"), Icon = Ui.Icon(Glyph.Connect) };
+        var tasks = new SelectorBarItem { Text = L("Taken"), Icon = Ui.Icon(Glyph.Tasks) };
         bar.Items.Add(chat);
         bar.Items.Add(engine);
         bar.Items.Add(system);
-        bar.SelectedItem = tab == 1 ? engine : tab == 2 ? system : chat;
+        bar.Items.Add(connectors);
+        bar.Items.Add(tasks);
+        bar.SelectedItem = tab switch { 1 => engine, 2 => system, 3 => connectors, 4 => tasks, _ => chat };
         var scroll = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 8, 14, 0) }.At(1);
-        UIElement Content() => bar.SelectedItem == engine ? EngineTab(app) : bar.SelectedItem == system ? SystemTab(app) : ChatTab();
+        UIElement Content() => bar.SelectedItem == engine ? EngineTab(app) : bar.SelectedItem == system ? SystemTab(app)
+            : bar.SelectedItem == connectors ? new ConnectorsTab(app).View : bar.SelectedItem == tasks ? TasksTab(app) : ChatTab();
         scroll.Content = Content();
         bar.SelectionChanged += (_, _) =>
         {
@@ -183,12 +188,73 @@ public static class SettingsDialog
                 warnChange));
     }
 
+    /// <summary>The heartbeat, staying in the notification area, and what the model does around tasks.</summary>
+    private static StackPanel TasksTab(AppState app)
+    {
+        var s = Settings.Shared;
+        var help = Ui.IconBtn(Glyph.Help, () => app.OpenHelp("tasks"), L("Hulp bij dit onderdeel"));
+        var mayLoad = Note("");
+        void Load() => mayLoad.Text = s.HeartbeatMayLoad
+            ? L("Is het model niet geladen, dan laadt de heartbeat het en stopt het daarna weer. Dat kost bij een groot model elke keer een paar minuten en veel stroom.")
+            : L("Is het model niet geladen, dan slaat de heartbeat over.");
+        Load();
+        var status = Note(app.HeartbeatStatus ?? "");
+        var hours = Enumerable.Range(0, 24).Select(h => ($"{h:00}:00", h)).ToList();
+        var checkNow = Ui.Btn(L("Nu controleren"), async () =>
+        {
+            status.Text = L("Bezig met controleren…");
+            await app.RunHeartbeat(forced: true);
+            status.Text = app.HeartbeatStatus ?? "";
+        });
+        checkNow.IsEnabled = app.EngineState.IsRunning || app.Host.CanStart;
+        var openList = Ui.Btn(L("Open checklist"), () =>
+        {
+            Chat.Heartbeat.Checklist();
+            Process.Start(new ProcessStartInfo(Paths.Heartbeat) { UseShellExecute = true });
+        });
+        UIElement login;
+        if (Program.TestData) login = Note(L("Opstarten met Windows kan niet in een testkopie met een eigen gegevensmap."));
+        else
+        {
+            var problem = Note("", Theme.Solid(Theme.Amber));
+            problem.Show(false);
+            var grid = Toggle(L("Opstarten met Windows"), TrayIcon.StartsWithWindows, on =>
+            {
+                try { TrayIcon.StartsWithWindows = on; problem.Show(false); }
+                catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+                {
+                    problem.Text = L($"Dat lukte niet: {e.Message}");
+                    problem.Show(true);
+                }
+            });
+            login = Ui.V(4, grid, problem);
+        }
+        return Tab(
+            Ui.Row("*,auto", 12, Note(L("De heartbeat laat het model af en toe een checklist nalopen, bijvoorbeeld je agenda of de schijf. Het meldt zich alleen als er iets is.")), help),
+            Section(L("Heartbeat"),
+                Toggle(L("Heartbeat"), s.Heartbeat, v => s.Heartbeat = v),
+                Row(L("Hoe vaak"), Pick([(L("Elk half uur"), 30), (L("Elk uur"), 60), (L("Elke 2 uur"), 120), (L("Elke 4 uur"), 240)], s.HeartbeatMinutes, v => s.HeartbeatMinutes = v)),
+                Row(L("Van"), Pick(hours, s.HeartbeatFrom, v => s.HeartbeatFrom = v)),
+                Row(L("Tot"), Pick(hours, s.HeartbeatTo, v => s.HeartbeatTo = v)),
+                Toggle(L("Het model mag hiervoor laden"), s.HeartbeatMayLoad, v => { s.HeartbeatMayLoad = v; Load(); }),
+                mayLoad,
+                Ui.Row("auto,auto,*", 8, openList, checkNow, status)),
+            Section(L("Op de achtergrond"),
+                Toggle(L("In het systeemvak blijven als het venster dicht is"), s.StayInTray, v => s.StayInTray = v),
+                Note(L("Alleen als er taken of een heartbeat aan staan. Dan kunnen ze doorgaan met het venster dicht; WinAIMagic staat dan rechtsonder in het systeemvak.")),
+                Toggle(L("Het model stoppen als het venster dicht gaat"), s.StopModelOnClose, v => s.StopModelOnClose = v),
+                login),
+            Section(L("Taken"),
+                Toggle(L("Het model na een taak weer stoppen"), s.TasksStopModel, v => s.TasksStopModel = v),
+                Note(L("Als een taak het model laadde en jij het intussen niet gebruikte, stopt het weer als de taken klaar zijn, zodat het geheugen vrij is."))));
+    }
+
     // the same choice stands beside the engine's Start button on the models page
     internal static string SkipExpertsTitle => L("Experts overslaan (GLM)");
     internal static string SkipExpertsNote => L("Laat experts weg die weinig meetellen. GLM schrijft dan sneller, vooral op een kaart met weinig VRAM, maar de antwoorden wijken iets af van het volledige model: bij Sterk meer dan bij Licht. Geldt na het herstarten van de engine.");
     internal static (string Label, string Value)[] SkipExpertsOptions() => [(L("Uit: het volledige model"), "off"), (L("Licht: sneller"), "light"), (L("Sterk: nog sneller"), "strong")];
 
-    private static (string, string)[] Rights() => [(L("Toestaan"), "allow"), (L("Eerst vragen"), "ask"), (L("Weigeren"), "deny")];
+    internal static (string, string)[] Rights() => [(L("Toestaan"), "allow"), (L("Eerst vragen"), "ask"), (L("Weigeren"), "deny")];
 
     private static void OpenNotes()
     {
@@ -199,9 +265,9 @@ public static class SettingsDialog
 
     // MARK: - the parts of a form
 
-    private static StackPanel Tab(params UIElement[] sections) => Ui.V(14, sections);
+    internal static StackPanel Tab(params UIElement[] sections) => Ui.V(14, sections);
 
-    private static StackPanel Section(string title, params UIElement[] rows)
+    internal static StackPanel Section(string title, params UIElement[] rows)
     {
         var body = Ui.V(10, rows);
         var card = Ui.Rounded(Theme.Solid(Microsoft.UI.Colors.White, 0.05), 12, body);
@@ -209,7 +275,7 @@ public static class SettingsDialog
         return Ui.V(6, Ui.Bold(title, 13, Theme.Secondary), card);
     }
 
-    private static Grid Row(string label, FrameworkElement control)
+    internal static Grid Row(string label, FrameworkElement control)
     {
         control.VerticalAlignment = VerticalAlignment.Center;
         return Ui.Row("*,auto", 12, Ui.Label(label, 14, wrap: true), control);
@@ -217,9 +283,9 @@ public static class SettingsDialog
 
     private static StackPanel Stacked(string label, UIElement control) => Ui.V(5, Ui.Label(label, 14), control);
 
-    private static TextBlock Note(string text, Microsoft.UI.Xaml.Media.Brush? color = null) => Ui.Caption(text, color);
+    internal static TextBlock Note(string text, Microsoft.UI.Xaml.Media.Brush? color = null) => Ui.Caption(text, color);
 
-    private static Grid Toggle(string label, bool value, Action<bool> set)
+    internal static Grid Toggle(string label, bool value, Action<bool> set)
     {
         var t = new ToggleSwitch { IsOn = value, OnContent = "", OffContent = "", MinWidth = 0, HorizontalAlignment = HorizontalAlignment.Right };
         t.Toggled += (_, _) => set(t.IsOn);

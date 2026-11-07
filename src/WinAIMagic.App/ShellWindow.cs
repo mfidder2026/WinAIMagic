@@ -29,6 +29,10 @@ public sealed partial class ShellWindow : Window
     private FrameworkElement[] titleControls = [];
     private FrameworkElement? shown;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? hookTimer, tokenTimer;
+    private bool quitting;
+
+    /// <summary>The icon in the notification area (tasks and the heartbeat go on with the window closed).</summary>
+    public TrayIcon Tray { get; }
 
     public ShellWindow(AppState app, string[] args)
     {
@@ -69,9 +73,21 @@ public sealed partial class ShellWindow : Window
         Content = Build();
         app.LanguageChanged += Rebuild;
         app.PropertyChanged += OnApp;
+        Tray = new TrayIcon(WinRT.Interop.WindowNative.GetWindowHandle(this), icon) { Activated = ShowFromTray, Menu = TrayMenu };
+        Activated += (_, e) => app.WindowActive = e.WindowActivationState != WindowActivationState.Deactivated && AppWindow.IsVisible;
+        // with tasks or a heartbeat on, closing the window leaves the app in the notification area; without, it quits as before
+        AppWindow.Closing += (_, e) =>
+        {
+            if (quitting || !app.HasBackgroundWork || !Settings.Shared.StayInTray) return;
+            e.Cancel = true;
+            HideToTray(stopModel: Settings.Shared.StopModelOnClose);
+        };
+        app.Changed += UpdateTray;
         Closed += (_, _) =>
         {
             AppWindow.Hide();   // the rest of the closing may take a few seconds: the engine stops with the app
+            Tray.Dispose();
+            Notifier.Shutdown();
             app.Dispose();
         };
         Start();
@@ -165,6 +181,7 @@ public sealed partial class ShellWindow : Window
                 PaneKind.Cluster => new ClusterPage(app),
                 PaneKind.System => new SystemPage(app),
                 PaneKind.Help => new HelpPage(app),
+                PaneKind.Tasks => new TasksPage(app),
                 PaneKind.Chat => new ChatPage(app),
                 _ => new ModelsPage(app),
             };
@@ -186,7 +203,7 @@ public sealed partial class ShellWindow : Window
 
     private async Task StartUp()
     {
-        string? pageArg = Arg("page") switch { "Documenten" => "Documents", "Beeld" => "Images", "Vergelijken" => "Compare", "Modellen" => "Models", "Systeem" => "System", "Hulp" => "Help", var p => p };
+        string? pageArg = Arg("page") switch { "Documenten" => "Documents", "Beeld" => "Images", "Vergelijken" => "Compare", "Modellen" => "Models", "Systeem" => "System", "Hulp" => "Help", "Taken" => "Tasks", var p => p };
         Pane? forced = Enum.TryParse<PaneKind>(pageArg, true, out var kind) ? new Pane(kind, kind == PaneKind.Chat ? app.Store.Selection : null) : null;
         // first run: the models until one is there
         bool ready = app.Host.Store.StatusOf(app.Host.SelectedModelId).IsComplete;
@@ -197,12 +214,81 @@ public sealed partial class ShellWindow : Window
         // leftovers of a forced quit go, downloads go on, and then the start order of the original app
         await Task.Run(app.Host.OnAppStart);
         if (Settings.Shared.AutoStart && app.Host.CanStart) app.StartEngine();
+        // the scheduled tasks and the heartbeat, and the icon in the notification area when they are on
+        app.StartTasks();
+        UpdateTray();
         // what this PC needs is checked at every start; the very first start, or something in the way, shows it
         await app.RunCheck();
         if (forced == null && (app.Host.Check.NeedsAttention || !Settings.Shared.SystemCheckSeen)) app.Pane = new Pane(PaneKind.System);
         Settings.Shared.SystemCheckSeen = true;
         if (app.Store.LoadProblem is { } problem && Content.XamlRoot != null)
             await Ui.Ask(app, L("Gesprekken"), problem, null, close: L("Sluiten"));
+    }
+
+    /// <summary>The window goes, the app stays in the notification area; the model stops unless something runs, so its memory is free again.</summary>
+    public void HideToTray(bool stopModel)
+    {
+        AppWindow.Hide();
+        app.WindowActive = false;
+        Tray.Show(TrayTip());
+        bool running;
+        lock (app.TaskRuns) running = app.TaskRuns.Count > 0;
+        if (stopModel && !app.Chat.Busy && !running && app.EngineState.IsActive) app.StopEngine();
+    }
+
+    public void ShowFromTray()
+    {
+        AppWindow.Show();
+        BringToFront();
+        app.WindowActive = true;
+        UpdateTray();
+    }
+
+    /// <summary>Quits for real (the tray's Afsluiten).</summary>
+    public void Quit()
+    {
+        quitting = true;
+        Close();
+    }
+
+    /// <summary>The icon is there while tasks or a heartbeat are on, or while the window is hidden.</summary>
+    private void UpdateTray()
+    {
+        bool want = !AppWindow.IsVisible || app.HasBackgroundWork;
+        if (want) Tray.Show(TrayTip());
+        else Tray.Hide();
+    }
+
+    private string TrayTip()
+    {
+        int runs;
+        lock (app.TaskRuns) runs = app.TaskRuns.Count;
+        return "WinAIMagic" + (runs > 0 ? " · " + L($"Taken bezig: {runs}") : app.EngineState.IsRunning ? " · " + L("Model geladen") : "");
+    }
+
+    private List<TrayIcon.Item> TrayMenu()
+    {
+        var items = new List<TrayIcon.Item>();
+        var model = app.Host.Engine?.Model?.Name ?? "";
+        items.Add(new(app.EngineState.IsRunning ? L($"Model geladen: {model}") : L("Model niet geladen")));
+        int runs;
+        lock (app.TaskRuns) runs = app.TaskRuns.Count;
+        if (runs > 0) items.Add(new(L($"Taken bezig: {runs}")));
+        else if (app.Chat.Busy) items.Add(new(L("Bezig met een gesprek")));
+        if (app.Tasks.Tasks.Where(t => t.Enabled && t.NextRun != null).OrderBy(t => t.NextRun).FirstOrDefault() is { } next)
+        {
+            var when = next.NextRun!.Value.ToLocalTime().ToString("g", AppLanguages.Current.Culture());
+            items.Add(new(L($"Volgende taak: {next.Title}, {when}")));
+        }
+        if (Settings.Shared.Heartbeat && app.HeartbeatStatus is { } status) items.Add(new(status));
+        items.Add(TrayIcon.Item.Separator);
+        items.Add(new(L("Open WinAIMagic"), ShowFromTray));
+        items.Add(new(L("Taken"), () => { ShowFromTray(); app.Pane = new Pane(PaneKind.Tasks); }));
+        if (Settings.Shared.Heartbeat) items.Add(new(L("Nu controleren"), () => _ = app.RunHeartbeat(forced: true)));
+        if (app.Chat.Busy) items.Add(new(L("Alles stoppen"), app.Chat.Stop));
+        items.Add(TrayIcon.Item.Separator);
+        items.Add(new(L("WinAIMagic afsluiten"), Quit));
+        return items;
     }
 
     public void BringToFront()
