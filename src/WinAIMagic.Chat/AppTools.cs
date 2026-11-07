@@ -74,12 +74,12 @@ public static class AppTools
                     ["helper"] = Prop("string", "A helper's id (host:port) from app_status"),
                 }, "action"));
         if (skills)
-            tools.Add(Function("create_skill", "Make a new skill of the user's own, or replace one of their own skills, so it shows in the skill list and can be loaded with use_skill. A skill is instructions for one subject with commands that work on this PC. The user approves it first. Do not put a skill in a work folder or in WINAIMAGIC.md: this tool is the only place skills go.",
+            tools.Add(Function("create_skill", "Make a new skill of the user's own, or replace one of their own skills, so it shows in the skill list and can be loaded with use_skill. A skill is instructions for one subject with commands that work on this PC, in ONE Markdown text that is complete on its own and quick to read: put everything that was learned or gathered in it (the rules, the steps, the commands, the common mistakes, short examples), condensed. A later conversation works in another folder and does not have this one, so never refer to files in the work folder or tell the model to read them; if a small script is needed, put it in the skill as a code block, to be written to the work folder when it is used. The user approves it first. Do not put a skill in a work folder or in WINAIMAGIC.md: this tool is the only place skills go.",
                 new JsonObject
                 {
                     ["name"] = Prop("string", "Short name, lower case with hyphens, e.g. c64-assembler"),
                     ["description"] = Prop("string", "One line: what the skill is about and when to load it"),
-                    ["instructions"] = Prop("string", "The skill itself in Markdown: paths, commands, steps, common mistakes"),
+                    ["instructions"] = Prop("string", "The whole skill in Markdown, complete on its own: rules, steps, commands, common mistakes, short examples, small scripts as code blocks. No references to files in the work folder"),
                 }, "name", "description", "instructions"));
         return tools;
     }
@@ -100,7 +100,7 @@ public static class AppTools
     /// <summary>For the system prompt: what this app is, so the model knows where it runs and asks the help instead of guessing.</summary>
     public static string PromptSection(bool skills) =>
         L("Je draait in WinAIMagic, een app die grote AI-modellen helemaal op deze Windows-pc draait. De app heeft schermen voor chatten, modellen, documenten, afbeeldingen (Beeld), vergelijken, een cluster, het systeem en de hulp. Je kent de app: lees met app_help hoe iets werkt en met app_status hoe de app en deze pc er nu voor staan, en gok niet. Vraagt de gebruiker iets te doen in de app (een model downloaden, kiezen of starten, een instelling wijzigen, een scherm openen, een afbeelding maken), doe het dan zelf met app_action in plaats van uit te leggen hoe het moet. Doe alleen wat de gebruiker vraagt: download, verwijder of wissel een model nooit uit jezelf, ook niet als je het aanraadt.")
-        + (skills ? " " + L("Vraagt de gebruiker om een skill te maken of aan te passen, gebruik dan create_skill; een skill hoort niet in de werkmap of in WINAIMAGIC.md.") : "");
+        + (skills ? " " + L("Vraagt de gebruiker om een skill te maken of aan te passen, gebruik dan create_skill; een skill hoort niet in de werkmap of in WINAIMAGIC.md. Een skill is één compact, op zichzelf staand md-bestand: zet alles wat je leerde of verzamelde erin, en verwijs niet naar bestanden in de werkmap, want een later gesprek werkt in een andere map.") : "");
 
     // MARK: - running
 

@@ -328,6 +328,17 @@ public sealed class EngineHost : IDisposable
     public bool ChatModelReady => SelectedModel is { } m && !buildingPack && Store.StatusOf(m.Id).IsComplete && Plan != null && Blocked == null;
 
     /// <summary>Switch to another model: stops the engine first when it runs a different one.</summary>
+    /// <summary>"Start dit model", the first half: this model becomes the chosen one, and another one that runs or loads stops first.
+    /// False: this one runs or loads already, and nothing changes. The caller then starts the engine.</summary>
+    public async Task<bool> Choose(string id)
+    {
+        bool active = Engine?.State.IsActive == true;
+        if (active && Engine?.Model?.Id == id) return false;
+        if (active && Engine != null) await Engine.StopAndWait();
+        SelectedModelId = id;
+        return true;
+    }
+
     public async Task Select(string id)
     {
         bool wasActive = Engine?.State.IsActive == true;

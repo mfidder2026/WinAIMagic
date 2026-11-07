@@ -1,7 +1,7 @@
 ---
 title: Models
 icon: Library
-keywords: model download compact Q4 MTP memory VRAM RAM SSD stream update delete fast heavy images model folder
+keywords: model download compact Q4 MTP memory VRAM RAM SSD stream update delete fast heavy start stop images model folder
 ---
 ## Which model?
 A large model does not have to fit in memory entirely here. Each card says for this PC:
@@ -23,7 +23,8 @@ The **main engine** divides a large model over VRAM, RAM and SSD. The **second e
 - **Download**: resumes after an interruption, and every file is checked (sha256).
 - **Check for update**: finds out in a few seconds whether there is a newer version, without reading the model. An update starts at once.
 - **Update**: appears when there is a newer version; downloads only the files that differ.
-- **Heavy** / **Fast**: the model for chatting and writing, and the model for small work in Documents and Beeld.
+- **Start this model**: loads the model to chat with; another model that runs stops first. While it runs, the button says **Stop**. At the top, the button with the model's name starts any downloaded model too, on every page.
+- **Fast**: the model for small work in Documents and Beeld.
 - **Images**: the model for Beeld.
 - **Delete model**: frees the disk space (stop the model first).
 

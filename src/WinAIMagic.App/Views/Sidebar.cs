@@ -99,6 +99,11 @@ public sealed partial class Sidebar : Grid
             chatOrder = order;
             chats.Children.Clear();
             chatRows.Clear();
+            // the first row: a new conversation, where the list is (the pencil at the top does the same)
+            var add = Row(Ui.H(11, Ui.Icon(Glyph.NewChat, 14, Theme.Secondary), Ui.Label(L("Nieuw gesprek"), 13, Theme.Secondary)), app.NewConversation);
+            add.Tip(L("Nieuw gesprek (Ctrl+N)"));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(add, L("Nieuw gesprek"));
+            chats.Children.Add(add);
             foreach (var c in list)
             {
                 var id = c.Id;
@@ -109,14 +114,29 @@ public sealed partial class Sidebar : Grid
                 var waiting = new Microsoft.UI.Xaml.Shapes.Ellipse { Width = 7, Height = 7, Fill = Theme.Solid(Theme.Amber), Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Center };
                 waiting.Tip(L("Wacht op jouw goedkeuring"));
                 var texts = Ui.V(1, title, time);
-                var content = Ui.Row("*,auto", 6, texts, new Grid { Children = { busy, waiting } });
+                // on hover, unless it is busy or waits: then the ring or the dot stays
+                var trash = ChatUi.Plain(Ui.Icon(Glyph.Trash, 12, Theme.Secondary), () => _ = AskDelete(id), L("Verwijder dit gesprek"));
+                trash.Visibility = Visibility.Collapsed;
+                trash.VerticalAlignment = VerticalAlignment.Center;
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(trash, L("Verwijder dit gesprek"));
+                var content = Ui.Row("*,auto", 6, texts, new Grid { Children = { busy, waiting, trash } });
                 content.Width = 210;
                 var row = Row(content, () => app.Pane = new Pane(PaneKind.Chat, id));
+                void Hover(bool inside) => trash.Visibility = inside && !app.Chat.IsBusy(id) && app.Chat.ApprovalFor(id) == null ? Visibility.Visible : Visibility.Collapsed;
+                row.PointerEntered += (_, _) => Hover(true);
+                row.PointerExited += (_, _) => Hover(false);
+                // the Delete key on the conversation that has the focus
+                row.KeyDown += (_, e) =>
+                {
+                    if (e.Key != Windows.System.VirtualKey.Delete || app.Chat.IsBusy(id)) return;
+                    e.Handled = true;
+                    _ = AskDelete(id);
+                };
                 var menu = new MenuFlyout();
                 var stop = new MenuFlyoutItem { Text = L("Stoppen"), Icon = Ui.Icon(Glyph.Stop) };
                 stop.Click += (_, _) => app.Chat.Stop(id);
                 var delete = new MenuFlyoutItem { Text = L("Verwijderen"), Icon = Ui.Icon(Glyph.Trash) };
-                delete.Click += (_, _) => Delete(id);
+                delete.Click += (_, _) => _ = AskDelete(id);
                 menu.Items.Add(stop);
                 menu.Items.Add(delete);
                 menu.Opening += (_, _) =>
@@ -142,6 +162,15 @@ public sealed partial class Sidebar : Grid
             row.Busy.Visibility = working ? Visibility.Visible : Visibility.Collapsed;
             if (row.Busy.IsActive != working) row.Busy.IsActive = working;
         }
+    }
+
+    /// <summary>Every way of deleting asks first: it cannot be undone.</summary>
+    private async Task AskDelete(Guid id)
+    {
+        if (app.Chat.IsBusy(id) || app.Store.Conversations.FirstOrDefault(c => c.Id == id) is not { } c) return;
+        var answer = await Ui.Ask(app, L("Dit gesprek verwijderen?"), L($"'{c.DisplayTitle}' verdwijnt met alle berichten. Dit kun je niet ongedaan maken."),
+            L("Verwijderen"), danger: true);
+        if (answer == ContentDialogResult.Primary) Delete(id);
     }
 
     private void Delete(Guid id)

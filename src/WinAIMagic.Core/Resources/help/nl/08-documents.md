@@ -16,4 +16,4 @@ Maak Word-documenten zonder cloud-AI. Een **project** is een map met:
 
 Wat er op het voorblad moet, vul je één keer per project in. De documenten staan in `Documenten\WinAIMagic`.
 
-> Een snel model doet het kleine werk (notities per pagina, spelling) en een zwaar model het schrijven. Kies ze onder Modellen met **Snel** en **Zwaar**. Het snelle model draait op de processor, naast het zware op de videokaart.
+> Een snel model doet het kleine werk (notities per pagina, spelling) en een zwaar model het schrijven. Kies onder Modellen het snelle met **Snel**; het zware is het model dat je met **Start dit model** start. Het snelle model draait op de processor, naast het zware op de videokaart.

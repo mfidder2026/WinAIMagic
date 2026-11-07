@@ -268,15 +268,16 @@ public sealed class ModelCard
         delete.Show(!downloading && !building && (st.Have > 0 || Directory.Exists(Paths.ModelDir(model.Id))));
         delete.IsEnabled = !inUse;
         delete.Tip(inUse ? (makesImages ? L("Wacht tot de afbeelding klaar is.") : L("Stop eerst de engine.")) : null);
-        Roles(selected, st);
+        Roles(selected, st, running);
     }
 
-    /// <summary>The same three roles on every card: heavy and fast for a model that chats, images for one that draws. Filled in the
-    /// model's colour with a check when it has the role.</summary>
-    private void Roles(bool selected, ModelStore.ModelStatus st)
+    /// <summary>A model that chats: Snel, and the one thing to do with it once it is here, "Start dit model" (another one stops first), or
+    /// Stop while it runs, or that it loads. A model that draws: its role for images. A role is filled in the model's colour with a check.</summary>
+    private void Roles(bool selected, ModelStore.ModelStatus st, bool running)
     {
         bool fast = !makesImages && app.DocumentEngines.FastChoice?.Id == model.Id;
-        var key = $"{selected}|{fast}|{st.IsComplete}|{st.HeadersAvailable}|{app.Settings.FastModel}";
+        bool loading = !makesImages && !running && app.Host.Engine?.Model?.Id == model.Id && app.EngineState.Status == EngineStatus.Starting;
+        var key = $"{selected}|{fast}|{st.IsComplete}|{st.HeadersAvailable}|{app.Settings.FastModel}|{running}|{loading}";
         if (key == rolesKey) return;
         rolesKey = key;
         roles.Children.Clear();
@@ -288,12 +289,6 @@ public sealed class ModelCard
             roles.Children.Add(b);
             return;
         }
-        var heavy = Role(L("Zwaar"), Glyph.Think, selected, () =>
-        {
-            if (app.Settings.FastModel == model.Id) app.Settings.FastModel = "";
-            app.Select(model.Id);
-        });
-        heavy.IsEnabled = st.HeadersAvailable || selected;
         // the chosen one again: back to the automatic choice
         var quick = Role(L("Snel"), Glyph.Bolt, fast, () =>
         {
@@ -302,8 +297,20 @@ public sealed class ModelCard
         });
         quick.IsEnabled = !selected && st.IsComplete;
         quick.Tip(selected ? L("Dit is het zware model.") : L("Het snelle model doet in Documenten het kleine werk: notities, spelling, korter maken."));
-        roles.Children.Add(heavy);
         roles.Children.Add(quick);
+        if (running) roles.Children.Add(Ui.Btn(L("Stop"), app.StopEngine, Glyph.Stop));
+        else if (loading)
+        {
+            var busy = Ui.H(6, new ProgressRing { Width = 14, Height = 14, IsActive = true }, Ui.Label(L("Laden…"), 13, Theme.Secondary));
+            busy.VerticalAlignment = VerticalAlignment.Center;
+            roles.Children.Add(busy);
+        }
+        else if (st.IsComplete)
+        {
+            var start = Ui.Btn(L("Start dit model"), () => _ = app.StartModel(model.Id), Glyph.Play, family);
+            start.Tip(L("Laadt dit model; een ander model dat draait, stopt eerst."));
+            roles.Children.Add(start);
+        }
     }
 
     private async Task Download()
@@ -469,7 +476,7 @@ public sealed class EngineCard
             Update();
         };
         var body = Ui.V(10, head, bar, failed, why, warnings, buildPack, skipPart, Ui.V(4, toggle, logView));
-        View = Ui.Card(body, L("Engine"), Glyph.Bolt, Theme.Mint);
+        View = Ui.Card(body, L("Gekozen model"), Glyph.Bolt, Theme.Mint);
     }
 
     public void Update()

@@ -495,9 +495,47 @@ public sealed partial class StatusPill : Grid
         VerticalAlignment = VerticalAlignment.Center;
         text.MaxWidth = 300;
         Children.Add(Ui.H(7, dot, text));
-        this.Tip(all ? L("Welke modellen in het geheugen staan: klik voor het live dashboard") : L("Engine-status: klik voor het live dashboard"));
-        Tapped += (_, _) => app.Pane = new Pane(PaneKind.Live);
+        this.Tip(all ? L("Welk model er draait. Klik om een model te starten of te stoppen.") : L("Engine-status: klik voor het live dashboard"));
+        // at the top: a menu to start or stop a model on every page
+        if (all) Tapped += (_, _) => Menu().ShowAt(this, new Microsoft.UI.Xaml.Controls.Primitives.FlyoutShowOptions { Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.BottomEdgeAlignedLeft });
+        else Tapped += (_, _) => app.Pane = new Pane(PaneKind.Live);
         app.Watch(this, Update);
+    }
+
+    /// <summary>Every downloaded model to start with one click, Stop model, and the pages Modellen and Live.</summary>
+    private MenuFlyout Menu()
+    {
+        var menu = new MenuFlyout();
+        var store = app.Host.Store;
+        var ready = store.Catalog.Models.Where(m => store.StatusOf(m.Id).IsComplete).ToList();
+        bool active = app.EngineState.IsActive;
+        if (ready.Count == 0) menu.Items.Add(new MenuFlyoutItem { Text = L("Nog geen model gedownload"), IsEnabled = false });
+        else
+        {
+            menu.Items.Add(new MenuFlyoutItem { Text = L("Start een model"), IsEnabled = false });
+            foreach (var m in ready)
+            {
+                bool on = active && app.Host.Engine?.Model?.Id == m.Id;
+                var item = new MenuFlyoutItem { Text = m.Name + "  " + m.TotalSize.GbShort(), Icon = Ui.Icon(on ? Glyph.Done : Glyph.Play), IsEnabled = !on };
+                var id = m.Id;
+                item.Click += (_, _) => _ = app.StartModel(id);
+                menu.Items.Add(item);
+            }
+        }
+        if (active)
+        {
+            var stop = new MenuFlyoutItem { Text = L("Stop model"), Icon = Ui.Icon(Glyph.Stop) };
+            stop.Click += (_, _) => app.StopEngine();
+            menu.Items.Add(stop);
+        }
+        menu.Items.Add(new MenuFlyoutSeparator());
+        var models = new MenuFlyoutItem { Text = L("Modellen…") };
+        models.Click += (_, _) => app.Pane = new Pane(PaneKind.Models);
+        var live = new MenuFlyoutItem { Text = L("Live-dashboard") };
+        live.Click += (_, _) => app.Pane = new Pane(PaneKind.Live);
+        menu.Items.Add(models);
+        menu.Items.Add(live);
+        return menu;
     }
 
     /// <summary>Every model in memory with what it does: the chat engine (Zwaar), the second engine (Snel) and the image model while it
@@ -508,10 +546,11 @@ public sealed partial class StatusPill : Grid
         UpdateOwn();
     }
 
-    private static (string Text, Windows.UI.Color Color, int Rank)? Part(EngineState s, string? name, string role) => s.Status switch
+    /// <summary>`role` null: only one model runs, and its role says nothing.</summary>
+    private static (string Text, Windows.UI.Color Color, int Rank)? Part(EngineState s, string? name, string? role) => s.Status switch
     {
-        EngineStatus.Running => (L($"{name ?? "Model"} actief ({role})"), Theme.Mint, 1),
-        EngineStatus.Starting => (L($"{name ?? "Model"} laden… ({role})"), Theme.Amber, 2),
+        EngineStatus.Running => (role == null ? L($"{name ?? "Model"} actief") : L($"{name ?? "Model"} actief ({role})"), Theme.Mint, 1),
+        EngineStatus.Starting => (role == null ? L($"{name ?? "Model"} laden…") : L($"{name ?? "Model"} laden… ({role})"), Theme.Amber, 2),
         EngineStatus.Failed => (L($"{name ?? "Model"}: fout"), Theme.Pink, 3),
         _ => null,
     };
@@ -519,12 +558,14 @@ public sealed partial class StatusPill : Grid
     private void UpdateAll()
     {
         var parts = new List<(string Text, Windows.UI.Color Color, int Rank)>();
-        if (Part(app.EngineState, app.Host.Engine?.Model?.ShortName ?? app.Host.SelectedModel?.ShortName, L("Zwaar")) is { } heavy) parts.Add(heavy);
+        // the role only matters when a fast model runs beside the chat model
+        bool both = app.FastEngine?.State.Status is EngineStatus.Running or EngineStatus.Starting;
+        if (Part(app.EngineState, app.Host.Engine?.Model?.ShortName ?? app.Host.SelectedModel?.ShortName, both ? L("Zwaar") : null) is { } heavy) parts.Add(heavy);
         if (app.FastEngine is { } fast && Part(fast.State, fast.Model?.ShortName, L("Snel")) is { } quick) parts.Add(quick);
         if (app.Host.Images.Busy) parts.Add((L($"{app.Host.ImageModel?.ShortName ?? L("Beeld")} tekent"), Theme.Mint, 1));
         var color = parts.Count == 0 ? Theme.Rgb(140, 145, 160) : parts.MaxBy(p => p.Rank).Color;
         text.MaxWidth = 520;
-        text.SetIfChanged(parts.Count == 0 ? L("Geen model geladen") : string.Join(" · ", parts.Select(p => p.Text)));
+        text.SetIfChanged(parts.Count == 0 ? L("Geen model · klik om te starten") : string.Join(" · ", parts.Select(p => p.Text)));
         dot.Fill = new SolidColorBrush(color);
         BorderBrush = Theme.Solid(color, 0.4);
     }
@@ -562,7 +603,7 @@ public sealed partial class EngineButton : Grid
         this.app = app;
         VerticalAlignment = VerticalAlignment.Center;
         start = Ui.Btn(L("Start"), app.StartEngine, Glyph.Play, Theme.Accent);
-        stop = Ui.Btn(L("Stop"), app.StopEngine, Glyph.Stop);
+        stop = Ui.Btn(L("Stop model"), app.StopEngine, Glyph.Stop);
         Children.Add(start);
         Children.Add(stop);
         app.Watch(this, Update);
@@ -575,6 +616,13 @@ public sealed partial class EngineButton : Grid
         stop.Show(active);
         if (active) return;
         bool can = app.Host.CanStart;
+        // "Start <model>": which one is said on the button
+        var title = L($"Start {app.Host.SelectedModel?.ShortName ?? L("model")}");
+        if (start.Content is Panel content && content.Children.OfType<TextBlock>().FirstOrDefault() is { } label && label.Text != title)
+        {
+            label.Text = title;
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(start, title);
+        }
         if (start.IsEnabled != can) start.IsEnabled = can;
         start.Tip(can ? null : app.Host.WhyNotStartable);
     }

@@ -16,4 +16,4 @@ Make Word documents without a cloud AI. A **project** is a folder with:
 
 What goes on the cover page you fill in once per project. The documents are in `Documents\WinAIMagic`.
 
-> A fast model does the small work (notes per page, spelling) and a heavy model the writing. Choose them under Models with **Fast** and **Heavy**. The fast model runs on the processor, beside the heavy one on the graphics card.
+> A fast model does the small work (notes per page, spelling) and a heavy model the writing. Choose the fast one under Models with **Fast**; the heavy one is the model you start with **Start this model**. The fast model runs on the processor, beside the heavy one on the graphics card.

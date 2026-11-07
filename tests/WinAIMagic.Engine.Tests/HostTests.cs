@@ -847,6 +847,40 @@ public class HostTests : EngineTest
         await host.Engine.StopAndWait();
     }
 
+    /// <summary>"Start dit model": another model that runs stops first; the one that runs already is left as it is.</summary>
+    [Fact]
+    public async Task StartingAModelStopsTheOtherOne()
+    {
+        Settings.Shared.Port = FreePort();
+        var bytes = TestModels.TinyModel();
+        ModelInfo Tiny(string id) => new()
+        {
+            Id = id, Name = id, Family = "qwen", Summary = "s",
+            Files = new[] { new ModelFile { Local = id + ".gguf", Size = (ulong)bytes.Length, Sha256 = new[] { "" }, Url = "u" } },
+            Memory = (ulong)bytes.Length,
+        };
+        var catalog = new ModelCatalog { Models = new[] { Tiny("one"), Tiny("two") } };
+        foreach (var m in catalog.Models)
+        {
+            Directory.CreateDirectory(Paths.ModelDir(m.Id));
+            File.WriteAllBytes(Path.Combine(Paths.ModelDir(m.Id), m.Files[0].Local), bytes);
+        }
+        using var host = Host(new ModelStore(catalog, new HttpClient(new FakeServer()), timer: false), FakeGpuBackend.Nvidia(16));
+        Assert.True(await host.Choose("one"));
+        host.StartEngine();
+        Assert.True(WaitUntil(() => host.Engine!.State.IsRunning));
+        var first = host.Engine!;
+        Assert.False(await host.Choose("one"));
+        Assert.True(first.State.IsRunning);
+        Assert.True(await host.Choose("two"));
+        Assert.False(first.State.IsActive);
+        Assert.Equal("two", host.SelectedModelId);
+        host.StartEngine();
+        Assert.True(WaitUntil(() => host.Engine!.State.IsRunning));
+        Assert.Equal("two", host.Engine!.Model!.Id);
+        await host.Engine.StopAndWait();
+    }
+
     [Fact]
     public async Task TheModelsMoveThroughTheHostAndAreFoundThere()
     {

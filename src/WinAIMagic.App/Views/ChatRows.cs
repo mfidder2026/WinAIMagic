@@ -459,10 +459,13 @@ public sealed partial class Disclosure : StackPanel
     }
 }
 
-/// <summary>The steps of an answer, folded above 3: a long task takes dozens of them, and the chat is about the answer.</summary>
+/// <summary>The steps of an answer. While the model works the list grows, so every step shows as it comes (the latest twelve, with
+/// how many came before); when the answer is done it folds into one line, since the chat is about the answer. Up to 3 are simply shown.</summary>
 public sealed partial class ActivityList : StackPanel
 {
     private const int FoldAbove = 3;
+    /// <summary>While working, at most this many of the latest steps.</summary>
+    private const int Live = 12;
     private readonly RowMemory memory;
     private string shown = "";
     private List<ToolActivity> last = [];
@@ -472,6 +475,8 @@ public sealed partial class ActivityList : StackPanel
     {
         this.memory = memory;
         Spacing = 4;
+        // the steps stay on the left, also when the list opens
+        HorizontalAlignment = HorizontalAlignment.Stretch;
     }
 
     public void Update(List<ToolActivity> list, bool stream)
@@ -487,7 +492,24 @@ public sealed partial class ActivityList : StackPanel
     private void Rebuild()
     {
         Children.Clear();
-        if (last.Count > FoldAbove)
+        if (last.Count <= FoldAbove) foreach (var a in last) Add(new ActivityRow(a, memory));
+        else if (streaming && !memory.Steps)
+        {
+            int hidden = last.Count - Live;
+            if (hidden > 0)
+            {
+                var earlier = ChatUi.Plain(Ui.H(6, Ui.Icon(Glyph.Bullets, 13, Theme.Tertiary), Ui.Label(L($"{hidden} eerdere stappen"), 13, Theme.Tertiary)), () =>
+                {
+                    memory.Steps = true;
+                    shown = "";
+                    Update(last, streaming);
+                });
+                earlier.Padding = new Thickness(2, 1, 6, 2);
+                Add(earlier);
+            }
+            foreach (var a in last.Skip(Math.Max(0, hidden))) Add(new ActivityRow(a, memory));
+        }
+        else
         {
             var fold = new Disclosure(Glyph.Bullets, memory.Steps, on =>
             {
@@ -496,12 +518,15 @@ public sealed partial class ActivityList : StackPanel
                 DispatcherQueue.TryEnqueue(() => { shown = ""; Update(last, streaming); });
             });
             fold.SetTitle(L($"{last.Count} stappen"), false);
-            Children.Add(fold);
-            if (memory.Steps) foreach (var a in last) Children.Add(new ActivityRow(a, memory));
-            // while it works, what it is doing now
-            else if (streaming) foreach (var a in last.Skip(last.Count - 2)) Children.Add(new ActivityRow(a, memory));
+            Add(fold);
+            if (memory.Steps) foreach (var a in last) Add(new ActivityRow(a, memory));
         }
-        else foreach (var a in last) Children.Add(new ActivityRow(a, memory));
+    }
+
+    private void Add(FrameworkElement e)
+    {
+        e.HorizontalAlignment = HorizontalAlignment.Left;
+        Children.Add(e);
     }
 }
 

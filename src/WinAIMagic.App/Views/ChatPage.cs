@@ -338,12 +338,12 @@ public sealed class ChatPage : IPage
                 content = Ui.Row("auto,*,auto", 8, Ui.Icon(Glyph.Warning, 14, new SolidColorBrush(Theme.Red)), Ui.Caption(s.Message, Theme.Primary, 13), again);
                 break;
             default:
-                var start = Ui.Btn(L("Start engine"), app.StartEngine, null, Theme.Accent);
+                var start = Ui.Btn(L($"Start {app.Host.SelectedModel?.ShortName ?? L("model")}"), app.StartEngine, null, Theme.Accent);
                 start.IsEnabled = can;
                 start.Tip(can ? null : app.Host.WhyNotStartable);
-                string said = !can ? app.Host.WhyNotStartable ?? L("Model of engine nog niet klaar: zie Modellen.")
-                    : onFast != null ? L($"{onFast.ShortName} draait nu alleen als snel model, op de processor, voor Documenten en Beeld. Start de engine om ermee te chatten; dan stopt het snelle exemplaar.")
-                    : L("De engine staat uit.");
+                string said = !can ? app.Host.WhyNotStartable ?? L("Het gekozen model staat er nog niet: kies of download er een bij Modellen.")
+                    : onFast != null ? L($"{onFast.ShortName} draait nu alleen als snel model, op de processor, voor Documenten en Beeld. Start het om ermee te chatten; dan stopt het snelle exemplaar.")
+                    : L("Er is geen model gestart. Je vraag start het vanzelf, of klik op Start.");
                 content = Ui.Row("auto,*,auto", 8, Ui.Icon(Glyph.Power, 14, Theme.Secondary), Ui.Caption(said, Theme.Primary, 13), start);
                 break;
         }

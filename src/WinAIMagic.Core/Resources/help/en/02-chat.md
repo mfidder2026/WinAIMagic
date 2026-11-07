@@ -1,10 +1,16 @@
 ---
 title: Chat
 icon: Chat
-keywords: conversation question thinking temperature system prompt context summary go on image paste copy stop
+keywords: conversation question thinking temperature system prompt context summary go on image paste copy stop new conversation delete trash
 ---
 ## Asking a question
 Type your question at the bottom and press **Enter**. **Shift+Enter** starts a new line. The answer appears while the model writes; **Stop** breaks it off.
+
+When no model runs yet, your question starts it by itself. Another model starts with one click: click the button with the model's name at the top and choose it, or press **Start this model** on its card under Models.
+
+## Managing conversations
+- **New conversation**: **New conversation** at the top of the conversations in the sidebar, the pencil at the top, or Ctrl+N. There is no maximum; the list scrolls.
+- **Delete**: move over a conversation and click the trash can, or select it and press Delete (also with a right-click). The app asks first. Stop a conversation that is busy first.
 
 ## Buttons below the input field
 | Button | What it does |

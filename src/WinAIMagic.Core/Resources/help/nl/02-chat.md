@@ -1,10 +1,16 @@
 ---
 title: Chatten
 icon: Chat
-keywords: gesprek vraag denken nadenken temperatuur systeemprompt context samenvatting ga door afbeelding plakken kopiëren stop
+keywords: gesprek vraag denken nadenken temperatuur systeemprompt context samenvatting ga door afbeelding plakken kopiëren stop nieuw gesprek verwijderen prullenbak
 ---
 ## Een vraag stellen
 Typ je vraag onderin en druk op **Enter**. Met **Shift+Enter** begin je een nieuwe regel. Het antwoord verschijnt terwijl het model schrijft; **Stop** breekt het af.
+
+Staat er nog geen model aan, dan start je vraag het vanzelf. Een ander model start je met één klik: klik op de knop met de modelnaam bovenaan en kies het, of druk op **Start dit model** op de kaart onder Modellen.
+
+## Gesprekken beheren
+- **Nieuw gesprek**: **Nieuw gesprek** bovenaan de gesprekken in de zijbalk, het potlood bovenaan, of Ctrl+N. Er is geen maximum; de lijst scrolt.
+- **Verwijderen**: beweeg over een gesprek en klik op de prullenbak, of selecteer het en druk op Delete (ook met een rechtermuisklik). De app vraagt eerst of je het zeker weet. Een gesprek dat bezig is, stop je eerst.
 
 ## Knoppen onder het invoerveld
 | Knop | Wat het doet |

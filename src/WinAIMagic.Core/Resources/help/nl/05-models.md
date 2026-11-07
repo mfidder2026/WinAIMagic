@@ -1,7 +1,7 @@
 ---
 title: Modellen
 icon: Library
-keywords: model downloaden compact Q4 MTP geheugen VRAM RAM SSD streamen update verwijderen snel zwaar afbeeldingen modelmap
+keywords: model downloaden compact Q4 MTP geheugen VRAM RAM SSD streamen update verwijderen snel zwaar start starten stoppen afbeeldingen modelmap
 ---
 ## Welk model?
 Een groot model hoeft hier niet helemaal in het geheugen te passen. Elke kaart zegt voor deze pc:
@@ -23,7 +23,8 @@ De **hoofdengine** verdeelt een groot model over VRAM, RAM en SSD. De **tweede e
 - **Download**: gaat verder na een onderbreking, en elk bestand wordt gecontroleerd (sha256).
 - **Controleer op update**: kijkt in een paar seconden of er een nieuwere versie is, zonder het model te lezen. Een update begint meteen.
 - **Update**: verschijnt als er een nieuwere versie is; downloadt alleen de bestanden die anders zijn.
-- **Zwaar** / **Snel**: het model voor chatten en schrijven, en het model voor klein werk in Documenten en Beeld.
+- **Start dit model**: laadt het model om mee te chatten; een ander model dat draait, stopt eerst. Draait het, dan staat er **Stop**. Bovenaan start je met de knop met de modelnaam ook elk gedownload model, op elke pagina.
+- **Snel**: het model voor klein werk in Documenten en Beeld.
 - **Afbeeldingen**: het model voor Beeld.
 - **Verwijder model**: maakt de schijfruimte vrij (stop het model eerst).
 

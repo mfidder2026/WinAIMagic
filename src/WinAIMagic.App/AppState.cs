@@ -182,6 +182,15 @@ public sealed partial class AppState : INotifyPropertyChanged, IDisposable
 
     public void Select(string id) => Task.Run(() => Host.Select(id));
 
+    /// <summary>"Start dit model": choose it and start it in one go; another model that runs stops first. A model that was the fast one is
+    /// that no longer: the heavy and the fast model are never the same.</summary>
+    public Task StartModel(string id) => Task.Run(async () =>
+    {
+        if (Settings.FastModel == id) Settings.FastModel = "";
+        if (!await Host.Choose(id) || !Host.CanStart) return;
+        await StartEngineTask();
+    });
+
     /// <summary>One image; the documents module goes first when it is at work, and its fast model makes room when it is not.</summary>
     public Task MakeImage(string prompt, ImageSize size) => Task.Run(() => Host.MakeImage(prompt, size, async () =>
     {

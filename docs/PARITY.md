@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.13.0
+# Parity with MacAIMagic 1.14.0
 
-How this version relates to MacAIMagic at commit `19213aa`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `3ece2c5`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -36,6 +36,28 @@ How this version relates to MacAIMagic at commit `19213aa`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `3ece2c5` (1.14.0): a model in one click, conversations, the step list, skills in one file
+
+- **Not needed:** `3ece2c5` (the Mac's release; WinAIMagic takes its number, 1.14.0), and in `c7cba76` the Mac's quick build without notarization (`NOTARIZE=0` in make_app.sh).
+- **Taken over, `ab8f005`, the step list:** while the model works every step shows as it comes, the latest twelve with a "N eerdere stappen" button that opens the whole list; a finished answer folds into "N stappen". The rows stay on the left. (The owner had reported this on the Mac; the earlier Windows fix of that report was taken back then, on their word, and this is the Mac's version.)
+- **Taken over, `2c4548e` and `b1ae116`, conversations:** "Nieuw gesprek" is the first row under Gesprekken; a trash can shows on hover unless the conversation is busy or waits; Delete deletes the conversation that has the focus; every way of deleting, the right-click menu too, asks first ("Dit gesprek verwijderen?"). Help topic Chat (nl, en).
+- **Taken over, `20da6a0`, skills:** create_skill and the prompt line ask for one complete, condensed Markdown text without references to files in the work folder.
+- **Adapted, `c7cba76`, a model in one click:**
+  - Every downloaded chat model's card has "Start dit model" (another model stops first, through `EngineHost.Choose`), Stop while it runs, and "Laden…" while it loads. The Zwaar button is gone; Snel stays, and a model that was Snel stops being that when it is started.
+  - The pill at the top is a menu: every downloaded model, Stop model, Modellen… and Live-dashboard. With nothing running it says "Geen model · klik om te starten"; "(Zwaar)" only when a fast model runs beside it.
+  - The same words elsewhere: "Start <model>" and "Stop model" on Live, the chat banner, and "Gekozen model" for the card that was called Engine.
+  - Windows: StartModel stops the fast copy of the same model through the existing StartEngineTask; the Mac also stops its fast engine. Here the memory planner already plans the second engine beside the main one, so that is left as it was.
+  - Test: HostTests.StartingAModelStopsTheOtherOne.
+- Checked in the Debug app with the fake engine and a sparse stand-in model file:
+  - the version v1.14.0;
+  - the new conversation row;
+  - the delete question, cancelled;
+  - the trash can on hover;
+  - the menu's items;
+  - "Start dit model" on the card;
+  - "Gekozen model".
+- Not checked: starting a real model from the card or the menu, and the step list during a long real task.
 
 ### Windows only, after `19213aa`: speech on the PC
 
