@@ -105,6 +105,16 @@ Ministral-3-8B Q4 is the model for a PC with 8 or 16 GB of RAM. Measured on the 
 
 On 8 GB of RAM without a card the model needs about 5 GB free. With a limit of 5 GB on what it may keep in memory it still writes 5 tok/s; with 4.5 GB it drops to 0.7 tok/s, also at a smaller context, and a real SSD would make that worse. So close other programs there.
 
+**Nanbeige4.2-3B Q4** (2.7 GB) is the model for a PC with 6 to 12 GB of RAM, where Ministral would stream. It runs its 22 layers twice per token, so it writes no faster than Ministral, but it needs half the memory and it thinks before it answers. Measured on the same PC in the same way, a 3,100-token prompt and 300 tokens:
+
+| Stands in for | Context | Prompt reading | Writing |
+|---|---|---|---|
+| A card, all of it on the card | 16K | 3,216 tok/s | **67.8 tok/s** (Ministral 65.2) |
+| No card: 4 processor threads | 8K | 26 tok/s | **2.8 tok/s** (Ministral 3.3) |
+| No card, at most 4.5, 4 or 3.5 GB in memory | 8K | 26 tok/s | **2.8 tok/s** |
+
+In the app, on a simulated PC of 8 GB without a card, it answered at 3.4 tok/s, made a step list, wrote a file and asked before running it. The system prompt and the tools take 4K of its 8K context there. A small model at 4 bit slips at times: once it wrote "Parfie" for Paris. The 6 GB PC is computed only.
+
 **The 8-bit cache.** With a video card the second engine keeps what it remembers of the conversation (the KV cache) in 8 bits instead of 16. Measured with Ministral on this PC:
 
 - At 32K context it uses 8.6 GB of VRAM instead of 10.6; at 8K, 6.8 instead of 7.3.
@@ -139,6 +149,7 @@ Beside what it holds of its own, the engine reads the model files from disk; 512
 
 | Model | Download | Licence |
 |---|---|---|
+| Nanbeige4.2-3B Q4 | 3 GB | Apache 2.0 |
 | Ministral-3-8B Q4 | 5 GB | Apache 2.0 |
 | FLUX.2 Klein 4B (images) | 5 GB | Apache 2.0 |
 | Qwen3.6-35B-A3B Q4 | 22 GB | Qwen community licence, shown before download |
@@ -151,7 +162,7 @@ Beside what it holds of its own, the engine reads the model files from disk; 512
 | DeepSeek-V4.1-Flash Compact | 277 GB | MIT |
 | DeepSeek-V4.1-Flash Q4 | 459 GB | MIT |
 
-Read the model licences before using a model commercially. Only Ministral, Qwen3.6 and GLM-5.3-Flash Compact 24 have been run on the test PC so far.
+Read the model licences before using a model commercially. Only Nanbeige, Ministral, Qwen3.6 and GLM-5.3-Flash Compact 24 have been run on the test PC so far.
 
 ## Privacy
 

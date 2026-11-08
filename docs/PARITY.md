@@ -248,6 +248,8 @@ All numbers here are computed by the planner for Qwen3.6-35B-A3B. None has been 
 
 - **Ministral-3-8B Q4,** a small model for a PC with 8 or 16 GB of RAM, is in this catalog and not yet on the Mac. It has no experts, so the planner treats it differently here: it never repacks into RAM (the same 5.3 tok/s, 3.6 GB less private memory), has no expert cache, and gets 8K of context where memory is short. It is only recommended on a PC with less than 23 GiB and a card of at most 8 GB; a larger card still gets Qwen3.6.
 
+- **Nanbeige4.2-3B Q4** (2.7 GB, Apache 2.0, bartowski's GGUF pinned at one commit), a small model that thinks and is strong with tools, is in this catalog and not yet on the Mac. It is recommended on a PC with 6 to 12 GB of RAM, where Ministral streams; 16 GB keeps Ministral, which also reads pictures. It runs its 22 layers twice per token, each pass with a KV cache of its own: 181 KB per token in 16 bits, measured on the 5060 Ti. A model without experts now never gets less than 8K of context, also where it only just fits (Nanbeige on 12 GB came to 4K).
+
 - **Making images** is here and not yet on the Mac: the **Images** page, FLUX.2 Klein 4B and an image engine of its own, one process per image so that all its memory is free afterwards. See `ImagePlanner` for what was measured. The Mac has one pool of memory and another GPU backend, so its rules will differ.
 
 ## Mac gaps fixed here (brief §11)

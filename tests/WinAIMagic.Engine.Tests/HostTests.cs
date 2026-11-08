@@ -248,7 +248,7 @@ public class SystemCheckTests : EngineTest
     public void ASmallPcIsToldItStreams()
     {
         var b = FakeGpuBackend.Cpu();
-        using var host = Host(SystemInfo.Simulated(b, 6, 8), b);
+        using var host = Host(SystemInfo.Simulated(b, 4, 8), b);
         var model = SystemCheck.ModelItems(host).Single(i => i.Id == "model");
         Assert.Equal(SystemCheck.CheckState.Optional, model.State);
         Assert.Contains("streamen", model.Detail);
@@ -275,10 +275,10 @@ public class SystemCheckTests : EngineTest
         using (var host = Host(SystemInfo.Simulated(none, 8, 8), none))
         {
             var model = SystemCheck.ModelItems(host).Single(i => i.Id == "model");
-            Assert.Contains("deze pc met 8 GB RAM: Ministral-3-8B Q4", model.Detail);
+            Assert.Contains("deze pc met 8 GB RAM: Nanbeige4.2-3B Q4", model.Detail);
             Assert.Contains("nog niet gemeten", model.Detail);
             Assert.DoesNotContain("VRAM", model.Detail);
-            Assert.Equal("ministral-3-8b-q4", host.SelectedModelId);
+            Assert.Equal("nanbeige4.2-3b-q4", host.SelectedModelId);
         }
         // the model fits, and a PC without a card is not told about its VRAM
         using (var host = Host(SystemInfo.Simulated(none, 16, 8), none))

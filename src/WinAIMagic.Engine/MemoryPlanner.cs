@@ -252,7 +252,9 @@ public static class MemoryPlanner
             kvTokens = Math.Min(kvTokens, Math.Max(Sub(limit, fixedOnCard + KvBase) / perToken, PlainSmallContext));
         // the KV cache lives on the card, unless not even the dense weights do
         else if (s.HasGpu && limit >= fixedOnCard) kvTokens = Math.Min(kvTokens, (limit - fixedOnCard) / perToken);
-        return Math.Max(4096, (int)Math.Min(kvTokens, int.MaxValue) / 4096 * 4096);
+        // a model without experts that only just fits keeps the context it would get when it did not fit: the system prompt and
+        // the tools need it (Nanbeige on 12 GB without a card came to 4K)
+        return Math.Max(index.ExpertBytes == 0 ? PlainSmallContext : 4096, (int)Math.Min(kvTokens, int.MaxValue) / 4096 * 4096);
     }
 
     /// <summary>The chosen context, at most what the model was made for, and on a small PC at most what leaves the model its room.</summary>
