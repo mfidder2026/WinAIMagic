@@ -133,7 +133,12 @@ public sealed partial class MessageRow : Grid
     /// <summary>Beside the spinner: what the model prepares (a file, a command), or "Bezig…".</summary>
     private readonly TextBlock busyText = Ui.Label("", 13, Theme.Secondary);
     private StackPanel busyRow = null!;
-    private MarkdownView answer = null!;
+    private MarkdownView answer = null!, answerTail = null!;
+    /// <summary>A very long answer shows its start and end until the user asks for all of it.</summary>
+    private Button showAll = null!;
+    private TextBlock showAllText = null!;
+    private bool showWhole;
+    private string lastText = "";
     private TextBlock error = null!;
     private Border sources = null!;
     private TextBlock stats = null!;
@@ -149,8 +154,10 @@ public sealed partial class MessageRow : Grid
     {
         this.memory = memory;
         this.shifted = shifted;
-        assistant = m.Automatic != true && m.Role != ChatRole.User;
-        if (m.Automatic == true) BuildNudge();
+        // only the app's own push-on is a nudge; a skill the app loaded itself shows as a step
+        assistant = m.Role != ChatRole.User;
+        if (m.Automatic == true && m.Role == ChatRole.User && m.Attachments.Count > 0) BuildLook(m);
+        else if (m.Automatic == true && m.Role == ChatRole.User) BuildNudge();
         else if (m.Role == ChatRole.User) BuildUser(m);
         else BuildAssistant();
         Update(m, streaming);
@@ -160,6 +167,17 @@ public sealed partial class MessageRow : Grid
     {
         var row = Ui.H(6, Ui.Icon(Glyph.Refresh, 12, Theme.Secondary), Ui.Label(L("Het model was nog niet klaar en gaat automatisch door"), 12, Theme.Secondary));
         row.HorizontalAlignment = HorizontalAlignment.Center;
+        Children.Add(row);
+    }
+
+    /// <summary>A picture the model asked to look at (view_image): small, so the user sees what it saw.</summary>
+    private void BuildLook(ChatMessage m)
+    {
+        var row = Ui.H(8);
+        row.HorizontalAlignment = HorizontalAlignment.Center;
+        foreach (var a in m.Attachments) row.Children.Add(ChatUi.Thumb(a.Jpeg, 160, 6));
+        var names = string.Join(", ", m.Attachments.Select(a => a.Filename));
+        row.Children.Add(Ui.H(6, Ui.Icon(Glyph.Eye, 12, Theme.Secondary), Ui.Label(L($"Het model bekijkt {names}"), 12, Theme.Secondary)));
         Children.Add(row);
     }
 
@@ -211,7 +229,7 @@ public sealed partial class MessageRow : Grid
                 thoughts = new MarkdownView(shifted, true, 13, Theme.Secondary);
                 var rule = new Border { Child = thoughts, BorderBrush = Theme.Solid(Colors.White, 0.18), BorderThickness = new Thickness(2, 0, 0, 0), Padding = new Thickness(10, 0, 0, 0), Margin = new Thickness(0, 4, 0, 0) };
                 thinking.Content = rule;
-                thoughts.Set(reasoning);
+                thoughts.Set(LongText.ThinkingEnd(reasoning));
             }
         });
         if (memory.Thinking) thinking.SetOpen(true);
@@ -236,7 +254,11 @@ public sealed partial class MessageRow : Grid
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(speak, L("Lees voor"));
         statsRow = Ui.H(10, stats, copy, speak);
 
-        var body = Ui.V(10, thinking, steps, busyRow, answer, error, sources, statsRow);
+        answerTail = new MarkdownView(shifted);
+        showAllText = Ui.Label("", 13, new SolidColorBrush(Theme.Accent));
+        showAll = ChatUi.Plain(showAllText, () => { showWhole = true; ShowText(lastText); }, L("Toon alles"));
+        showAll.HorizontalAlignment = HorizontalAlignment.Left;
+        var body = Ui.V(10, thinking, steps, busyRow, answer, showAll, answerTail, error, sources, statsRow);
         card = new Border
         {
             Child = body, Padding = new Thickness(16), CornerRadius = new CornerRadius(18), HorizontalAlignment = HorizontalAlignment.Left,
@@ -244,6 +266,24 @@ public sealed partial class MessageRow : Grid
         };
         Grid.SetColumn(card, 1);
         Children.Add(card);
+    }
+
+    /// <summary>The answer; a very long one as its start and end with "Toon alles" between them.</summary>
+    private void ShowText(string text)
+    {
+        lastText = text;
+        answer.Show(text.Length > 0);
+        var folded = showWhole ? null : LongText.Folded(text);
+        showAll.Show(folded != null);
+        answerTail.Show(folded != null);
+        if (folded is { } f)
+        {
+            answer.Set(f.Head);
+            answerTail.Set(f.Tail);
+            var hidden = f.Hidden.ToString("N0", AppLanguages.Current.Culture());
+            showAllText.SetIfChanged(L($"… {hidden} tekens verborgen · Toon alles"));
+        }
+        else answer.Set(text);
     }
 
     /// <summary>Show the message as it is now; cheap when nothing changed.</summary>
@@ -256,7 +296,7 @@ public sealed partial class MessageRow : Grid
         {
             thinking.SetTitle(waiting ? L("Denkt na…") : L("Gedachtegang"), waiting);
             reasoning = m.Reasoning;
-            thoughts?.Set(reasoning);
+            thoughts?.Set(LongText.ThinkingEnd(reasoning));
         }
         steps.Show(m.Activities.Count > 0);
         if (m.Activities.Count > 0) steps.Update(m.Activities, streaming);
@@ -266,8 +306,7 @@ public sealed partial class MessageRow : Grid
         spinner.Active = spin;
         busyRow.Show(spin);
         if (spin) busyText.SetIfChanged(preparing ? m.Preparing! : L("Bezig…"));
-        answer.Show(m.Text.Length > 0);
-        answer.Set(m.Text);
+        ShowText(m.Text);
         error.Show(m.Error != null);
         if (m.Error != null) error.SetIfChanged(m.Error);
         UpdateSources(m.Sources);

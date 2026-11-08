@@ -21,6 +21,25 @@ internal static class TextLimit
     }
 }
 
+/// <summary>How the chat shows a very long message: a monologue of 100,000 characters made the Mac's chat go blank, and is slow
+/// to lay out here too.</summary>
+public static class LongText
+{
+    /// <summary>A very long text as its start and its end, cut at line ends; null when it is short enough to show whole.</summary>
+    public static (string Head, int Hidden, string Tail)? Folded(string text, int above = 12_000, int keep = 4000)
+    {
+        if (text.Length <= above) return null;
+        var head = TextLimit.Prefix(text, keep);
+        if (head.LastIndexOf('\n') is var nl and > 0) head = head[..nl];
+        var tail = TextLimit.Suffix(text, keep);
+        if (tail.IndexOf('\n') is var first and >= 0) tail = tail[(first + 1)..];
+        return (head, text.Length - head.Length - tail.Length, tail);
+    }
+
+    /// <summary>A very long thinking text shows its end.</summary>
+    public static string ThinkingEnd(string text) => text.Length > 12_000 ? "…\n" + TextLimit.Suffix(text, 8000) : text;
+}
+
 /// <summary>Write beside the file, then rename. Antivirus can hold a file for a moment: then try again.</summary>
 internal static class AtomicFile
 {

@@ -85,5 +85,50 @@ public static class Skills
         return $"There is no skill named \"{name}\". Available: " + string.Join(", ", skills.Select(s => s.Name));
     }
 
+    /// <summary>Words that say nothing about a subject.</summary>
+    private static readonly HashSet<string> Common =
+    [
+        "voor", "met", "een", "het", "van", "naar", "zodra", "worden", "wordt", "moet", "laden", "plus", "geteste", "vaste",
+        "code", "harde", "regels", "this", "that", "with", "when", "from", "load", "loaded", "into", "your", "what", "alle",
+        "deze", "maken", "schrijven", "programmeren", "gebruik", "door", "over", "wilt", "skill", "instructies", "windows",
+    ];
+
+    internal static HashSet<string> Words(string text)
+    {
+        var words = new HashSet<string>();
+        var word = new System.Text.StringBuilder();
+        foreach (var ch in text.ToLowerInvariant() + " ")
+        {
+            if (char.IsLetterOrDigit(ch)) { word.Append(ch); continue; }
+            if (word.Length > 0) { words.Add(word.ToString()); word.Clear(); }
+        }
+        return words;
+    }
+
+    /// <summary>The skills a question is clearly about: a word of the skill's name, and at least three words of its name and
+    /// description together in the question. A small model often skips use_skill; then the app loads these itself.</summary>
+    public static List<Skill> Matching(string question, IReadOnlyList<Skill>? skills = null)
+    {
+        var asked = Words(question);
+        // "sprite" counts for "sprites": a shared start of at least four letters
+        bool Found(string term) => asked.Any(a => a == term
+            || (Math.Min(a.Length, term.Length) >= 4 && (a.StartsWith(term, StringComparison.Ordinal) || term.StartsWith(a, StringComparison.Ordinal))));
+        var scored = new List<(Skill Skill, int Hits)>();
+        foreach (var s in skills ?? All)
+        {
+            var name = Words(s.Name.Replace('-', ' '));
+            name.ExceptWith(Common);
+            var terms = new HashSet<string>(name);
+            terms.UnionWith(Words(s.Description).Where(w => w.Length >= 4 || w.Any(char.IsDigit)));
+            terms.ExceptWith(Common);
+            int hits = terms.Count(Found);
+            if (name.Any(Found) && hits >= 3) scored.Add((s, hits));
+        }
+        return scored.OrderByDescending(x => x.Hits).Take(2).Select(x => x.Skill).ToList();
+    }
+
+    /// <summary>The step of a skill the app loaded itself.</summary>
+    public static string AutoLabel(string name) => L($"Skill geladen: {name} (vanzelf)");
+
     public static string Label(ToolCall call) => L($"Skill laden: {WorkspaceTools.Str(WorkspaceTools.Args(call), "name") ?? ""}");
 }

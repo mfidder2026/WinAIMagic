@@ -96,7 +96,7 @@ public class ChatRequestTests : ChatTest
         Assert.Equal(1.0, body["top_p"]!.GetValue<double>());
         Assert.True(body["chat_template_kwargs"]!["enable_thinking"]!.GetValue<bool>());
         Assert.Equal("high", body["chat_template_kwargs"]!["reasoning_effort"]!.GetValue<string>());
-        Assert.False(body.ContainsKey("max_tokens"));
+        Assert.Equal(16_384, body["max_tokens"]!.GetValue<int>());   // a quarter of the context
         Assert.Equal(16_000, body["thinking_budget_tokens"]!.GetValue<int>());
         Assert.Equal("\n\nGenoeg nagedacht; nu schrijf ik het antwoord.\n", body["reasoning_budget_message"]!.GetValue<string>());
         Assert.False(body.ContainsKey("tools"), "no web, no folder");
@@ -683,7 +683,7 @@ public class AgentLoopTests : ChatTest
         await Ask("Werk", engine);
         Assert.False(File.Exists(Path.Combine(work, "half.txt")));
         Assert.DoesNotContain(C.Messages, m => m.ToolCalls.Count > 0);
-        Assert.Equal("Je antwoord werd afgekapt omdat je context vol was. Ga verder waar je gebleven was.", C.Messages.Single(m => m.Automatic == true).Text);
+        Assert.Equal("Je antwoord werd te lang en is afgekapt; je krijgt alleen het begin en het eind terug. Denk of plan niet opnieuw in tekst: doe nu meteen de volgende stap met gereedschap. Schrijf grote code in delen: één bestand of één deel per write_file.", C.Messages.Single(m => m.Automatic == true).Text);
     }
 
     [Fact]

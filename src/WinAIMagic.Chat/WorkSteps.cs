@@ -72,6 +72,18 @@ public static class WorkSteps
         return $"Task list updated: {done} of {steps.Count} done" + (doing.Count == 0 ? "." : "; now: " + string.Join(", ", doing) + ".");
     }
 
+    /// <summary>After this many rounds of tools without task_list, the model is reminded of its list.</summary>
+    public const int RemindAfter = 6;
+
+    /// <summary>A line for the model when its list has open steps and it has not touched the list for a while; null otherwise.
+    /// Seen on the Mac: a 70-round C64 task set up 7 steps, ticked off the first, and never touched the list again.</summary>
+    public static string? Reminder(List<WorkStep>? steps, int roundsSince)
+    {
+        if (steps == null || roundsSince < RemindAfter || steps.TrueForAll(s => s.IsDone)) return null;
+        var list = string.Join("\n", steps.Select(s => $"- [{s.Status}] {s.Title}"));
+        return $"(Reminder from the app: the user sees your step list, and it has not changed for {roundsSince} rounds. If a step is done or another one started, call task_list now with the whole list. Your list:\n{list})";
+    }
+
     public static string Label(List<WorkStep>? steps)
     {
         if (steps == null) return L("Stappenlijst");

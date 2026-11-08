@@ -18,6 +18,7 @@ public sealed class ToolError(string message) : Exception(message)
     public static ToolError NotUnique(int n) => new($"old_text occurs {n} times; it must occur exactly once. Include more surrounding text.");
     public static ToolError TooBig(string p) => new($"{p} is larger than 2 MB; read it with offset/limit or tail.");
     public static ToolError BadBase64() => new("content is not valid base64.");
+    public static ToolError NotImage(string p) => new($"{p} is not an image this app can read (use PNG or JPEG).");
     public static ToolError BadName(string p) => new($"{p} is not a usable file name on Windows: alternate data streams (name:stream) and device names (CON, NUL, COM1, ...) are not allowed.");
 }
 
@@ -25,7 +26,10 @@ public sealed class ToolError(string message) : Exception(message)
 /// Every path is resolved inside the workspace; anything that points outside it is refused.</summary>
 public static class WorkspaceTools
 {
-    public static readonly IReadOnlySet<string> Names = new HashSet<string> { "list_dir", "read_file", "write_file", "edit_file", "run_command" };
+    public static readonly IReadOnlySet<string> Names = new HashSet<string> { "list_dir", "read_file", "write_file", "edit_file", "run_command", ImageTool };
+    /// <summary>Looks at a picture in the workspace (a screenshot of a game, an emulator, a chart): offered only while the engine runs
+    /// with vision, since a model without it cannot see the image.</summary>
+    public const string ImageTool = "view_image";
 
     // the kinds of action the user gives rights for (allow, ask, deny)
     public static string Letter(this WorkspaceRight r) => r == WorkspaceRight.Read ? L("L") : r == WorkspaceRight.Write ? L("S") : L("U");
@@ -72,6 +76,19 @@ public static class WorkspaceTools
                 ["timeout"] = Prop("integer", "Seconds before the command is stopped (default 120, max 1800)"),
             }, "command"),
     ];
+
+    public static JsonObject ImageDefinition => Function(ImageTool, "Look at an image file in the workspace (PNG, JPEG, GIF, BMP): you get to see the picture itself. Use it to check what a program with a window shows, for example an emulator screenshot saved to a file, a chart or a rendered page.",
+        new JsonObject { ["path"] = Prop("string", "Image file, relative to the workspace") }, "path");
+
+    /// <summary>The image a view_image call asks for, scaled for the vision tower: a small one (a 384-pixel emulator screen) is
+    /// enlarged with sharp pixels so its letters stay readable. Throws a ToolError for the model.</summary>
+    public static async Task<Attachment> ImageAsync(ToolCall call)
+    {
+        var path = Str(Args(call), "path") ?? "";
+        var file = Resolve(path);
+        if (!File.Exists(file)) throw ToolError.NotFound(path);
+        return await ImageScaler.MakeAsync(file, ImageScaler.LookMinSide).ConfigureAwait(false) ?? throw ToolError.NotImage(path);
+    }
 
     private static JsonObject Prop(string type, string? description = null)
     {
@@ -237,6 +254,7 @@ public static class WorkspaceTools
             "write_file" => L($"Schrijven: {path}"),
             "edit_file" => L($"Aanpassen: {path}"),
             "run_command" => L($"Uitvoeren: {Str(a, "command") ?? ""}"),
+            ImageTool => L($"Afbeelding bekijken: {path}"),
             _ => call.Name,
         };
     }

@@ -47,6 +47,7 @@ public sealed partial class AppState : INotifyPropertyChanged, IDisposable
         Host = new EngineHost();
         Host.Images.Root = Program.TestData ? Path.Combine(Paths.AppData, "Afbeeldingen") : null;
         Chat.TokensStreamed += Host.Metrics.AddTokens;
+        ChatClient.SeesImages = () => Host.Engine is { } e && e.State.IsRunning && e.Capabilities.Vision;
         LocalModel.TokensStreamed += Host.Metrics.AddTokens;
         throttle = Ui.CreateTimer();
         throttle.IsRepeating = false;

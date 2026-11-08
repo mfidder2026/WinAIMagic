@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.14.1
+# Parity with MacAIMagic 1.14.2
 
-How this version relates to MacAIMagic at commit `80f6c87`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `6b0d00b`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -36,6 +36,19 @@ How this version relates to MacAIMagic at commit `80f6c87`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `6b0d00b` (1.14.2, WinAIMagic 1.14.3): skills by themselves, long answers, view_image
+
+- **Taken over:**
+  - `b0d14b7` and `0c3f53b` (a question clearly about a skill loads it): `Skills.Matching` compares the question with each skill's name and description (a word of the name, three words in all, a shared start of four letters counts). Before the first answer `ChatClient.LoadMatchingSkills` puts it into the conversation as a use_skill call and its result, once per skill per conversation, at most two per question. It shows as the step "Skill geladen: <name> (vanzelf)"; the push-on line is now only for the app's own messages with role user. Tests: SkillMatchTests (the Mac's two cases with the Windows skill uiterlijk in place of appearance-dock, plus TheSkillIsLoadedOnceAsAStep).
+  - `08a02cb` (a long monologue no longer loops or blanks the chat): one answer takes at most a quarter of the context (`max_tokens`, 16K at 64K); a cut-off answer is marked `CutOff` and goes back to the model (and into a summary) as its first and last 3,000 characters; the nudge now says to take the next step with a tool and write large code in parts. A message over 12,000 characters shows its start and end with "Toon alles"; a long thinking text shows its end. Tests: LongAnswerTests and LongMessageViewTests (the Mac's cases, plus ACutOffAnswerIsSentBackShortened).
+  - `90b2463` (the model looks at screenshots itself): the tool view_image (right: read), offered only while the engine runs with vision (`ChatClient.SeesImages`, from the engine's capabilities). The picture follows the tool results as an automatic user message; only the last 3 go to the engine again, older ones become a line of text. A picture under 1024 pixels is enlarged by a whole factor with sharp pixels (a 384 × 272 screenshot becomes 768 × 544). With vision the system prompt says to check a program with a window by a screenshot. After 6 rounds of tools without task_list, while steps are open, the round's last tool result carries a reminder with the list. The chat shows the picture small with "Het model bekijkt shot.png". Tests: ViewImageTests (the Mac's four cases plus ThePictureFollowsTheToolResults) and StepReminderTests.
+  - `6b0d00b` (the "no model started" notice above the input field): the engine notice is now a rounded card right above the input field, as wide as it, below the step card and an approval card. Checked in the Debug app with UI Automation: its bottom is 38 pixels above the input field. Not seen on screen (the screen was locked).
+- **Adapted:**
+  - `416f204` (a stopped answer shows no red "cancelled"): a stop already ended quietly here (StopDuringTheAnswerKeepsWhatWasWritten). Made sure: after a stop, any error of the cancelled request (not only OperationCanceledException) ends the answer as a stop.
+  - `08a02cb`, sorted keys: not needed. JsonObject keeps the order its keys were added in, so the requests already start the same each time (test ToolDefinitionsAlwaysSerializeTheSame).
+- **Not run:** a real model using view_image or the step reminder; the automatic skill with a real model. The c64run.py script of `90b2463` is the owner's own skill on the Mac, outside the repository.
+- **Not needed:** `2db95c9` and `9385f60` (the Mac's releases); `7d8f326`, `7c5ed51` and `344c57d`, already so here (see below).
 
 ### Up to `80f6c87` (1.14.1): what the model prepares, and the chat's end
 

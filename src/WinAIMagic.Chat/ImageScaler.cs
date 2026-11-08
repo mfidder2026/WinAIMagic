@@ -10,24 +10,28 @@ public static class ImageScaler
 {
     public const int MaxSide = 1344;
     public const double JpegQuality = 0.85;
+    /// <summary>view_image enlarges a smaller picture to about this size, by a whole factor, so the vision tower (patches of 14 pixels)
+    /// can read its letters.</summary>
+    public const int LookMinSide = 1024;
 
     /// <summary>An attachment from an image file; null when it is not an image.</summary>
-    public static async Task<Attachment?> MakeAsync(string file)
+    public static async Task<Attachment?> MakeAsync(string file, int minSide = 0)
     {
         byte[] data;
         try { data = await File.ReadAllBytesAsync(file).ConfigureAwait(false); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
-        return await MakeAsync(data, Path.GetFileName(file)).ConfigureAwait(false);
+        return await MakeAsync(data, Path.GetFileName(file), minSide).ConfigureAwait(false);
     }
 
-    public static async Task<Attachment?> MakeAsync(byte[] image, string name)
+    public static async Task<Attachment?> MakeAsync(byte[] image, string name, int minSide = 0)
     {
-        var jpeg = await JpegAsync(image).ConfigureAwait(false);
+        var jpeg = await JpegAsync(image, minSide).ConfigureAwait(false);
         return jpeg == null ? null : new Attachment { Filename = name, Jpeg = jpeg };
     }
 
-    /// <summary>Longest side at most 1344 (never enlarged), on a white ground, JPEG quality 0.85; null when it is not an image.</summary>
-    public static async Task<byte[]?> JpegAsync(byte[] image)
+    /// <summary>Longest side at most 1344, on a white ground, JPEG quality 0.85; null when it is not an image. Enlarged only below
+    /// `minSide`, by a whole factor with sharp pixels.</summary>
+    public static async Task<byte[]?> JpegAsync(byte[] image, int minSide = 0)
     {
         try
         {
@@ -35,12 +39,14 @@ public static class ImageScaler
             await input.WriteAsync(image.AsBuffer());
             input.Seek(0);
             var decoder = await BitmapDecoder.CreateAsync(input);
-            double scale = Math.Min(1, (double)MaxSide / Math.Max(decoder.OrientedPixelWidth, decoder.OrientedPixelHeight));
+            double longest = Math.Max(decoder.OrientedPixelWidth, decoder.OrientedPixelHeight);
+            bool up = minSide > 0 && longest < minSide;
+            double scale = up ? Math.Max(1, Math.Floor(minSide / longest)) : Math.Min(1, MaxSide / longest);
             var transform = new BitmapTransform
             {
                 ScaledWidth = (uint)Math.Max(1, Math.Round(decoder.PixelWidth * scale)),
                 ScaledHeight = (uint)Math.Max(1, Math.Round(decoder.PixelHeight * scale)),
-                InterpolationMode = BitmapInterpolationMode.Fant,
+                InterpolationMode = up ? BitmapInterpolationMode.NearestNeighbor : BitmapInterpolationMode.Fant,
             };
             using var bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, transform,
                 ExifOrientationMode.RespectExifOrientation, ColorManagementMode.ColorManageToSRgb);

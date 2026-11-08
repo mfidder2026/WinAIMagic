@@ -29,7 +29,13 @@ public sealed class ChatPage : IPage
     private readonly ContextMeter meter;
     private readonly MiniSpark spark = new(Theme.Violet, 22) { Width = 160 };
     private readonly TextBlock speed = Ui.Label("", 13, new SolidColorBrush(Theme.Cyan), FontWeights.SemiBold, display: true);
-    private readonly Border engineBanner = new() { Background = Theme.Solid(Colors.White, 0.05), BorderBrush = Theme.Hairline, BorderThickness = new Thickness(0, 1, 0, 0) };
+    /// <summary>"No model started" and its kin: a rounded card right above the input field, as wide as it, below the step card and an
+    /// approval card. It is about what happens when you send, not part of the conversation.</summary>
+    private readonly Border engineBanner = new()
+    {
+        Background = Theme.Solid(Colors.White, 0.05), BorderBrush = Theme.Hairline, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
+        MaxWidth = 860, Margin = new Thickness(24, 6, 24, 0),
+    };
     private readonly Border otherBanner, noticeBanner;
     private readonly TextBlock noticeText = Ui.Caption("", new SolidColorBrush(Theme.Amber), 13);
     private readonly Border approvalHost = new() { MaxWidth = 860, Margin = new Thickness(24, 4, 24, 0), Visibility = Visibility.Collapsed };
@@ -83,13 +89,13 @@ public sealed class ChatPage : IPage
         noticeBanner = Banner(noticeText, Theme.Amber);
         otherBanner = Banner(Ui.H(8, Ui.Icon(Glyph.Clock, 13, new SolidColorBrush(Theme.Amber)), Ui.Caption(L("De engine werkt aan een ander verzoek (bijvoorbeeld via de API). Een nieuw bericht wacht tot dat klaar is."), new SolidColorBrush(Theme.Amber), 13)), Theme.Amber);
         root.Children.Add(noticeBanner.At(2));
-        root.Children.Add(engineBanner.At(3));
-        root.Children.Add(otherBanner.At(4));
+        root.Children.Add(otherBanner.At(3));
         // this conversation waits while the model writes for another one of ours (a task, another chat)
         gateBanner = Banner(Ui.Row("auto,*", 8, Ui.Icon(Glyph.Hourglass, 13, new SolidColorBrush(Theme.Amber)), gateText), Theme.Amber);
-        root.Children.Add(gateBanner.At(5));
-        root.Children.Add(stepsHost.At(6));
-        root.Children.Add(approvalHost.At(7));
+        root.Children.Add(gateBanner.At(4));
+        root.Children.Add(stepsHost.At(5));
+        root.Children.Add(approvalHost.At(6));
+        root.Children.Add(engineBanner.At(7));
 
         Composer = new Composer(app, () =>
         {
@@ -190,7 +196,7 @@ public sealed class ChatPage : IPage
     private double Estimate(object key, double width)
     {
         if (key is SummaryKey || !visible.TryGetValue((Guid)key, out var m)) return 22;
-        if (m.Automatic == true) return 20;
+        if (m.Automatic == true && m.Role == ChatRole.User) return m.Attachments.Count > 0 ? 170 : 20;
         double perLine = Math.Max((width - (m.Role == ChatRole.User ? 112 : 74)) / 7.4, 20);
         int breaks = 0;
         foreach (char c in m.Text) if (c == '\n') breaks++;
@@ -288,11 +294,12 @@ public sealed class ChatPage : IPage
         foreach (var m in c.Messages)
         {
             bool blank = m.Role == ChatRole.Assistant && m.Text.Length == 0 && m.Reasoning.Length == 0 && m.Error == null && m.Activities.Count == 0 && !(busy && m.Id == last);
-            if (!m.IsHidden && !blank && !(m.Automatic == true && nudged))
+            bool nudge = m.Automatic == true && m.Role == ChatRole.User && m.Attachments.Count == 0;
+            if (!m.IsHidden && !blank && !(nudge && nudged))
             {
                 keys.Add(m.Id);
                 visible[m.Id] = m;
-                nudged = m.Automatic == true;
+                nudged = nudge;
             }
             if (m.Id == c.SummaryUpTo && c.Summary != null) keys.Add(new SummaryKey(c.Id));
         }

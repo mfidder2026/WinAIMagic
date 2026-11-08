@@ -47,6 +47,14 @@ public sealed class ChatClient(HttpClient? http = null)
     public const double CompactAt = 0.8;
     /// <summary>How many times in a row the model is told to go on without it doing anything in between.</summary>
     public const int MaxNudges = 3;
+    /// <summary>One answer may take at most this share of the context: a model that plans aloud for 50,000 tokens fills the whole
+    /// context, gets summarized, and starts the same plan again (GLM on the Mac). A big file still fits (16K tokens at 64K).</summary>
+    public const double AnswerShare = 0.25;
+    public int MaxAnswerTokens => Math.Max(4096, (int)(ContextLimit * AnswerShare));
+    /// <summary>The engine runs with vision now: the model can look at an image file (view_image). Set by the app.</summary>
+    public static Func<bool> SeesImages { get; set; } = () => false;
+    /// <summary>Pictures the model looked at stay in its requests, the last few of them: each costs hundreds of tokens.</summary>
+    public const int ImagesKept = 3;
 
     /// <summary>Any conversation at work.</summary>
     public bool Busy { get { lock (sync) return runs.Count > 0; } }
@@ -257,7 +265,8 @@ public sealed class ChatClient(HttpClient? http = null)
             await Run(id, store, baseUrl, owner, ct);
             await Learn(id, store, baseUrl, ct);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        // a stop can also surface as another error of the cancelled request (an IOException from the stream): never a red line
+        catch (Exception) when (ct.IsCancellationRequested) { }
         catch (Exception e)
         {
             store.Update(id, c => { if (c.Messages.Count > 0) c.Messages[^1].Error = e.Message; });
@@ -281,6 +290,7 @@ public sealed class ChatClient(HttpClient? http = null)
         // connectors loaded before (or always loaded) run again, so their tools are in the request
         if (Connectors is { } connectors) await connectors.EnsureRunningAsync(LoadedConnectors, ct);
         if (KeepsNotes && WorkspaceTools.Workspace is { } folder) WorkspaceNotes.CreateIfNeeded(folder);
+        LoadMatchingSkills(id, store);
         var activities = new List<ToolActivity>();
         var sources = new List<Source>();
         int nudges = 0;
@@ -288,6 +298,8 @@ public sealed class ChatClient(HttpClient? http = null)
         // only work in a folder needs the model's own KLAAR to end: an answer after reading the system or the web is finished
         // when it does not announce a next step
         bool changedFiles = false;
+        // rounds of tools since the model last updated its step list: a model forgets to tick steps off
+        int roundsSinceSteps = 0;
         try
         {
             for (int round = 0; round < rounds; round++)
@@ -325,7 +337,7 @@ public sealed class ChatClient(HttpClient? http = null)
                         await throttle.DrainAsync();
                         break;
                     }
-                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    catch (Exception) when (ct.IsCancellationRequested)
                     {
                         await throttle.DrainAsync();
                         store.Update(id, _ => reply.Preparing = null);
@@ -370,17 +382,25 @@ public sealed class ChatClient(HttpClient? http = null)
                         return;
                     }
                     nudges++;
-                    store.Update(id, _ => reply.Activities = []);
-                    var nudge = cutOff ? L("Je antwoord werd afgekapt omdat je context vol was. Ga verder waar je gebleven was.")
+                    store.Update(id, _ => { reply.Activities = []; if (cutOff) reply.CutOff = true; });
+                    // "go on where you were" made a model that plans aloud write the same plan again, without end
+                    var nudge = cutOff ? L("Je antwoord werd te lang en is afgekapt; je krijgt alleen het begin en het eind terug. Denk of plan niet opnieuw in tekst: doe nu meteen de volgende stap met gereedschap. Schrijf grote code in delen: één bestand of één deel per write_file.")
                         : L("Je stopte zonder gereedschap te gebruiken. Is de taak nog niet af, roep dan nu meteen het volgende gereedschap aan, zonder het eerst aan te kondigen; werkt iets niet, probeer dan een andere aanpak. Is de taak wel af en gecontroleerd, begin je bericht dan met het woord KLAAR en zeg kort wat het resultaat is.");
                     store.Update(id, c => c.Messages.Add(new ChatMessage { Role = ChatRole.User, Text = nudge, Automatic = true }));
                     continue;
                 }
                 nudges = 0;
 
+                // a picture cannot go in a tool result: it follows them, as a message of the app with the image
+                var looked = new List<Attachment>();
+                if (result.ToolCalls.Exists(t => t.Name == WorkSteps.ToolName)) roundsSinceSteps = 0; else roundsSinceSteps++;
+                var stepsNudge = WorkSteps.Reminder(store.Find(id)?.Steps, roundsSinceSteps);
+                if (stepsNudge != null) roundsSinceSteps = 0;
+
                 // run the tools; the next round's message carries the activity list, this one folds away
-                foreach (var call in result.ToolCalls)
+                for (int place = 0; place < result.ToolCalls.Count; place++)
                 {
+                    var call = result.ToolCalls[place];
                     bool isWorkspace = WorkspaceTools.Names.Contains(call.Name);
                     bool isSystem = SystemTools.Names.Contains(call.Name);
                     bool isSkill = call.Name == Skills.ToolName;
@@ -423,6 +443,20 @@ public sealed class ChatClient(HttpClient? http = null)
                         {
                             text = "The user did not allow this. Ask what they want instead, or continue without it.";
                             step.Denied = true;
+                        }
+                        else if (call.Name == WorkspaceTools.ImageTool)
+                        {
+                            try
+                            {
+                                var picture = await WorkspaceTools.ImageAsync(call);
+                                if (SeesImages())
+                                {
+                                    looked.Add(picture);
+                                    text = "The image follows in the next message.";
+                                }
+                                else text = "The model runs without vision now, so it cannot see images. Check the result another way (text output, a log).";
+                            }
+                            catch (ToolError e) { text = "Error: " + e.Message; }
                         }
                         else text = await WorkspaceTools.RunAsync(call, ct);
                     }
@@ -490,12 +524,20 @@ public sealed class ChatClient(HttpClient? http = null)
                         text = TextLimit.Prefix(text, room * 3 / 4) + $"\n… (shortened, the output was {text.Length} characters) …\n" + TextLimit.Suffix(text, room / 4);
                     step.Done = true;
                     step.Output = TextLimit.Prefix(text, 4000);
+                    // the reminder rides on the round's last result: a message of its own would break the tool turn, and on the last
+                    // one the engine's cache of the conversation stays valid
+                    var withNudge = place == result.ToolCalls.Count - 1 && stepsNudge != null ? text + "\n\n" + stepsNudge : text;
                     store.Update(id, c =>
                     {
                         reply.Activities = [];
                         reply.Sources = [];
-                        c.Messages.Add(new ChatMessage { Role = ChatRole.Tool, Text = text, ToolCallId = call.Id });
+                        c.Messages.Add(new ChatMessage { Role = ChatRole.Tool, Text = withNudge, ToolCallId = call.Id });
                     });
+                }
+                if (looked.Count > 0)
+                {
+                    var names = string.Join(", ", looked.Select(a => a.Filename));
+                    store.Update(id, c => c.Messages.Add(new ChatMessage { Role = ChatRole.User, Text = L($"Hier is de afbeelding die je opvroeg: {names}."), Attachments = looked, Automatic = true }));
                 }
             }
             // the steps ran out: say so, in a message the user sees (a tool result is folded away)
@@ -510,6 +552,33 @@ public sealed class ChatClient(HttpClient? http = null)
         finally
         {
             if (ct.IsCancellationRequested) FillStopped(id, store);
+        }
+    }
+
+    /// <summary>A question clearly about a skill's subject gets that skill before the first answer, as if the model had called
+    /// use_skill: a small model often answers or searches the web without loading it. Once per skill per conversation.</summary>
+    internal static void LoadMatchingSkills(Guid id, ConversationStore store, IReadOnlyList<Skill>? skills = null)
+    {
+        if (!Settings.Shared.Skills || store.Find(id) is not { } c) return;
+        if (c.Messages.LastOrDefault(m => m.Role == ChatRole.User && m.Automatic != true)?.Text is not { } question) return;
+        var loaded = c.Messages.SelectMany(m => m.ToolCalls).Where(t => t.Name == Skills.ToolName)
+            .Select(t => (WorkspaceTools.Str(WorkspaceTools.Args(t), "name") ?? "").ToLowerInvariant()).ToHashSet();
+        foreach (var skill in Skills.Matching(question, skills))
+        {
+            if (loaded.Contains(skill.Name.ToLowerInvariant())) continue;
+            var call = new ToolCall("auto_skill_" + Guid.NewGuid().ToString("N")[..8], Skills.ToolName, new JsonObject { ["name"] = skill.Name }.ToJsonString());
+            var step = new ChatMessage
+            {
+                Role = ChatRole.Assistant,
+                ToolCalls = [call],
+                Activities = [new ToolActivity { Label = Skills.AutoLabel(skill.Name), Done = true }],
+                Automatic = true,
+            };
+            store.Update(id, conversation =>
+            {
+                conversation.Messages.Add(step);
+                conversation.Messages.Add(new ChatMessage { Role = ChatRole.Tool, Text = Skills.Run(call, [skill]), ToolCallId = call.Id });
+            });
         }
     }
 
@@ -898,7 +967,7 @@ public sealed class ChatClient(HttpClient? http = null)
                         lines.Add(L("Gebruiker:") + " " + m.Text + (m.Attachments.Count == 0 ? "" : " [" + L("afbeelding") + "]"));
                         break;
                     case ChatRole.Assistant:
-                        if (m.Text.Length > 0) lines.Add(L("Assistent:") + " " + m.Text);
+                        if (m.Text.Length > 0) lines.Add(L("Assistent:") + " " + (m.CutOff == true ? Shortened(m.Text) : m.Text));
                         foreach (var call in m.ToolCalls) lines.Add(L($"Assistent gebruikt {call.Name}:") + " " + TextLimit.Prefix(call.Arguments, 600));
                         break;
                     case ChatRole.Tool:
@@ -948,7 +1017,11 @@ public sealed class ChatClient(HttpClient? http = null)
         var s = Settings.Shared;
         var tools = new JsonArray();
         if (s.WebSearch) foreach (var t in WebTools.Definitions) tools.Add(t!.DeepClone());
-        if (s.WorkspaceTools && WorkspaceTools.Workspace != null) foreach (var t in WorkspaceTools.Definitions) tools.Add(t!.DeepClone());
+        if (s.WorkspaceTools && WorkspaceTools.Workspace != null)
+        {
+            foreach (var t in WorkspaceTools.Definitions) tools.Add(t!.DeepClone());
+            if (SeesImages()) tools.Add(WorkspaceTools.ImageDefinition);
+        }
         // the app's own tools, skills and system management come last: with them off the request starts the same as before
         if (s.AppTools) foreach (var t in AppTools.Definitions(s.Skills)) tools.Add(t!.DeepClone());
         if (s.Skills && Skills.All.Count > 0) tools.Add(Skills.Definition);
@@ -994,7 +1067,8 @@ public sealed class ChatClient(HttpClient? http = null)
             // the user's own notes for this folder and what was learned here, like CLAUDE.md for Claude Code
             if (NotesForPrompt(ws) is { } text) system += "\n\n" + ChatTexts.FolderNotes + "\n" + text;
             var noTools = DeveloperTools.HasDeveloperTools ? "" : " " + ChatTexts.NoDeveloperTools(DeveloperTools.Missing);
-            system += "\n\n" + ChatTexts.KeepGoing + noTools;
+            var look = SeesImages() ? " " + L("Wat een programma met een venster laat zien (een spel, een emulator), controleer je zelf: laat het een screenshot als bestand opslaan en bekijk dat met view_image. Zeg pas dat het werkt als je het resultaat hebt gezien.") : "";
+            system += "\n\n" + ChatTexts.KeepGoing + look + noTools;
         }
         // Instellingen → Systeembeheer: nothing is added while they are off
         if (s.AppTools) system += "\n\n" + AppTools.PromptSection(s.Skills);
@@ -1009,12 +1083,20 @@ public sealed class ChatClient(HttpClient? http = null)
             system += "\n\n" + L("Samenvatting van het begin van dit gesprek (die berichten zijn weggelaten om ruimte te maken in je context):") + "\n" + summary;
 
         var o = new JsonArray(new JsonObject { ["role"] = "system", ["content"] = system });
-        foreach (var m in history)
+        // older pictures the model looked at itself go as a line of text; the user's own pictures always go
+        var list = history as IList<ChatMessage> ?? history.ToList();
+        var keptLooks = list.Where(m => m.Automatic == true && m.Attachments.Count > 0).TakeLast(ImagesKept).Select(m => m.Id).ToHashSet();
+        foreach (var m in list)
         {
             switch (m.Role)
             {
                 case ChatRole.User:
-                    if (m.Attachments.Count == 0)
+                    if (m.Automatic == true && m.Attachments.Count > 0 && !keptLooks.Contains(m.Id))
+                    {
+                        var seen = string.Join(", ", m.Attachments.Select(a => a.Filename));
+                        o.Add(new JsonObject { ["role"] = "user", ["content"] = L($"(Hier stond een afbeelding die je eerder bekeek: {seen}.)") });
+                    }
+                    else if (m.Attachments.Count == 0)
                     {
                         o.Add(new JsonObject { ["role"] = "user", ["content"] = m.Text });
                     }
@@ -1030,7 +1112,7 @@ public sealed class ChatClient(HttpClient? http = null)
                 case ChatRole.Assistant:
                     if (m.Text.Length == 0 && m.ToolCalls.Count == 0) continue;
                     // the thinking stays here: reasoning never goes back to the model
-                    var msg = new JsonObject { ["role"] = "assistant", ["content"] = m.Text };
+                    var msg = new JsonObject { ["role"] = "assistant", ["content"] = m.CutOff == true ? Shortened(m.Text) : m.Text };
                     if (m.ToolCalls.Count > 0)
                     {
                         var calls = new JsonArray();
@@ -1056,6 +1138,15 @@ public sealed class ChatClient(HttpClient? http = null)
         return o;
     }
 
+    /// <summary>A cut-off answer as the model gets it back: its start and its end, so it knows where it was without the monologue in
+    /// between filling the context.</summary>
+    public static string Shortened(string text, int keep = 3000)
+    {
+        if (text.Length <= keep * 2 + 200) return text;
+        var left = (text.Length - keep * 2).ToString("N0", AppLanguages.Current.Culture());
+        return TextLimit.Prefix(text, keep) + "\n\n[" + L($"… {left} tekens weggelaten …") + "]\n\n" + TextLimit.Suffix(text, keep);
+    }
+
     internal JsonObject StreamBody(IEnumerable<ChatMessage> history, string? summary)
     {
         var s = Settings.Shared;
@@ -1067,6 +1158,7 @@ public sealed class ChatClient(HttpClient? http = null)
             ["stream_options"] = new JsonObject { ["include_usage"] = true },
             ["temperature"] = s.Temperature,
             ["top_p"] = 1.0,
+            ["max_tokens"] = MaxAnswerTokens,
             // enable_thinking is understood by both templates (DeepSeek maps it to thinking_mode)
             ["chat_template_kwargs"] = new JsonObject { ["enable_thinking"] = s.Thinking, ["reasoning_effort"] = s.ReasoningEffort },
         };
