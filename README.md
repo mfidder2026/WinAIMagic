@@ -10,13 +10,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mfidder2026/WinAIMagic/releases/latest">Download WinAIMagic</a> ·
+  <a href="https://github.com/mfidder2026/WinAIMagic/releases/latest">Download the setup</a> ·
   <a href="docs/README.nl.md">Nederlands</a>
 </p>
 
 ![The chat screen with GLM-5.3-Flash running locally](docs/screenshots/chat.png)
 
-WinAIMagic is the Windows version of [MacAIMagic](https://github.com/mfidder2026/MacAIMagic). Unzip it and start it: no installation, no Python, no Visual Studio and no CUDA Toolkit needed, just a video card driver. It runs the large mixture-of-experts models (GLM, DeepSeek, Qwen, MiniMax) as well as small models for a laptop, such as Ling-3.0-tiny, which writes about 20 tok/s on four processor threads.
+WinAIMagic is the Windows version of [MacAIMagic](https://github.com/mfidder2026/MacAIMagic). Install it with one setup file: no Python, no Visual Studio and no CUDA Toolkit needed, just a video card driver. It runs the large mixture-of-experts models (GLM, DeepSeek, Qwen, MiniMax) as well as small models for a laptop, such as Ling-3.0-tiny, which writes about 20 tok/s on four processor threads.
 
 ## What it does
 
@@ -50,13 +50,13 @@ Available in English, Dutch, German and French.
 
 ## Install
 
-1. Download `WinAIMagic-*.zip` (about 255 MB) from [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest). The `.sha256` next to it lets you check the file.
-2. Unzip it where you want the app and its models, ideally on a fast NVMe drive, and start `WinAIMagic.exe`. No installation and no administrator rights are needed.
-3. Windows SmartScreen may warn you, because the app is not code-signed yet: choose **More info** and **Run anyway**.
-4. On a PC with an NVIDIA card, the **System** page offers the NVIDIA pack the first time (about 1.6 GB, from the same release). It goes into the same folder and counts after a restart. Without it the app runs on the processor or through Vulkan, and the large models that need the main engine do not run.
+1. Download `WinAIMagic-Setup-*.exe` from [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest). The `.sha256` next to it lets you check the file.
+2. Run it and choose a folder for the models, ideally on a fast NVMe drive. No administrator rights are needed. A newer setup installs over an older version and keeps your settings, conversations and models.
+3. Windows SmartScreen may warn you, because the setup is not code-signed yet: choose **More info** and **Run anyway**.
+4. On a PC with an NVIDIA card, the **System** page offers the NVIDIA pack (about 1.6 GB). The app downloads it from the same release and checks it; it counts after a restart. An update with the same NVIDIA engines keeps them. Without the pack the app runs on the processor or through Vulkan, and the large models that need the main engine do not run.
 5. In the app, open **Models**, download a model, and press **Start engine**.
 
-Settings, conversations and models stay in the folder `data` beside `WinAIMagic.exe`, so the app also runs from a USB drive; documents and images go to your own Documents and Pictures. API keys are encrypted for your Windows account, so on another PC you enter them again.
+API keys are encrypted for your Windows account, so on another PC you enter them again.
 
 The system check tells you what your PC still needs. The most common one: the Windows page file must be at least your VRAM plus 9 GB. The app offers a button for that; it asks for permission and needs a restart.
 

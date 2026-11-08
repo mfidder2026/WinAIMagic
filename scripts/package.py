@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """Lays out dist\\app (the published app with its engine folder) and builds the release files.
 
-    python scripts/package.py [--skip-publish] [--setup] [--skip-portable]
+    python scripts/package.py [--skip-publish] [--skip-setup] [--zip]
 
 Layout: dist\\app\\WinAIMagic.exe, dist\\app\\engine\\{tiered\\(serve, tools, bin), python\\, cuda\\, vulkan\\, cpu\\}.
 Everything the user needs comes along: no Python, Visual Studio or CUDA Toolkit on the target PC (brief §2.5).
 
-Two files for a release, in dist\\ (since 1.14.3 there is one version of the app, on the owner's request):
-- WinAIMagic-<v>.zip: the app without the NVIDIA engines (engine\\cuda, engine\\tiered\\bin), with portable.txt, so its data
-  stays beside it, and engine\\nvidia-pack.json, which names the second file.
+Two files for a release, in dist\\ (one version of the app, on the owner's request):
+- WinAIMagic-Setup-<v>.exe: the app without the NVIDIA engines (engine\\cuda, engine\\tiered\\bin), with
+  engine\\nvidia-pack.json, which names the second file. It installs over an older version.
 - WinAIMagic-NVIDIA-<v>.zip: those engines, which the app offers to download on a PC with an NVIDIA card. It must be attached to
   the release v<v>: the manifest points there.
---setup also builds the old installer, WinAIMagic-Setup-<v>.exe (everything, offline); it is no longer released.
+--zip also builds WinAIMagic-<v>.zip, the same app to unzip, with its data beside it; it is not released.
 """
 import argparse
 import hashlib
@@ -175,8 +175,28 @@ def scan():
     return hits
 
 
+def nvidia_pack():
+    """The NVIDIA zip, and the manifest in dist\\app\\engine that tells the app where it is published."""
+    v = version()
+    pack = DIST / f"WinAIMagic-NVIDIA-{v}.zip"
+    print(">", pack.name, flush=True)
+    items = [(p, p.relative_to(ENGINE).as_posix()) for folder in NVIDIA_FOLDERS for p in sorted((ENGINE / folder).rglob("*")) if p.is_file()]
+    zip_tree(pack, items)
+    manifest = {"version": v, "url": f"https://github.com/{REPO}/releases/download/v{v}/{pack.name}",
+                "size": pack.stat().st_size, "sha256": sha256(pack)}
+    (ENGINE / "nvidia-pack.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+    print(f"  {pack.name}: {pack.stat().st_size / 1e6:.0f} MB, sha256 {manifest['sha256']}")
+    return pack
+
+
 def setup():
     run([ISCC, f"/DSource={APP}", f"/DOut={DIST}", ROOT / "installer/WinAIMagic.iss"])
+    v = version()
+    # Inno names it after the four-part file version; the release uses the app's own
+    for f in DIST.glob(f"WinAIMagic-Setup-{v}.*.exe"):
+        f.replace(DIST / f"WinAIMagic-Setup-{v}.exe")
+    out = DIST / f"WinAIMagic-Setup-{v}.exe"
+    print(f"  {out.name}: {out.stat().st_size / 1e6:.0f} MB, sha256 {sha256(out)}")
 
 
 def version():
@@ -200,14 +220,8 @@ def sha256(path):
     return h.hexdigest()
 
 
-def portable():
+def portable(pack):
     v = version()
-    pack = DIST / f"WinAIMagic-NVIDIA-{v}.zip"
-    print(">", pack.name, flush=True)
-    items = [(p, p.relative_to(ENGINE).as_posix()) for folder in NVIDIA_FOLDERS for p in sorted((ENGINE / folder).rglob("*")) if p.is_file()]
-    zip_tree(pack, items)
-    manifest = {"version": v, "url": f"https://github.com/{REPO}/releases/download/v{v}/{pack.name}",
-                "size": pack.stat().st_size, "sha256": sha256(pack)}
 
     out = DIST / f"WinAIMagic-{v}.zip"
     print(">", out.name, flush=True)
@@ -220,20 +234,18 @@ def portable():
         "WinAIMagic\r\n\r\n"
         "This file keeps settings, conversations and models in the folder 'data' next to WinAIMagic.exe.\r\n"
         "Remove it and WinAIMagic uses %LOCALAPPDATA%\\WinAIMagic, like the installed version.\r\n", encoding="utf-8")
-    (stage / "nvidia-pack.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     items = [(p, "WinAIMagic/" + p.relative_to(APP).as_posix()) for p in files]
-    items += [(stage / "portable.txt", "WinAIMagic/portable.txt"), (stage / "nvidia-pack.json", "WinAIMagic/engine/nvidia-pack.json")]
+    items += [(stage / "portable.txt", "WinAIMagic/portable.txt")]
     zip_tree(out, items)
     shutil.rmtree(stage, ignore_errors=True)
-    for f in (out, pack):
-        print(f"  {f.name}: {f.stat().st_size / 1e6:.0f} MB, sha256 {sha256(f)}")
+    print(f"  {out.name}: {out.stat().st_size / 1e6:.0f} MB, sha256 {sha256(out)}")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-publish", action="store_true")
-    ap.add_argument("--setup", action="store_true", help="also build the installer (no longer released)")
-    ap.add_argument("--skip-portable", action="store_true")
+    ap.add_argument("--skip-setup", action="store_true")
+    ap.add_argument("--zip", action="store_true", help="also build the app as a zip (not released)")
     a = ap.parse_args()
     APP.mkdir(parents=True, exist_ok=True)
     if not a.skip_publish:
@@ -244,8 +256,9 @@ if __name__ == "__main__":
     notices()
     if scan():
         print("the upstream name is still in the package: see above")
-    if a.setup:
+    pack = nvidia_pack()
+    if not a.skip_setup:
         setup()
-    if not a.skip_portable:
-        portable()
+    if a.zip:
+        portable(pack)
     print("done:", DIST)

@@ -7,13 +7,14 @@ using static WinAIMagic.Core.Support.Lang;
 
 namespace WinAIMagic.Engine;
 
-/// <summary>Where the pack of this app version is published: written by scripts/package.py into the portable app.</summary>
+/// <summary>Where the pack of this app version is published: written by scripts/package.py into the setup's engine folder.</summary>
 public sealed record NvidiaPackInfo(string Version, string Url, ulong Size, string Sha256);
 
-/// <summary>The portable app comes without the NVIDIA engines (engine\cuda and engine\tiered\bin, with cuBLAS about 1.4 GB),
-/// so a PC without such a card downloads about 200 MB. On a PC with one the system check offers them once: one zip from the
-/// release of the same version, checked against its sha256, unpacked beside the app. The engine is chosen at the start, so
-/// it counts after a restart. The setup has them already and carries no manifest, so it never offers the pack.</summary>
+/// <summary>The setup comes without the NVIDIA engines (engine\cuda and engine\tiered\bin, with cuBLAS about 1.6 GB), so a PC
+/// without such a card downloads far less. On a PC with one the system check offers them: one zip from the release of the same
+/// version, checked against its sha256, unpacked beside the app. The engine is chosen at the start, so it counts after a
+/// restart. An update whose pack has the same sha256 keeps the engines already there. An installation without a manifest (the
+/// old full setup) never offers the pack.</summary>
 public sealed class NvidiaPack
 {
     public const string ManifestName = "nvidia-pack.json", StampName = "pack-version.txt";
@@ -53,7 +54,8 @@ public sealed class NvidiaPack
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
-    /// <summary>The engines of this version are there: a pack of an older version left behind by an update does not count.</summary>
+    /// <summary>The engines of this version are there: a pack with other contents left behind by an update does not count. The stamp
+    /// is the pack's sha256 (the version for packs installed before 1.14.3).</summary>
     public bool Present
     {
         get
@@ -61,11 +63,13 @@ public sealed class NvidiaPack
             if (!File.Exists(Path.Combine(EngineRoot, "cuda", "llama-server.exe"))) return false;
             if (Info is not { } info) return true;
             var stamp = Path.Combine(EngineRoot, "cuda", StampName);
-            return File.Exists(stamp) && File.ReadAllText(stamp).Trim() == info.Version;
+            if (!File.Exists(stamp)) return false;
+            var was = File.ReadAllText(stamp).Trim();
+            return was.Equals(info.Sha256, StringComparison.OrdinalIgnoreCase) || was == info.Version;
         }
     }
 
-    /// <summary>Worth offering: this is the portable app, the engines are missing (or older), and there is an NVIDIA card,
+    /// <summary>Worth offering: this installation has a manifest, the engines are missing (or other), and there is an NVIDIA card,
     /// which then runs on Vulkan, or on the old engines.</summary>
     public bool Offered(IGpuBackend backend) =>
         Info != null && !Present && (backend.Id == "cuda" || backend.Adapters.Any(a => a.VendorId == GpuAdapter.NvidiaId));
@@ -125,7 +129,7 @@ public sealed class NvidiaPack
                 Directory.CreateDirectory(Path.GetDirectoryName(to)!);
                 Directory.Move(Path.Combine(fresh, folder), to);
             }
-            File.WriteAllText(Path.Combine(EngineRoot, "cuda", StampName), info.Version);
+            File.WriteAllText(Path.Combine(EngineRoot, "cuda", StampName), info.Sha256);
             File.Delete(part);
             Directory.Delete(fresh, true);
             Set(PackState.Installed);

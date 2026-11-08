@@ -2,19 +2,19 @@
 
 Draai enorme AI-modellen volledig op je eigen Windows 11-pc. Een model dat niet in je videokaart past, start gewoon en haalt de rest uit het RAM en van de SSD. Niets verlaat je computer, behalve zoekopdrachten als je web zoeken aanzet en de modeldownloads.
 
-Dit is de Windows-versie van [MacAIMagic](https://github.com/mfidder2026/MacAIMagic). Uitpakken en starten: geen installatie, geen Python, Visual Studio of CUDA Toolkit, alleen de driver van je videokaart. Het draait de grote mixture-of-experts-modellen (GLM, DeepSeek, Qwen, MiniMax) en kleine modellen voor een laptop, zoals Ling-3.0-tiny, dat op vier processorthreads ongeveer 20 tok/s schrijft. De Engelse uitleg staat in de [README](../README.md).
+Dit is de Windows-versie van [MacAIMagic](https://github.com/mfidder2026/MacAIMagic). Eén setup: geen Python, Visual Studio of CUDA Toolkit, alleen de driver van je videokaart. Het draait de grote mixture-of-experts-modellen (GLM, DeepSeek, Qwen, MiniMax) en kleine modellen voor een laptop, zoals Ling-3.0-tiny, dat op vier processorthreads ongeveer 20 tok/s schrijft. De Engelse uitleg staat in de [README](../README.md).
 
 ## Installeren
 
-1. Download `WinAIMagic-*.zip` (ongeveer 255 MB) bij [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest). Met de `.sha256` ernaast kun je het bestand controleren.
-2. Pak hem uit waar je de app en de modellen wilt hebben, het liefst op een snelle NVMe-schijf, en start `WinAIMagic.exe`. Installeren en beheerdersrechten zijn niet nodig.
-3. Windows SmartScreen kan waarschuwen, omdat de app nog niet ondertekend is. Kies dan **Meer informatie** en **Toch uitvoeren**.
-4. Op een pc met een NVIDIA-kaart biedt het scherm **Systeem** de eerste keer het NVIDIA-pakket aan (ongeveer 1,6 GB, uit dezelfde release). Dat komt in dezelfde map en werkt na een herstart. Zonder pakket rekent de app op de processor of via Vulkan, en draaien de grote modellen die de hoofdengine nodig hebben niet.
+1. Download `WinAIMagic-Setup-*.exe` bij [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest). Met de `.sha256` ernaast kun je het bestand controleren.
+2. Start het bestand en kies een map voor de modellen, het liefst op een snelle NVMe-schijf. Beheerdersrechten zijn niet nodig. Een nieuwere setup installeert over een oudere versie heen en houdt je instellingen, gesprekken en modellen.
+3. Windows SmartScreen kan waarschuwen, omdat de setup nog niet ondertekend is. Kies dan **Meer informatie** en **Toch uitvoeren**.
+4. Op een pc met een NVIDIA-kaart biedt het scherm **Systeem** het NVIDIA-pakket aan (ongeveer 1,6 GB). De app downloadt het uit dezelfde release en controleert het; het werkt na een herstart. Een update met dezelfde NVIDIA-engines houdt ze. Zonder pakket rekent de app op de processor of via Vulkan, en draaien de grote modellen die de hoofdengine nodig hebben niet.
 5. Open in de app **Modellen**, download een model en druk op **Start engine**.
 
 Je hebt alleen de driver van je videokaart nodig. Python, Visual Studio en de CUDA Toolkit komen niet op je pc.
 
-Instellingen, gesprekken en modellen blijven in de map `data` naast `WinAIMagic.exe`, dus de app werkt ook vanaf een USB-stick; documenten en afbeeldingen gaan naar je eigen Documenten en Afbeeldingen. API-sleutels zijn versleuteld voor je Windows-account: op een andere pc vul je ze opnieuw in.
+API-sleutels zijn versleuteld voor je Windows-account: op een andere pc vul je ze opnieuw in.
 
 Het scherm **Systeem** laat zien wat je pc nog nodig heeft. Vaak is dat een groter wisselbestand: minstens je VRAM plus 9 GB. De knop daarvoor vraagt om toestemming en werkt na een herstart.
 
@@ -116,5 +116,5 @@ Zie [PARITY.md](PARITY.md) voor de hele lijst. De belangrijkste punten:
 
 - AMD-kaarten gebruiken alleen de tweede engine via Vulkan.
 - Afbeeldingen zijn getest op GLM (hoofdengine) en Qwen3.6 (tweede engine). Op DeepSeek en MiniMax zijn ze aangesloten, maar nog niet met een echte afbeelding gedraaid. Elk model haalt zijn afbeeldingsbestanden apart op (ongeveer 1 tot 1,7 GB).
-- De app is nog niet ondertekend en nog niet getest op een schone pc.
+- De setup is nog niet ondertekend en nog niet getest op een schone pc.
 - De cluster is alleen getest met een helper op dezelfde pc, nog niet met twee aparte pc's.

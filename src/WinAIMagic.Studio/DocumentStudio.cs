@@ -975,7 +975,8 @@ public sealed class DocumentStudio : INotifyPropertyChanged
                 answer = await LocalModel.CompleteAsync(url, model, system, prompt, thinking: 1500, maxTokens: limit, temperature: 0.5, onText: Show, ct: ct);
                 body = DraftSections.WithoutHeadings(DraftSections.Cleaned(answer.Text, section.Title));
             }
-            if (answer.CutOff) AddNote(L($"Sectie '{section.Title}' is afgebroken omdat die te lang werd; controleer het einde."));
+            if (answer.Looped) AddNote(L($"Het model herhaalde zichzelf in '{section.Title}'; de herhaling is weggelaten. Controleer het einde."));
+            else if (answer.CutOff) AddNote(L($"Sectie '{section.Title}' is afgebroken omdat die te lang werd; controleer het einde."));
             if (body.Length == 0)
             {
                 // one silent section is no reason to throw away the others: it stays as it was, for the user to see

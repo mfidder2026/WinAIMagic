@@ -7,7 +7,7 @@ using Xunit;
 
 namespace WinAIMagic.Engine.Tests;
 
-/// <summary>The portable app downloads the NVIDIA engines once, checks them and puts them beside itself.</summary>
+/// <summary>The app from the setup downloads the NVIDIA engines once, checks them and puts them beside itself.</summary>
 public class NvidiaPackTests : EngineTest
 {
     private const string Url = "https://example.test/WinAIMagic-NVIDIA-9.9.9.zip";
@@ -104,7 +104,19 @@ public class NvidiaPackTests : EngineTest
         Assert.True(pack.Present);
     }
 
-    /// <summary>An update of the portable app leaves the old pack behind: that one is offered again.</summary>
+    /// <summary>An update with the same NVIDIA engines (the same sha256) keeps them: the 1.6 GB is not downloaded again.</summary>
+    [Fact]
+    public void TheSamePackStaysAfterAnUpdate()
+    {
+        var zip = Zip();
+        Manifest(zip);
+        Directory.CreateDirectory(Path.Combine(EngineRoot, "cuda"));
+        File.WriteAllText(Path.Combine(EngineRoot, "cuda", "llama-server.exe"), "");
+        File.WriteAllText(Path.Combine(EngineRoot, "cuda", NvidiaPack.StampName), Convert.ToHexStringLower(SHA256.HashData(zip)));
+        Assert.True(new NvidiaPack(new HttpClient(), EngineRoot).Present);
+    }
+
+    /// <summary>An update leaves the old pack behind: when its contents differ, it is offered again.</summary>
     [Fact]
     public void AnOlderPackIsNotPresent()
     {

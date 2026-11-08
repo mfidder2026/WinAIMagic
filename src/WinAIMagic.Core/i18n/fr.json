@@ -633,6 +633,7 @@
  "Het model gaf geen tekst terug; er is niets veranderd.": "Le modèle n'a renvoyé aucun texte ; rien n'a changé.",
  "Het model gaf geen tekst voor '%@'; de instructie staat er nog. Zet de cursor erin en gebruik Pas aan.": "Le modèle n'a donné aucun texte pour « %@ » ; la consigne est toujours là. Place le curseur dedans et utilise Modifier.",
  "Het model heeft %@ stappen gezet en pauzeert. Zeg \"ga door\" om verder te gaan.": "Le modèle a effectué %@ étapes et fait une pause. Dites « continue » pour poursuivre.",
+ "Het model herhaalde zichzelf in '%@'; de herhaling is weggelaten. Controleer het einde.": "Le modèle s'est répété dans « %@ » ; la répétition a été retirée. Vérifie la fin.",
  "Het model kan deze pc voor je bekijken en instellen. Een wijziging keur je eerst goed, en het model kan hem weer ongedaan maken.": "Le modèle peut examiner et configurer ce PC pour toi. Tu approuves d'abord une modification, et le modèle peut l'annuler.",
  "Het model kent de app: het leest de hulp en ziet hoe de app en deze pc ervoor staan": "Le modèle connaît l'application : il lit l'aide et voit où en sont l'application et ce PC",
  "Het model kon niet starten. Kijk in WinAIMagic bij Modellen of Engine.": "Le modèle n'a pas pu démarrer. Regarde dans WinAIMagic sous Modèles ou Moteur.",

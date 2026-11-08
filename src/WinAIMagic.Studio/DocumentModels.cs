@@ -244,7 +244,32 @@ public static class LocalModel
     {
         public string Text { get; set; } = "";
         public bool CutOff { get; set; }
+        /// <summary>The model began to repeat itself; the stream was stopped and the repetition taken off.</summary>
+        public bool Looped { get; set; }
         public double? TokensPerSecond { get; set; }
+    }
+
+    /// <summary>Where a text starts to go round in circles: the second copy of a line of some length once that line has come three
+    /// times. Null when it does not. Ling-3.0-tiny wrote "maar de HR-afdeling heeft de bevoegdheid om dit te bevestigen" until its
+    /// token limit in 4 of 12 sections on the test PC; that kept the machine at full load for nothing.</summary>
+    public static int? LoopStart(string text, int times = 3, int minLength = 25)
+    {
+        var seen = new Dictionary<string, List<int>>();
+        int start = 0;
+        while (start < text.Length)
+        {
+            int end = text.IndexOf('\n', start);
+            if (end < 0) end = text.Length;
+            var line = text[start..end].Trim().TrimStart('-', '*', ' ').Trim();
+            if (line.Length >= minLength)
+            {
+                if (!seen.TryGetValue(line, out var at)) seen[line] = at = [];
+                at.Add(start);
+                if (at.Count >= times) return at[1];
+            }
+            start = end + 1;
+        }
+        return null;
     }
 
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(3600);
@@ -277,6 +302,10 @@ public static class LocalModel
             ["temperature"] = temperature,
             // the thinking counts too
             ["max_tokens"] = maxTokens + thinking,
+            // a small model repeats a line until its limit (Ling: 4 of 12 sections on the test PC, 1 of 12 with this); the
+            // second engine's DRY sampler makes a repeated stretch less likely, others ignore the field
+            ["dry_multiplier"] = 0.8,
+            ["dry_allowed_length"] = 3,
             ["chat_template_kwargs"] = new JsonObject { ["enable_thinking"] = thinking > 0 },
             // the budget too when it is off: GLM's template ignores enable_thinking and always opens with <think>
             ["thinking_budget_tokens"] = thinking,
@@ -318,6 +347,14 @@ public static class LocalModel
                 var payload = line[6..];
                 if (payload == "[DONE]") break;
                 if (!ReadChunk(payload, result, text, ref unseenTokens)) continue;
+                // a model that goes round in circles is stopped here: closing the stream stops the engine too
+                if (text.Length > 0 && text[^1] == '\n' && LoopStart(text.ToString()) is int loop)
+                {
+                    text.Length = loop;
+                    result.Looped = true;
+                    result.CutOff = false;
+                    break;
+                }
                 if (DateTime.UtcNow - shown >= TimeSpan.FromSeconds(0.1))
                 {
                     shown = DateTime.UtcNow;

@@ -29,4 +29,4 @@ De **hoofdengine** verdeelt een groot model over VRAM, RAM en SSD. De **tweede e
 - **Verwijder model**: maakt de schijfruimte vrij (stop het model eerst).
 
 ## Modelmap
-Standaard staan de modellen in de map `data` naast de app (`%LOCALAPPDATA%\WinAIMagic\models` bij een app die met de oude setup is geïnstalleerd). Een andere map, ook op een andere schijf, kies je onder Modellen → Modelmap → **Kies map…**. De modellen gaan mee, zonder opnieuw te downloaden.
+Standaard staan de modellen in `%LOCALAPPDATA%\WinAIMagic\models`, of in de map die je in de setup koos. Een andere map, ook op een andere schijf, kies je onder Modellen → Modelmap → **Kies map…**. De modellen gaan mee, zonder opnieuw te downloaden.

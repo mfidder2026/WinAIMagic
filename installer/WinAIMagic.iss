@@ -53,7 +53,8 @@ fr.ModelText=Les modèles font de 20 à 460 Go chacun. Choisissez de préférenc
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "{#Source}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; the NVIDIA engines are not in the setup: the app downloads them from the release (engine\nvidia-pack.json says where)
+Source: "{#Source}\*"; DestDir: "{app}"; Excludes: "\engine\cuda\*,\engine\tiered\bin\*,portable.txt"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [InstallDelete]
 ; older versions shipped two measuring tools and a second copy of cuBLAS beside the main engine
@@ -65,6 +66,13 @@ Type: files; Name: "{app}\engine\cpu\llama-bench.exe"
 Type: files; Name: "{app}\engine\cpu\llama-perplexity.exe"
 Type: files; Name: "{app}\engine\tiered\bin\cublas64_13.dll"
 Type: files; Name: "{app}\engine\tiered\bin\cublasLt64_13.dll"
+
+[UninstallDelete]
+; what the app downloaded itself: the NVIDIA pack and what a broken download left
+Type: filesandordirs; Name: "{app}\engine\cuda"
+Type: filesandordirs; Name: "{app}\engine\tiered\bin"
+Type: filesandordirs; Name: "{app}\engine\nvidia-new"
+Type: files; Name: "{app}\engine\nvidia-pack.zip.part"
 
 [Icons]
 Name: "{group}\WinAIMagic"; Filename: "{app}\WinAIMagic.exe"
@@ -85,7 +93,14 @@ begin
   ModelPage.Values[0] := ExpandConstant('{localappdata}\WinAIMagic\models');
 end;
 
+// An update over an installed version keeps the model folder the app already has: no question about it.
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (PageID = ModelPage.ID) and FileExists(ExpandConstant('{app}\WinAIMagic.exe'));
+end;
+
 // The app takes this over into its settings at the next start (models are never removed by an uninstall).
+// The default folder changes nothing, so an update never resets a folder chosen in the app.
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Data: String;
