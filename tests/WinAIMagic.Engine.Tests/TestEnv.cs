@@ -151,7 +151,7 @@ public static class TestModels
             "glm" => Index("glm5-next", 46, dense, (memory - dense) / 43, firstExpertLayer: 3, contextLength: 1 << 20),
             "minimax" => Index("minimax-m3", 60, dense, (memory - dense) / 57, firstExpertLayer: 3, contextLength: 1 << 20),
             "mistral" => Index("mistral3", 34, dense, 0, contextLength: 262144),
-            "nanbeige" => Index("nanbeige", 22, dense, 0, contextLength: 262144),
+            "ling" => Index("bailingmoe3", 24, dense, (memory - dense) / 23, firstExpertLayer: 1, contextLength: 131072),
             _ => Index(m.Id.StartsWith("qwen3.8") ? "qwen4exp" : "qwen35moe", 40, dense, (memory - dense) / 40, contextLength: 262144),
         };
     }

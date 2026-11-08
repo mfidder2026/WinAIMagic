@@ -130,8 +130,8 @@ public class CatalogTests : EngineTest
             Assert.NotNull(m.Memory);
             if (m.Family != "minimax")
             {
-                // Nanbeige reads text only: its makers publish no image part
-                if (m.Family != "nanbeige") Assert.NotNull(C.VisionFor(m));
+                // Ling reads text only: its makers publish no image part
+                if (m.Family != "ling") Assert.NotNull(C.VisionFor(m));
                 Assert.NotNull(m.Dense);
             }
             // llama.cpp finds the other shards from the first one's name: <prefix>-0000N-of-0000M.gguf
@@ -157,7 +157,7 @@ public class CatalogTests : EngineTest
     {
         foreach (var m in C.Models)
         {
-            Assert.True(new[] { "DeepSeek-V4.1-Flash", "GLM-5.3-Flash", "MiniMax-M3.1-Flash", "Qwen3.8-Flash-Next", "Qwen3.6-35B-A3B", "Ministral-3-8B", "Nanbeige4.2-3B" }.Any(m.Name.StartsWith), m.Name);
+            Assert.True(new[] { "DeepSeek-V4.1-Flash", "GLM-5.3-Flash", "MiniMax-M3.1-Flash", "Qwen3.8-Flash-Next", "Qwen3.6-35B-A3B", "Ministral-3-8B", "Ling-3.0-tiny" }.Any(m.Name.StartsWith), m.Name);
             Assert.All(m.Files, f => Assert.StartsWith(m.Id, f.Local));
         }
     }

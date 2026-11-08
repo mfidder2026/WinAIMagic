@@ -275,10 +275,10 @@ public class SystemCheckTests : EngineTest
         using (var host = Host(SystemInfo.Simulated(none, 8, 8), none))
         {
             var model = SystemCheck.ModelItems(host).Single(i => i.Id == "model");
-            Assert.Contains("deze pc met 8 GB RAM: Nanbeige4.2-3B Q4", model.Detail);
+            Assert.Contains("deze pc met 8 GB RAM: Ling-3.0-tiny Q4", model.Detail);
             Assert.Contains("nog niet gemeten", model.Detail);
             Assert.DoesNotContain("VRAM", model.Detail);
-            Assert.Equal("nanbeige4.2-3b-q4", host.SelectedModelId);
+            Assert.Equal("ling-3.0-tiny-q4", host.SelectedModelId);
         }
         // the model fits, and a PC without a card is not told about its VRAM
         using (var host = Host(SystemInfo.Simulated(none, 16, 8), none))

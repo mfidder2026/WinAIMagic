@@ -437,21 +437,22 @@
       "recommendMaxVramGb": 8.5
     },
     {
-      "id": "nanbeige4.2-3b-q4",
-      "name": "Nanbeige4.2-3B Q4",
-      "family": "nanbeige",
-      "summary": "3B · 4 bit · 3 GB in het geheugen · denkt na, sterk met tools · voor een pc met 8 GB",
+      "id": "ling-3.0-tiny-q4",
+      "name": "Ling-3.0-tiny Q4",
+      "family": "ling",
+      "summary": "8B MoE · 1B actief · 4 bit · 5 GB in het geheugen · snel zonder videokaart · voor een pc met 8 GB",
       "files": [
         {
-          "local": "nanbeige4.2-3b-q4.gguf",
-          "size": 2684023968,
-          "sha256": "b92d2e35c9876b0c4bc671996360204f4149d0546c23d5954d5eb3b106c81f24",
-          "url": "https://huggingface.co/bartowski/Nanbeige_Nanbeige4.2-3B-GGUF/resolve/17562eefe9752007209148d5f7a6e275fc8d8077/Nanbeige_Nanbeige4.2-3B-Q4_K_M.gguf"
+          "local": "ling-3.0-tiny-q4.gguf",
+          "size": 4917354688,
+          "sha256": "5eb12d8150f502e5ef15c05f0a03aec72ef8b8319fbaa8b2e03b43754ce9f2c5",
+          "url": "https://huggingface.co/bartowski/Ling-3.0-tiny-GGUF/resolve/ea072726af0d2e8ba325b2f90fc0efa762105a91/Ling-3.0-tiny-Q4_K_M.gguf"
         }
       ],
-      "memory": 2680055808,
-      "dense": 2680055808,
+      "memory": 4910838400,
+      "dense": 718369408,
       "engine": "llama",
+      "smallPc": true,
       "recommendMaxVramGb": 8.5
     }
   ],

@@ -57,9 +57,13 @@ public sealed record ModelInfo
     [JsonPropertyName("recommendMaxVramGb")] public double? RecommendMaxVramGb { get; init; }
     /// <summary>False: a variant of another model (Qwen3.6 Heretic beside Qwen3.6), never the recommendation, even when it is smaller.</summary>
     [JsonPropertyName("recommend")] public bool Recommend { get; init; } = true;
+    /// <summary>True: a small model, recommended only on a PC with little memory, as a model without experts always is. Elsewhere a
+    /// larger model that reads a little from the SSD does more (Ling beside Qwen3.6).</summary>
+    [JsonPropertyName("smallPc")] public bool SmallPc { get; init; }
 
     /// <summary>No routed experts: every token reads all the weights, so nothing can stay behind on the SSD for long.</summary>
     [JsonIgnore] public bool IsPlain => Dense != null && Dense == Memory;
+    [JsonIgnore] public bool IsForSmallPc => IsPlain || SmallPc;
     [JsonIgnore] public ulong TotalSize => Files.Aggregate(0UL, (n, f) => n + f.Size);
     [JsonIgnore] public bool HasMtp => Mtp is "builtin" or "file";
     [JsonIgnore] public string ShortName => Name.Split(' ')[0];

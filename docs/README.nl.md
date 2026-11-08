@@ -69,15 +69,15 @@ Ministral-3-8B Q4 (5 GB) is het model voor een pc met 8 of 16 GB RAM. Gemeten op
 
 Op 8 GB RAM zonder videokaart heeft het model ongeveer 5 GB vrij nodig. Met een limiet van 5 GB op wat het in het geheugen mag houden schrijft het nog 5 tok/s, met 4,5 GB zakt dat naar 0,7 tok/s, ook bij een kleinere context, en een echte SSD maakt dat nog erger. Sluit daar dus andere programma's.
 
-**Nanbeige4.2-3B Q4** (2,7 GB) is het model voor een pc met 6 tot 12 GB RAM, waar Ministral zou streamen. Het doorloopt zijn 22 lagen twee keer per token en schrijft daardoor niet sneller dan Ministral, maar het heeft de helft van het geheugen nodig en denkt na voor het antwoordt. Gemeten op dezelfde pc op dezelfde manier, een prompt van 3.100 tokens en 300 tokens:
+**Ling-3.0-tiny Q4** (4,9 GB, MIT) is het model voor een pc met 6 tot 12 GB RAM, waar Ministral zou streamen. Het is een MoE van 8B waarvan per token 1B meedoet, en 18 van zijn 24 lagen hebben lineaire attention. Daardoor is zijn cache klein (9 KB per token) en streamen zijn experts goed. Gemeten op dezelfde pc op dezelfde manier, een prompt van 3.100 tokens en 300 tokens:
 
 | Bootst na | Context | Prompt lezen | Schrijven |
 |---|---|---|---|
-| Een videokaart, alles op de kaart | 16K | 3.216 tok/s | **67,8 tok/s** (Ministral 65,2) |
-| Geen videokaart: 4 processorthreads | 8K | 26 tok/s | **2,8 tok/s** (Ministral 3,3) |
-| Geen videokaart, hooguit 4,5, 4 of 3,5 GB in het geheugen | 8K | 26 tok/s | **2,8 tok/s** |
+| Een videokaart, alles op de kaart | 16K | 7.770 tok/s | **222 tok/s** (Ministral 65,2) |
+| Geen videokaart: 4 processorthreads | 8K | 128 tok/s | **21,0 tok/s** (Ministral 3,3) |
+| Geen videokaart, hooguit 4,5, 3,5 of 2,5 GB in het geheugen | 8K | 117 tot 126 tok/s | **20,5, 19,8 en 17,1 tok/s** |
 
-In de app, op een nagebootste pc van 8 GB zonder videokaart, antwoordde het met 3,4 tok/s, maakte het een stappenlijst, schreef het een bestand en vroeg het toestemming voor het uitvoeren. De systeemprompt en de tools nemen daar 4K van de 8K context. Een klein model in 4 bit vergist zich soms: één keer schreef het "Parfie" voor Parijs. De pc van 6 GB is alleen berekend.
+Het bestand bleef op deze pc, die ruim RAM heeft, in de bestandscache van Windows. Een echte pc van 8 GB leest vaker van zijn SSD, en hoeveel trager dat is, is niet gemeten. In de app, op een nagebootste pc van 8 GB zonder videokaart, antwoordde het met 19,3 tok/s bij 16K context, waarvan de systeemprompt en de tools 5K nemen, schreef het een bestand en vroeg het toestemming voor het uitvoeren. Het is een klein model en maakt fouten: van vijf Nederlandse vragen had het de sommen en Parijs goed en noemde het de verkeerde schrijver van "De avonden". Het verving Nanbeige4.2-3B, dat op dezelfde vragen slechter Nederlands schreef, twee keer nadacht zonder te antwoorden en op de processor 2,8 tok/s schreef. De pc van 6 GB is alleen berekend.
 
 **De 8-bit-cache.** Met een videokaart bewaart de tweede engine wat hij van het gesprek onthoudt (de KV-cache) in 8 bits in plaats van 16. Gemeten met Ministral op deze pc:
 

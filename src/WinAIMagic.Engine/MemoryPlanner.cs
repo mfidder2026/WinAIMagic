@@ -181,14 +181,14 @@ public static class MemoryPlanner
         EngineFor(model, s) == EngineKind.Tiered ? TieredVramLimit(s) : LlamaVramLimit(s);
 
     /// <summary>The first model in the catalog that fits in this PC's VRAM + RAM; a larger card skips the models meant for small ones,
-    /// and a model without experts is only for a PC with little memory: elsewhere a model that reads a little from the SSD does more.
+    /// and a model without experts or a small one is only for a PC with little memory: elsewhere a model that reads a little from the SSD does more.
     /// If none fits, the smallest that streams, when this PC has room for what that has to hold. Otherwise none: a model still
     /// starts, but this PC is better off as a helper in a cluster.</summary>
     public static ModelInfo? Recommended(IEnumerable<ModelInfo> models, SystemInfo s)
     {
         var usable = models.Where(m => m.Recommend && EngineFor(m, s) != null).ToList();
         double vramGb = s.VramTotal / (double)(1UL << 30);
-        return usable.FirstOrDefault(m => FitFor(m, s) == Fit.Fits && (!m.IsPlain || IsSmallPc(s))
+        return usable.FirstOrDefault(m => FitFor(m, s) == Fit.Fits && (!m.IsForSmallPc || IsSmallPc(s))
                                           && ((m.Tier?.RecommendMaxVramGb ?? m.RecommendMaxVramGb) is not double max || !s.HasGpu || vramGb <= max))
             ?? usable.Where(m => FitFor(m, s) == Fit.Streams && HasRoomToStream(m, s)).MinBy(m => m.TotalSize);
     }
@@ -199,6 +199,9 @@ public static class MemoryPlanner
     {
         ulong dense = model.Dense ?? (model.Memory ?? model.TotalSize) / 10;
         if (model.IsPlain) return dense + WindowsRoom <= s.RamTotal + VramLimitFor(model, s);
+        // a small model streams through the file cache beside Windows, not in RAM the engine pins, so the engine's margin does not
+        // apply. Ling wrote 17 tok/s on 4 processor threads with 2.5 GB in memory (a limit on the test PC's working set, not a real PC).
+        if (model.SmallPc) return dense + SmallComputeBuffers + SmallestCache + WindowsRoom <= s.RamTotal + VramLimitFor(model, s);
         return dense + ComputeBuffers + SmallestCache <= VramLimitFor(model, s) + RamBudget(s);
     }
 
@@ -253,7 +256,7 @@ public static class MemoryPlanner
         // the KV cache lives on the card, unless not even the dense weights do
         else if (s.HasGpu && limit >= fixedOnCard) kvTokens = Math.Min(kvTokens, (limit - fixedOnCard) / perToken);
         // a model without experts that only just fits keeps the context it would get when it did not fit: the system prompt and
-        // the tools need it (Nanbeige on 12 GB without a card came to 4K)
+        // the tools need it (a 3B model without experts on 12 GB without a card came to 4K)
         return Math.Max(index.ExpertBytes == 0 ? PlainSmallContext : 4096, (int)Math.Min(kvTokens, int.MaxValue) / 4096 * 4096);
     }
 

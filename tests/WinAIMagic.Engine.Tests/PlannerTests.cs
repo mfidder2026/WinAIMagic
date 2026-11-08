@@ -242,10 +242,10 @@ public class ThreeTierTests : EngineTest
         Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["qwen3.6-35b-a3b-q4"], small));
         // larger than memory is what the app is for: everything else streams on 32 GB, nothing is too big
         Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["ministral-3-8b-q4"], small));
-        Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["nanbeige4.2-3b-q4"], small));
+        Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["ling-3.0-tiny-q4"], small));
         // Heretic is Qwen3.6 without refusals, a little smaller: it fits where Qwen3.6 does
         Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["qwen3.6-35b-a3b-heretic-q4"], small));
-        foreach (var m in ModelCatalog.Shared.Models.Where(m => m.Id is not ("qwen3.6-35b-a3b-q4" or "qwen3.6-35b-a3b-heretic-q4" or "ministral-3-8b-q4" or "nanbeige4.2-3b-q4")))
+        foreach (var m in ModelCatalog.Shared.Models.Where(m => m.Id is not ("qwen3.6-35b-a3b-q4" or "qwen3.6-35b-a3b-heretic-q4" or "ministral-3-8b-q4" or "ling-3.0-tiny-q4")))
             Assert.Equal(MemoryPlanner.Fit.Streams, MemoryPlanner.FitFor(m, small));
         Assert.Equal(MemoryPlanner.Fit.Fits, MemoryPlanner.FitFor(byId["deepseek-v4.1-flash-compact"], big));
         Assert.Equal(MemoryPlanner.Fit.Streams, MemoryPlanner.FitFor(byId["deepseek-v4.1-flash-q4"], big));
@@ -422,8 +422,8 @@ public class SmallPcTests : EngineTest
     private static readonly GGUFIndex QwenIndex = TestModels.IndexOf(Qwen);
     private static readonly ModelInfo Ministral = ModelCatalog.Shared.Model("ministral-3-8b-q4")!;
     private static readonly GGUFIndex MinistralIndex = TestModels.IndexOf(Ministral);
-    private static readonly ModelInfo Nanbeige = ModelCatalog.Shared.Model("nanbeige4.2-3b-q4")!;
-    private static readonly GGUFIndex NanbeigeIndex = TestModels.IndexOf(Nanbeige);
+    private static readonly ModelInfo Ling = ModelCatalog.Shared.Model("ling-3.0-tiny-q4")!;
+    private static readonly GGUFIndex LingIndex = TestModels.IndexOf(Ling);
 
     /// <summary>`vram` 0: no card, which is also what a laptop with only graphics in its processor gets.</summary>
     private static SystemInfo Pc(int vram, int ram = 16) =>
@@ -454,27 +454,30 @@ public class SmallPcTests : EngineTest
         Assert.Equal(Ministral.Id, MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s)?.Id);
     }
 
-    /// <summary>With less, where Ministral streams, the smaller Nanbeige: it fits on 12 GB and streams least on 8 and 6 GB. Measured on the
-    /// test PC with a limit on the working set in place of such a laptop, not on a real one.</summary>
+    /// <summary>With less, where Ministral streams, Ling: a MoE with 1B active, whose experts stream well. On the test PC with 4 processor
+    /// threads it wrote 21 tok/s, and 17 to 20 tok/s with a limit of 2.5 to 4.5 GB on its working set in place of such a laptop; not
+    /// measured on a real one, whose SSD would be read more.</summary>
     [Theory]
-    [InlineData(0, 12, MemoryPlanner.Fit.Fits)]
+    [InlineData(0, 12, MemoryPlanner.Fit.Streams)]
     [InlineData(4, 8, MemoryPlanner.Fit.Streams)]
     [InlineData(0, 8, MemoryPlanner.Fit.Streams)]
     [InlineData(0, 6, MemoryPlanner.Fit.Streams)]
-    public void ALaptopWithLessIsRecommendedNanbeige(int vram, int ram, MemoryPlanner.Fit fit)
+    public void ALaptopWithLessIsRecommendedLing(int vram, int ram, MemoryPlanner.Fit fit)
     {
         var s = Pc(vram, ram);
         Assert.Equal(MemoryPlanner.Fit.Streams, MemoryPlanner.FitFor(Ministral, s));
-        Assert.Equal(fit, MemoryPlanner.FitFor(Nanbeige, s));
-        Assert.Equal(Nanbeige.Id, MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s)?.Id);
+        Assert.Equal(fit, MemoryPlanner.FitFor(Ling, s));
+        Assert.Equal(Ling.Id, MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s)?.Id);
     }
 
-    /// <summary>A model without experts never gets less than 8K, also where it only just fits: the system prompt and the tools need it.</summary>
+    /// <summary>Ling's cache is small (9 KB per token), so where it fits it keeps a large context, and where it streams the context of a small
+    /// PC: twice what a 3B model without experts got there.</summary>
     [Fact]
-    public void NanbeigeKeeps8KWhereItOnlyJustFits()
+    public void LingKeepsItsContext()
     {
-        var s = Pc(0, 12);
-        Assert.Equal(MemoryPlanner.PlainSmallContext, MemoryPlanner.ContextSize(NanbeigeIndex, s, 65_536, false, EngineKind.Llama));
+        Assert.Equal(65_536, MemoryPlanner.ContextSize(LingIndex, Pc(0, 16), 65_536, false, EngineKind.Llama));
+        Assert.Equal(MemoryPlanner.TinyPcContext, MemoryPlanner.ContextSize(LingIndex, Pc(0, 12), 65_536, false, EngineKind.Llama));
+        Assert.Equal(MemoryPlanner.TinyPcContext, MemoryPlanner.ContextSize(LingIndex, Pc(0, 8), 65_536, false, EngineKind.Llama));
     }
 
     /// <summary>What Windows reports for a laptop sold with 8 GB, part of which goes to the graphics in its processor.</summary>
@@ -484,7 +487,7 @@ public class SmallPcTests : EngineTest
     public void TheRecommendationSurvivesWhatWindowsReports(double gib)
     {
         var s = Pc(0, 8) with { RamTotal = (ulong)(gib * (1UL << 30)) };
-        Assert.Equal(Nanbeige.Id, MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s)?.Id);
+        Assert.Equal(Ling.Id, MemoryPlanner.Recommended(ModelCatalog.Shared.Models, s)?.Id);
     }
 
     /// <summary>Less than this: nothing is recommended, and a model still starts.</summary>
