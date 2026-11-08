@@ -2,7 +2,7 @@
 
 Draai enorme AI-modellen volledig op je eigen Windows 11-pc. Een model dat niet in je videokaart past, start gewoon en haalt de rest uit het RAM en van de SSD. Niets verlaat je computer, behalve zoekopdrachten als je web zoeken aanzet en de modeldownloads.
 
-Dit is de Windows-versie van [MacAIMagic](https://github.com/mfidder2026/MacAIMagic). De Engelse uitleg staat in de [README](../README.md).
+Dit is de Windows-versie van [MacAIMagic](https://github.com/mfidder2026/MacAIMagic). Uitpakken en starten: geen installatie, geen Python, Visual Studio of CUDA Toolkit, alleen de driver van je videokaart. Het draait de grote mixture-of-experts-modellen (GLM, DeepSeek, Qwen, MiniMax) en kleine modellen voor een laptop, zoals Ling-3.0-tiny, dat op vier processorthreads ongeveer 20 tok/s schrijft. De Engelse uitleg staat in de [README](../README.md).
 
 ## Installeren
 
@@ -116,5 +116,5 @@ Zie [PARITY.md](PARITY.md) voor de hele lijst. De belangrijkste punten:
 
 - AMD-kaarten gebruiken alleen de tweede engine via Vulkan.
 - Afbeeldingen zijn getest op GLM (hoofdengine) en Qwen3.6 (tweede engine). Op DeepSeek en MiniMax zijn ze aangesloten, maar nog niet met een echte afbeelding gedraaid. Elk model haalt zijn afbeeldingsbestanden apart op (ongeveer 1 tot 1,7 GB).
-- De setup is nog niet ondertekend en nog niet getest op een schone pc.
+- De app is nog niet ondertekend en nog niet getest op een schone pc.
 - De cluster is alleen getest met een helper op dezelfde pc, nog niet met twee aparte pc's.
