@@ -50,12 +50,13 @@ Available in English, Dutch, German and French.
 
 ## Install
 
-1. Download `WinAIMagic-Setup-*.exe` from [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest). It holds everything, including the NVIDIA engines, so it is large; for a PC without an NVIDIA card the portable version below is much smaller.
-2. Run it. Choose a folder for the models, ideally on a fast NVMe drive. No administrator rights are needed.
-3. Windows SmartScreen may warn you, because this installer is not code-signed yet: choose **More info** and **Run anyway**. The `.sha256` next to the installer lets you check the file.
-4. In the app, open **Models**, download a model, and press **Start engine**.
+1. Download `WinAIMagic-*.zip` (about 255 MB) from [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest). The `.sha256` next to it lets you check the file.
+2. Unzip it where you want the app and its models, ideally on a fast NVMe drive, and start `WinAIMagic.exe`. No installation and no administrator rights are needed.
+3. Windows SmartScreen may warn you, because the app is not code-signed yet: choose **More info** and **Run anyway**.
+4. On a PC with an NVIDIA card, the **System** page offers the NVIDIA pack the first time (about 1.6 GB, from the same release). It goes into the same folder and counts after a restart. Without it the app runs on the processor or through Vulkan, and the large models that need the main engine do not run.
+5. In the app, open **Models**, download a model, and press **Start engine**.
 
-**Portable version.** `WinAIMagic-Portable-*.zip` (about 215 MB) needs no installation: unzip it anywhere, also on a USB drive, and start `WinAIMagic.exe`. Its settings, conversations and models stay in the folder `data` beside it; documents and images still go to your own Documents and Pictures. It leaves out the NVIDIA engines. On a PC with an NVIDIA card the **System** page offers them as the NVIDIA pack (about 1.4 GB), which goes into the same folder and counts after a restart. Without it the app runs on the processor or through Vulkan, and the large models that need the main engine do not run. API keys are encrypted for your Windows account, so on another PC you enter them again.
+Settings, conversations and models stay in the folder `data` beside `WinAIMagic.exe`, so the app also runs from a USB drive; documents and images go to your own Documents and Pictures. API keys are encrypted for your Windows account, so on another PC you enter them again.
 
 The system check tells you what your PC still needs. The most common one: the Windows page file must be at least your VRAM plus 9 GB. The app offers a button for that; it asks for permission and needs a restart.
 

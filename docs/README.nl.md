@@ -6,14 +6,15 @@ Dit is de Windows-versie van [MacAIMagic](https://github.com/mfidder2026/MacAIMa
 
 ## Installeren
 
-1. Download `WinAIMagic-Setup-*.exe` bij [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest). Daar zit alles in, ook de NVIDIA-engines, dus hij is groot; voor een pc zonder NVIDIA-kaart is de draagbare versie hieronder veel kleiner.
-2. Start het bestand en kies een map voor de modellen, het liefst op een snelle NVMe-schijf. Beheerdersrechten zijn niet nodig.
-3. Windows SmartScreen kan waarschuwen, omdat de setup nog niet ondertekend is. Kies dan **Meer informatie** en **Toch uitvoeren**.
-4. Open in de app **Modellen**, download een model en druk op **Start engine**.
+1. Download `WinAIMagic-*.zip` (ongeveer 255 MB) bij [Releases](https://github.com/mfidder2026/WinAIMagic/releases/latest). Met de `.sha256` ernaast kun je het bestand controleren.
+2. Pak hem uit waar je de app en de modellen wilt hebben, het liefst op een snelle NVMe-schijf, en start `WinAIMagic.exe`. Installeren en beheerdersrechten zijn niet nodig.
+3. Windows SmartScreen kan waarschuwen, omdat de app nog niet ondertekend is. Kies dan **Meer informatie** en **Toch uitvoeren**.
+4. Op een pc met een NVIDIA-kaart biedt het scherm **Systeem** de eerste keer het NVIDIA-pakket aan (ongeveer 1,6 GB, uit dezelfde release). Dat komt in dezelfde map en werkt na een herstart. Zonder pakket rekent de app op de processor of via Vulkan, en draaien de grote modellen die de hoofdengine nodig hebben niet.
+5. Open in de app **Modellen**, download een model en druk op **Start engine**.
 
 Je hebt alleen de driver van je videokaart nodig. Python, Visual Studio en de CUDA Toolkit komen niet op je pc.
 
-**Draagbare versie.** `WinAIMagic-Portable-*.zip` (ongeveer 215 MB) hoef je niet te installeren: pak hem ergens uit, ook op een USB-stick, en start `WinAIMagic.exe`. Instellingen, gesprekken en modellen blijven in de map `data` ernaast; documenten en afbeeldingen gaan wel naar je eigen Documenten en Afbeeldingen. De NVIDIA-engines zitten er niet in. Op een pc met een NVIDIA-kaart biedt het scherm **Systeem** ze aan als het NVIDIA-pakket (ongeveer 1,4 GB). Dat komt in dezelfde map en werkt na een herstart. Zonder pakket rekent de app op de processor of via Vulkan, en draaien de grote modellen die de hoofdengine nodig hebben niet. API-sleutels zijn versleuteld voor je Windows-account: op een andere pc vul je ze opnieuw in.
+Instellingen, gesprekken en modellen blijven in de map `data` naast `WinAIMagic.exe`, dus de app werkt ook vanaf een USB-stick; documenten en afbeeldingen gaan naar je eigen Documenten en Afbeeldingen. API-sleutels zijn versleuteld voor je Windows-account: op een andere pc vul je ze opnieuw in.
 
 Het scherm **Systeem** laat zien wat je pc nog nodig heeft. Vaak is dat een groter wisselbestand: minstens je VRAM plus 9 GB. De knop daarvoor vraagt om toestemming en werkt na een herstart.
 

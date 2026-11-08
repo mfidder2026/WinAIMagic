@@ -5,7 +5,7 @@ keywords: systeemcheck controle videokaart engine wisselbestand Defender schijfr
 ---
 **Systeem** controleert bij elke start wat WinAIMagic nodig heeft:
 - de versie van de app, de videokaart, het RAM en welke engine-backend past (CUDA, Vulkan of de processor);
-- of de engines starten, en of het NVIDIA-pakket er is in de draagbare versie;
+- of de engines starten, en of het NVIDIA-pakket er is;
 - het **wisselbestand**: de engine heeft er een grote nodig om het model vast te zetten;
 - de schijf van de modelmap, en of het een snelle NVMe-schijf is;
 - of Windows Defender de engine tegenhoudt.

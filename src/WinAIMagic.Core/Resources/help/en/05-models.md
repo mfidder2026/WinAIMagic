@@ -29,4 +29,4 @@ The **main engine** divides a large model over VRAM, RAM and SSD. The **second e
 - **Delete model**: frees the disk space (stop the model first).
 
 ## Model folder
-By default the models are in `%LOCALAPPDATA%\WinAIMagic\models` (in the portable version in the folder `data` beside the app). Choose another folder, also on another drive, under Models → Model folder → **Choose folder…**. The models move along, without downloading again.
+By default the models are in the folder `data` beside the app (`%LOCALAPPDATA%\WinAIMagic\models` for an app installed with the old setup). Choose another folder, also on another drive, under Models → Model folder → **Choose folder…**. The models move along, without downloading again.

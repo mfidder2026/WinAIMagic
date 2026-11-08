@@ -49,7 +49,7 @@ public sealed class SystemCheck
     internal static Item AppItem()
     {
         var version = Paths.AppVersion;
-        return new Item("app", "WinAIMagic", L($"Versie {version}") + " · " + Paths.AppRoot + (Paths.Portable ? " · " + L("draagbaar") : ""), CheckState.Ok);
+        return new Item("app", "WinAIMagic", L($"Versie {version}") + " · " + Paths.AppRoot, CheckState.Ok);
     }
 
     /// <summary>The engines of the portable app that it downloads for a make of card (Gpu\NvidiaPack.cs says which and how).</summary>

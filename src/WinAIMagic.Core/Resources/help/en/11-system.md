@@ -5,7 +5,7 @@ keywords: system check graphics card engine page file Defender disk space NVMe r
 ---
 **System** checks at every start what WinAIMagic needs:
 - the app's version, the graphics card, the RAM and which engine backend fits (CUDA, Vulkan or the processor);
-- whether the engines start, and whether the NVIDIA pack is there in the portable version;
+- whether the engines start, and whether the NVIDIA pack is there;
 - the **page file**: the engine needs a large one to lock the model in memory;
 - the drive of the model folder, and whether it is a fast NVMe drive;
 - whether Windows Defender blocks the engine.

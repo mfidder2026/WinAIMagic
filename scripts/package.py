@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Lays out dist\\app (the published app with its engine folder) and builds the installer.
+"""Lays out dist\\app (the published app with its engine folder) and builds the release files.
 
-    python scripts/package.py [--skip-publish] [--skip-setup] [--skip-portable]
+    python scripts/package.py [--skip-publish] [--setup] [--skip-portable]
 
 Layout: dist\\app\\WinAIMagic.exe, dist\\app\\engine\\{tiered\\(serve, tools, bin), python\\, cuda\\, vulkan\\, cpu\\}.
 Everything the user needs comes along: no Python, Visual Studio or CUDA Toolkit on the target PC (brief §2.5).
 
-Three files for a release, in dist\\:
-- WinAIMagic-Setup-<v>.exe: everything, offline.
-- WinAIMagic-Portable-<v>.zip: the app without the NVIDIA engines (engine\\cuda, engine\\tiered\\bin), with portable.txt, so its
-  data stays beside it, and engine\\nvidia-pack.json, which names the third file.
-- WinAIMagic-NVIDIA-<v>.zip: those engines, which the portable app offers to download on a PC with an NVIDIA card. It must be
-  attached to the release v<v>: the manifest points there.
+Two files for a release, in dist\\ (since 1.14.3 there is one version of the app, on the owner's request):
+- WinAIMagic-<v>.zip: the app without the NVIDIA engines (engine\\cuda, engine\\tiered\\bin), with portable.txt, so its data
+  stays beside it, and engine\\nvidia-pack.json, which names the second file.
+- WinAIMagic-NVIDIA-<v>.zip: those engines, which the app offers to download on a PC with an NVIDIA card. It must be attached to
+  the release v<v>: the manifest points there.
+--setup also builds the old installer, WinAIMagic-Setup-<v>.exe (everything, offline); it is no longer released.
 """
 import argparse
 import hashlib
@@ -209,7 +209,7 @@ def portable():
     manifest = {"version": v, "url": f"https://github.com/{REPO}/releases/download/v{v}/{pack.name}",
                 "size": pack.stat().st_size, "sha256": sha256(pack)}
 
-    out = DIST / f"WinAIMagic-Portable-{v}.zip"
+    out = DIST / f"WinAIMagic-{v}.zip"
     print(">", out.name, flush=True)
     left_out = [ENGINE / f for f in NVIDIA_FOLDERS]
     files = [p for p in sorted(APP.rglob("*")) if p.is_file() and not any(p.is_relative_to(d) for d in left_out)]
@@ -217,7 +217,7 @@ def portable():
     shutil.rmtree(stage, ignore_errors=True)
     stage.mkdir(parents=True)
     (stage / "portable.txt").write_text(
-        "WinAIMagic, portable version.\r\n\r\n"
+        "WinAIMagic\r\n\r\n"
         "This file keeps settings, conversations and models in the folder 'data' next to WinAIMagic.exe.\r\n"
         "Remove it and WinAIMagic uses %LOCALAPPDATA%\\WinAIMagic, like the installed version.\r\n", encoding="utf-8")
     (stage / "nvidia-pack.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
@@ -232,7 +232,7 @@ def portable():
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-publish", action="store_true")
-    ap.add_argument("--skip-setup", action="store_true")
+    ap.add_argument("--setup", action="store_true", help="also build the installer (no longer released)")
     ap.add_argument("--skip-portable", action="store_true")
     a = ap.parse_args()
     APP.mkdir(parents=True, exist_ok=True)
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     notices()
     if scan():
         print("the upstream name is still in the package: see above")
-    if not a.skip_setup:
+    if a.setup:
         setup()
     if not a.skip_portable:
         portable()
