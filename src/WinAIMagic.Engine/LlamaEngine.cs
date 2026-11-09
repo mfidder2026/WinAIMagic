@@ -8,7 +8,35 @@ namespace WinAIMagic.Engine;
 /// <summary>Runs llama-server (the patched llama.cpp engine) with the memory plan: small models, the cluster, the limited mode.</summary>
 public sealed class LlamaEngine : EngineBase
 {
-    public LlamaEngine(int? port = null, string? logFile = null) : base(port, logFile) { }
+    public LlamaEngine(int? port = null, string? logFile = null, SlotKeeper? slots = null) : base(port, logFile)
+    {
+        Slots = slots ?? new SlotKeeper();
+        Slots.Note = WriteLog;
+    }
+
+    /// <summary>Keeps a conversation's place in the engine across a switch and a restart (see SlotKeeper).</summary>
+    public SlotKeeper Slots { get; }
+
+    /// <summary>States are kept unless switched off, and not on a cluster (not tried there).</summary>
+    private static bool KeepsStates(EngineStart s) => Settings.Shared.KeepEngineMemory && s.Rpc == null;
+
+    protected override void OnStarted(EngineStart s, ChildStart command)
+    {
+        if (KeepsStates(s))
+            Slots.Started(BaseUrl, SlotKeeper.StateKey(s.Model.Id, s.Plan.ContextSize, s.Vision != null, command.Args.Contains("--spec-type")));
+        else Slots.Stopped();
+    }
+
+    protected override void OnStopped() => Slots.Stopped();
+
+    protected override Task? BeforeStop() => Slots.HasUnsaved ? Slots.SaveCurrentAsync() : null;
+
+    public override void SaveForQuit()
+    {
+        if (Slots.Key == null) return;
+        if (State.Status == EngineStatus.Running) Slots.SaveBlocking();
+        else WriteLog($"WinAIMagic: afsluiten, engine niet klaar ({State.Status}): niets bewaard");
+    }
 
     public override EngineKind Kind => EngineKind.Llama;
     public override EngineCapabilities Capabilities => new(Vision: ReadsImages, Cluster: true, ExpertTiers: false);
@@ -63,6 +91,8 @@ public sealed class LlamaEngine : EngineBase
         // the KV cache in 8 bits where it is on the card: half the memory for the same answers (MemoryPlanner.EightBitKv)
         if (plan.EightBitKv) args.AddRange(new[] { "--cache-type-k", "q8_0", "--cache-type-v", "q8_0" });
         if (s.Vision != null) args.AddRange(new[] { "--mmproj", s.Vision });
+        // a conversation's place in the engine can be saved and read back (SlotKeeper)
+        if (KeepsStates(s)) args.AddRange(new[] { "--slot-save-path", Slots.Folder });
         // cluster: the helpers' GPUs join as RPC devices
         if (s.Rpc != null) args.AddRange(new[] { "--rpc", s.Rpc });
         // multi-token prediction: a small head guesses the next tokens, the model checks them in one pass. Not for a model

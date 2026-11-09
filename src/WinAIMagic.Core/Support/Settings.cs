@@ -145,6 +145,9 @@ public sealed class Settings : INotifyPropertyChanged
     public bool AutoApprove { get => Get(false); set => Set(value); }
     /// <summary>Speculative decoding with the model's multi-token prediction head (GLM, Qwen).</summary>
     public bool Mtp { get => Get(true); set => Set(value); }
+    /// <summary>Save a conversation's place in the main engine when another one takes it or the engine stops, and read it back
+    /// (SlotKeeper): going on with a long conversation then does not read it all again.</summary>
+    public bool KeepEngineMemory { get => Get(true); set => Set(value); }
     /// <summary>Leave out experts missing from VRAM that count little: "off", "light" or "strong". Faster, but the answers change a little.</summary>
     public string SkipExperts { get => Get("off"); set => Set(value); }
     /// <summary>Drifting background colours (off: a still background, calmer).</summary>

@@ -1,7 +1,7 @@
 ---
 title: Settings
 icon: Settings
-keywords: settings language preferences context vision MTP port address VRAM reserve page file backend system management skills connectors tasks heartbeat notification area start with windows
+keywords: settings memory keep conversation language preferences context vision MTP port address VRAM reserve page file backend system management skills connectors tasks heartbeat notification area start with windows
 ---
 Open the settings with the gear at the top right.
 
@@ -14,6 +14,7 @@ Open the settings with the gear at the top right.
 ## Engine
 - **Context**: from 32K to 1M tokens. More context takes more memory.
 - **Images (vision)**, **MTP**, **Skip experts** (GLM), **Start the engine when the app opens**, **Moving background**.
+- **Keep conversations in the engine** (on by default): what the engine has read of a conversation goes to the SSD as soon as another conversation, a task or Documents gets the model, after every answer, and when the engine stops. When you go on later, also after a restart, the model does not read that conversation again. With a large model that saves minutes. It takes at most 40 GB (and never more than a tenth of the free disk); the oldest go first, and a deleted conversation takes its own along. **Clear** frees the space at once. Not on a cluster.
 - **Graphics card**: the VRAM reserve, the page file and the engine backend.
 - **Server**: address, port and API key (see *Local API*).
 

@@ -1,7 +1,7 @@
 ---
 title: Instellingen
 icon: Settings
-keywords: instellingen taal voorkeuren context vision MTP poort adres VRAM-reserve wisselbestand backend systeembeheer skills connectors taken heartbeat systeemvak opstarten
+keywords: instellingen geheugen gesprek bewaren taal voorkeuren context vision MTP poort adres VRAM-reserve wisselbestand backend systeembeheer skills connectors taken heartbeat systeemvak opstarten
 ---
 Open de instellingen met het tandwiel rechtsboven.
 
@@ -14,6 +14,7 @@ Open de instellingen met het tandwiel rechtsboven.
 ## Engine
 - **Context**: van 32K tot 1M tokens. Meer context kost meer geheugen.
 - **Afbeeldingen (vision)**, **MTP**, **Experts overslaan** (GLM), **Engine starten bij openen app**, **Bewegende achtergrond**.
+- **Gesprekken in de engine bewaren** (standaard aan): wat de engine van een gesprek gelezen heeft, gaat naar de SSD zodra een ander gesprek, een taak of Documenten het model krijgt, na elk antwoord, en als de engine stopt. Ga je later verder, ook na een herstart, dan leest het model dat gesprek niet opnieuw. Bij een groot model scheelt dat minuten. Het neemt hooguit 40 GB (en nooit meer dan een tiende van de vrije schijf); de oudste gaan eerst, en een verwijderd gesprek neemt het zijne mee. **Wis** maakt de ruimte meteen vrij. Niet bij een cluster.
 - **Videokaart**: de VRAM-reserve, het wisselbestand en de engine-backend.
 - **Server**: adres, poort en API-sleutel (zie *Lokale API*).
 

@@ -134,13 +134,13 @@ public sealed partial class AnswerRow : Grid
             workParts.Children.Clear();
             if (hidden > 0)
             {
-                earlierText.SetIfChanged(L($"{hidden} eerdere stappen"));
+                earlierText.SetIfChanged(hidden == 1 ? L("1 eerdere stap") : L($"{hidden} eerdere stappen"));
                 parts.Children.Add(earlier);
             }
             if (folded.Count > 0)
             {
                 int steps = folded.Count(p => p.Kind == PartKind.Step);
-                work.SetTitle(steps == 0 ? L("Gedachtegang") : L($"Gedachtegang en {steps} stappen"), false);
+                work.SetTitle(steps == 0 ? L("Gedachtegang") : steps == 1 ? L("Gedachtegang en 1 stap") : L($"Gedachtegang en {steps} stappen"), false);
                 parts.Children.Add(work);
                 if (memory.Work) foreach (var p in folded) workParts.Children.Add(views[p.Id]);
             }

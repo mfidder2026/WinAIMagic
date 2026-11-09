@@ -183,6 +183,34 @@ public abstract class EngineBase : IEngine
     /// <summary>A last look after the process ended: files of the run.</summary>
     protected virtual void CleanUp() { }
 
+    /// <summary>The process started with these arguments (the main engine tells its SlotKeeper).</summary>
+    protected virtual void OnStarted(EngineStart start, ChildStart command) { }
+
+    /// <summary>The process is gone.</summary>
+    protected virtual void OnStopped() { }
+
+    /// <summary>Work to finish while the engine still runs, before it is asked to stop (the main engine saves the
+    /// conversation in it); null when there is none.</summary>
+    protected virtual Task? BeforeStop() => null;
+
+    /// <summary>For quitting the app: what must be saved, blocking, before the engine goes.</summary>
+    public virtual void SaveForQuit() { }
+
+    /// <summary>The longest a stop waits for BeforeStop.</summary>
+    protected internal TimeSpan BeforeStopLimit { get; set; } = TimeSpan.FromSeconds(20);
+
+    /// <summary>A line of the app's own in the engine's log and its tail (the log view).</summary>
+    public void WriteLog(string line)
+    {
+        try { log?.WriteLine(line); } catch (Exception e) when (e is IOException or ObjectDisposedException) { }
+        lock (gate)
+        {
+            tail.Add(line);
+            if (tail.Count > 400) tail.RemoveRange(0, tail.Count - 400);
+        }
+        Changed?.Invoke();
+    }
+
     /// <summary>Tests start a fake process instead.</summary>
     internal string? ExecutableOverride { get; set; }
     internal IReadOnlyList<string>? ArgumentsOverride { get; set; }
@@ -228,6 +256,7 @@ public abstract class EngineBase : IEngine
         try
         {
             lock (gate) process = ChildProcess.Start(cmd);
+            OnStarted(s, cmd);
         }
         catch (Win32Exception e)
         {
@@ -254,8 +283,9 @@ public abstract class EngineBase : IEngine
             State = EngineState.Stopped;
             return;
         }
+        bool saves = state.Status == EngineStatus.Running && !stopRequested;
         Stop();
-        var until = DateTime.UtcNow + StopAndWaitLimit;
+        var until = DateTime.UtcNow + StopAndWaitLimit + (saves ? BeforeStopLimit : TimeSpan.Zero);
         while (DateTime.UtcNow < until)
         {
             lock (gate) if (process == null) return;
@@ -270,8 +300,25 @@ public abstract class EngineBase : IEngine
         ChildProcess? p;
         lock (gate) p = process;
         if (p == null) return;
+        // the conversation in the engine is saved first, so it goes on after a restart without reading it all again
+        var first = state.Status == EngineStatus.Running && !stopRequested ? BeforeStop() : null;
         stopRequested = true;
         State = EngineState.Stopping(L("Model ontladen…"));
+        if (first == null)
+        {
+            StopNow(p);
+            return;
+        }
+        var limit = BeforeStopLimit;
+        Task.Run(async () =>
+        {
+            try { await Task.WhenAny(first, Task.Delay(limit)).ConfigureAwait(false); }
+            finally { StopNow(p); }
+        });
+    }
+
+    private void StopNow(ChildProcess p)
+    {
         AskToStop(p);
         var wait = StopWait;
         Task.Run(async () =>
@@ -343,6 +390,7 @@ public abstract class EngineBase : IEngine
         log = null;
         CleanUp();
         lock (gate) process = null;
+        OnStopped();
         // 0: clean exit, 2 / 15: our break or terminate; 130 and STATUS_CONTROL_C_EXIT: how a break ends a process on Windows
         if (stopRequested || code is 0 or 2 or 15 or 130 or unchecked((int)0xC000013A))
         {

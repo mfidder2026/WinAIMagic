@@ -326,6 +326,8 @@ public sealed partial class AppState : INotifyPropertyChanged, IDisposable
         Closing?.Invoke();
         StopTasks();
         Chat.Stop();
+        // the conversation in the engine goes to the SSD before the engine goes (SlotKeeper)
+        (Host.Engine as EngineBase)?.SaveForQuit();
         studio?.Stop();
         studio?.Save();
         documentHost?.Dispose();

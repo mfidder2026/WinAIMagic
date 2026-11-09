@@ -317,6 +317,8 @@ public static class LocalModel
 
     private static async Task<Result> Stream(Uri url, JsonObject body, string key, SynchronizationContext? context, Action<string>? onText, CancellationToken ct)
     {
+        // the chat's conversation in this engine is saved first, so it need not be read again afterwards (SlotKeeper)
+        await SlotKeeper.YieldTo(url).ConfigureAwait(false);
         using var req = new HttpRequestMessage(HttpMethod.Post, url.ToString().TrimEnd('/') + "/v1/chat/completions")
         {
             Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),

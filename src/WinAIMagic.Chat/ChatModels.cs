@@ -84,6 +84,10 @@ public sealed class Conversation
     public bool? Hidden { get; set; }
     /// <summary>The Telegram account this conversation talks with (Instellingen → Telegram), if any.</summary>
     public long? Telegram { get; set; }
+    /// <summary>The notes (WINAIMAGIC.md, general and per folder) and the skill list as they were when this conversation began:
+    /// its system prompt stays the same, so the engine reuses what it read (and a saved state still fits). "" is no file.
+    /// A change counts for new conversations, and for this one after its summary.</summary>
+    public Dictionary<string, string>? Notes { get; set; }
 
     /// <summary>The title in the chosen language while it is still the default.</summary>
     [JsonIgnore]
@@ -197,8 +201,20 @@ public sealed class ConversationStore
             StartInLastFolder();
             if (Selection == id) Selection = Conversations[0].Id;
         }
+        // what the engine had read of it goes too
+        SlotKeeper.ForgetAll(id);
         Save();
         Changed?.Invoke(null);
+    }
+
+    /// <summary>A change nothing on screen shows (the notes a conversation began with): no event, so it may come from any
+    /// thread, and it goes to disk with the next save.</summary>
+    public void Remember(Guid id, Action<Conversation> change)
+    {
+        lock (gate)
+        {
+            if (Conversations.FirstOrDefault(x => x.Id == id) is { } c) change(c);
+        }
     }
 
     public void Update(Guid id, Action<Conversation> change)

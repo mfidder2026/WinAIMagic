@@ -141,12 +141,28 @@ public static class SettingsDialog
                 : L($"Het wisselbestand is {sys.PageFile.Gib()} GB, genoeg voor het vastzetten van het model.")),
             shortPage ? Ui.Btn(L("Stel in"), () => app.Perform(SystemCheck.CheckAction.SetPageFile), null, Theme.Accent) : null);
 
+        // what the engine keeps of conversations on the SSD (SlotKeeper), with a button that frees it
+        Button? clear = null;
+        string ClearText() => L($"Wis ({Bytes(SlotKeeper.UsedBytes)})");
+        clear = Ui.Btn(ClearText(), () =>
+        {
+            SlotKeeper.ClearAll();
+            var text = ClearText();
+            if (clear!.Content is StackPanel { Children: [.., TextBlock label] }) label.Text = text;
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(clear, text);
+        });
+        var keep = Ui.Row("*,auto", 12,
+            Note(L("Wat de engine van een gesprek gelezen heeft, gaat naar de SSD als een ander gesprek of een taak het model krijgt, of als de engine stopt. Verder gaan leest het dan niet opnieuw: bij DeepSeek scheelt dat minuten. Hooguit 40 GB, de oudste gaan eerst.")),
+            clear);
+
         return Tab(
             Section(L("Model"),
                 Row(L("Context"), Pick([("32K", 32_768), ("64K", 65_536), ("128K", 131_072), ("256K", 262_144), ("512K", 524_288), ("1M", 1_048_576)], s.ContextSize, v => s.ContextSize = v)),
                 Note(L("Meer context kost geheugen (KV-cache): bij 1M ~6 GB voor DeepSeek, ~20 GB voor GLM. Qwen gaat tot 256K. Een vol gesprek wordt automatisch samengevat.")),
                 Toggle(L("Afbeeldingen (vision, 1 GB extra)"), s.Vision, v => s.Vision = v),
                 Toggle(L("Sneller schrijven met MTP (GLM en Qwen)"), s.Mtp, v => s.Mtp = v),
+                Toggle(L("Gesprekken in de engine bewaren"), s.KeepEngineMemory, v => s.KeepEngineMemory = v),
+                keep,
                 Row(SkipExpertsTitle, Pick(SkipExpertsOptions(), s.SkipExperts, v => s.SkipExperts = v)),
                 Note(SkipExpertsNote),
                 Toggle(L("Engine starten bij openen app"), s.AutoStart, v => s.AutoStart = v),
@@ -163,6 +179,10 @@ public static class SettingsDialog
                 Secret(L("API-sleutel (leeg = alleen deze pc)"), s.ApiKey, v => s.ApiKey = v),
                 Note(L("Wijzigingen gelden na het herstarten van de engine. Gebruik 0.0.0.0 alleen met een API-sleutel."))));
     }
+
+    private static string Bytes(long b) => b < 1_000_000_000
+        ? string.Format(AppLanguages.Current.Culture(), "{0:0} MB", b / 1e6)
+        : string.Format(AppLanguages.Current.Culture(), "{0:0.0} GB", b / 1e9);
 
     /// <summary>Skills and system management: both on by default; off, the model gets the same tools and prompt as before.</summary>
     private static StackPanel SystemTab(AppState app)

@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.14.5
+# Parity with MacAIMagic 1.14.9
 
-How this version relates to MacAIMagic at commit `7729599`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `5d78a65`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -24,6 +24,7 @@ How this version relates to MacAIMagic at commit `7729599`, the last Mac commit 
 | `Engine/ModelCatalog`, `GGUFIndex`, `ModelStore` | `Engine/` same names, `Downloader`, `PackBuilder` | Done |
 | `Engine/MemoryPlanner` | `Engine/MemoryPlanner` | Redesigned for VRAM + RAM + SSD |
 | `Engine/EngineController` | `Engine/IEngine`, `TieredEngine`, `LlamaEngine`, `ChildProcess` | Redesigned, two engines |
+| `Engine/SlotKeeper` | `Core/Support/SlotKeeper` | Done for the main engine; not the second engine, not on a cluster |
 | `Engine/ClusterController` | `Engine/ClusterController` | Done; real helpers and DNS-SD not run |
 | `Engine/BenchmarkRunner` | `Engine/BenchmarkRunner` | Done, plus VRAM, RAM and export |
 | `Support/LiveMetrics`, `SystemInfo`, `SystemCheck` | `Engine/` same names, `Engine/Gpu/*` | Done; counters are locale independent |
@@ -36,6 +37,16 @@ How this version relates to MacAIMagic at commit `7729599`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `5d78a65` (1.14.9): a conversation keeps its place in the engine
+
+- **Taken over:**
+  - `a53078d` and `9fae591` (SlotKeeper): the main engine starts with `--slot-save-path` (`%LOCALAPPDATA%\WinAIMagic\EngineMemory`, not on a cluster). When the model gate gives a run the model, `ChatClient.EnterEngine` saves the conversation that had it and restores this one if a file exists for the same setup (model, context, vision, draft head). An answer is saved when it is done, Documents and image prompts save the chat's conversation first (`SlotKeeper.YieldTo`), a stop saves before it breaks the engine (`EngineBase.BeforeStop`, at most 20 s), quitting saves blocking (`SaveForQuit`). Every save and restore writes a line in engine.log and the log view. At most 40 GB and a tenth of the free disk, oldest first; a deleted conversation takes its file. Instellingen → Engine: "Gesprekken in de engine bewaren" with "Wis (…)". Tests: SlotKeeperTests (the Mac's names, against the Mac's fake_engine.py, now in the fixtures) and EngineTests.TheEngineGetsTheFolderUnlessItIsACluster.
+  - `5d78a65`: a conversation keeps the notes (both WINAIMAGIC.md files) and the skill list it began with (`Conversation.Notes`, `ChatClient.FrozenNotes`); a summary clears them. Test: SlotKeeperTests.AConversationKeepsTheNotesItBeganWith. "Gedachtegang en 1 stap" and "1 eerdere stap".
+- **Adapted:** a run without a conversation (a task step, the heartbeat) only saves the conversation in the engine (`YieldAsync`) instead of entering a new random id as on the Mac, which would save a state nobody comes back to. The keeper lives in Core, since Chat, Studio and Engine all use it.
+- **Measured here,** with the main engine on the processor (Ling-3.0-tiny Q4, `--n-gpu-layers 0`, 16K context): a prompt of 7,732 tokens read in 60.7 s; saved in 0.17 s (135 MB, to a folder with a space in its name); the engine stopped and started again (4.7 s); restored in 0.14 s; the next question read 29 tokens in 0.71 s. Not measured: a model on the card, DeepSeek or GLM, the app's own flow with a real model, a cluster.
+- **Already so here:** the window coming back (`5d78a65`, MainWindow.show): a second start wakes the running app, which shows its window (`Program.Woken`, `ShowFromTray`), as does the tray icon. Read in the code, not run this time.
+- **Not needed:** `4a009b4` (the Mac's own measurements); the rest of `5d78a65` takes over WinAIMagic 1.14.5 … 1.14.8.
 
 ### Up to `7729599` (1.14.5)
 

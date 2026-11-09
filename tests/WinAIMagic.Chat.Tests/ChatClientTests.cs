@@ -1030,8 +1030,10 @@ public class AgentLoopTests : ChatTest
 
     /// <summary>The prompt stays the same in the conversation that learned it, so the engine can keep its cache; an edit counts at once.</summary>
     [Fact]
-    public async Task ThePromptStaysFrozenUntilTheFileChanges()
+    public async Task ThePromptStaysFrozenAlsoWhenTheFileChanges()
     {
+        // since MacAIMagic 5d78a65 a running conversation keeps its notes as they began, also after an edit by the user: a
+        // changed start of the prompt makes the engine read the whole conversation again. A new conversation reads them anew.
         var engine = Task3(_ => "- een les van minstens acht tekens");
         engine.Then(_ => Say("eerst"));
         engine.Then(_ => Say("daarna"));
@@ -1049,8 +1051,8 @@ public class AgentLoopTests : ChatTest
         File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddSeconds(5));
         chat.Send("En nu", [], C.Id, store, Base);
         await chat.Completion;
-        Assert.Contains("EIGEN REGEL", Content(engine.Requests[5]));
-        Assert.Contains("een les", Content(engine.Requests[5]));
+        Assert.DoesNotContain("EIGEN REGEL", Content(engine.Requests[5]));
+        Assert.Equal(Content(engine.Requests[0]), Content(engine.Requests[5]));
     }
 
     [Fact]

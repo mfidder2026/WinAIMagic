@@ -22,7 +22,8 @@ Bij "eerst vragen" verschijnt een kaart met precies wat het model wil doen. Kies
 > Het model kan alleen binnen de werkmap schrijven. Een koppeling naar buiten de map werkt niet.
 
 ## WINAIMAGIC.md: notities en wat het model leert
-- Zet in de werkmap een bestand **WINAIMAGIC.md** met wat het model over die map moet weten, zoals hoe je een project bouwt. Het wordt bij elk bericht opnieuw gelezen.
+- Zet in de werkmap een bestand **WINAIMAGIC.md** met wat het model over die map moet weten, zoals hoe je een project bouwt. Een nieuw gesprek leest het bij zijn eerste bericht.
+- Een gesprek houdt de notities zoals ze waren toen het begon. Zo hoeft het model een lang gesprek niet opnieuw te lezen als er een les bij komt. Een wijziging geldt voor nieuwe gesprekken, en voor een lopend gesprek nadat het is samengevat. Wil je dat het model iets nu meteen weet, zeg het dan in de chat.
 - Na een taak van een paar stappen schrijft het model onder *Geleerd* wat werkte en wat niet, zodat het die fout niet nog eens maakt. Dat kun je uitzetten onder Instellingen → Chat → Werkmap.
 
 ## Goed om te weten

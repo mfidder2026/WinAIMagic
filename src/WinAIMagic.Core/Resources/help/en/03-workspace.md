@@ -22,7 +22,8 @@ With "ask first" a card shows exactly what the model wants to do. Choose **Allow
 > The model can only write inside the work folder. A link pointing outside the folder does not work.
 
 ## WINAIMAGIC.md: notes and what the model learns
-- Put a file **WINAIMAGIC.md** in the work folder with what the model should know about it, such as how to build the project. It is read again with every message.
+- Put a file **WINAIMAGIC.md** in the work folder with what the model should know about it, such as how to build the project. A new conversation reads it with its first message.
+- A conversation keeps the notes as they were when it began. That way the model does not have to read a long conversation again when a lesson is added. A change counts for new conversations, and for a running conversation after it has been summarized. If the model should know something right away, say it in the chat.
 - After a task of a few steps the model writes under *Learned* what worked and what did not, so it does not make that mistake again. You can turn that off under Settings → Chat → Work folder.
 
 ## Good to know

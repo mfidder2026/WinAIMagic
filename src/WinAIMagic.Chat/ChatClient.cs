@@ -150,9 +150,8 @@ public sealed class ChatClient(HttpClient? http = null)
     public TaskStore? Tasks { get; set; }
     /// <summary>Conversations where the user chose "always allow", for this app session.</summary>
     private readonly HashSet<Guid> trusted = [];
-    /// <summary>The notes as they were before this conversation's lessons went in: the model knows those already, and a changed
-    /// system prompt would make the engine read the whole conversation again. An edit by the user counts at once.</summary>
-    private (Guid Conversation, DateTime? Modified, string? Text)? frozenNotes;
+    /// <summary>The store of the conversations that run, for their notes as they were when they began (FrozenNotes).</summary>
+    private ConversationStore? runStore;
 
     /// <summary>Web questions need a few rounds; work in a folder (read, write, run, read the log, fix) needs many more.</summary>
     private int MaxToolRounds => WorkspaceActive || Settings.Shared.SystemManagement || LoadedConnectors.Count > 0 || AgentOn ? 200 : 20;
@@ -243,6 +242,7 @@ public sealed class ChatClient(HttpClient? http = null)
                 c.Title = TextLimit.Prefix(t, 48).Replace("\n", " ");
             }
         });
+        runStore = store;
         var cts = new CancellationTokenSource();
         var run = new RunState(cts, baseUrl);
         lock (sync) runs[conversation] = run;
@@ -264,6 +264,9 @@ public sealed class ChatClient(HttpClient? http = null)
         {
             await Run(id, store, baseUrl, owner, ct);
             await Learn(id, store, baseUrl, ct);
+            // the answer is done: its place in the engine goes to the SSD now, not only when another conversation takes the
+            // model or the app quits (a quit or a crash that comes first would lose it)
+            if (Gate(baseUrl).Holder == null && SlotKeeper.At(baseUrl) is { } keeper && keeper.Current == id) await keeper.SaveCurrentAsync();
         }
         // a stop can also surface as another error of the cancelled request (an IOException from the stream): never a red line
         catch (Exception) when (ct.IsCancellationRequested) { }
@@ -836,10 +839,8 @@ public sealed class ChatClient(HttpClient? http = null)
             if (tools.Count > 0) { body["tools"] = tools; body["tool_choice"] = "none"; }
             var answer = await CompleteAsync(body, baseUrl, 900, ct);
             if (answer == null || ct.IsCancellationRequested) return;
-            var before = NotesForPrompt(ws);
             var added = WorkspaceNotes.Add(WorkspaceNotes.Lessons(answer), ws);
             if (added.Count == 0) return;
-            frozenNotes = (id, WorkspaceNotes.Modified(ws), before);
             store.Update(id, conversation =>
             {
                 if (conversation.Messages.Count == 0) return;
@@ -853,10 +854,17 @@ public sealed class ChatClient(HttpClient? http = null)
         }
     }
 
-    private string? NotesForPrompt(string ws)
+    /// <summary>Notes (and the skill list) as this conversation first saw them (Conversation.Notes). The model and the app write
+    /// lessons into WINAIMAGIC.md while a conversation goes on; reading the file anew each time changed the start of the system
+    /// prompt, and the engine read the whole conversation again (seen on the Mac with DeepSeek: 50,353 tokens, 357 s, after
+    /// a restore). A change counts for new conversations, and for this one after its summary.</summary>
+    private string? FrozenNotes(string key, Func<string?> read)
     {
-        if (frozenNotes is { } f && f.Conversation == RunConversation && f.Modified == WorkspaceNotes.Modified(ws)) return f.Text;
-        return WorkspaceNotes.ForPrompt(ws);
+        if (RunConversation is not { } id || runStore is not { } store || store.Find(id) is not { } c) return read();
+        if (c.Notes is { } notes && notes.TryGetValue(key, out var kept)) return kept.Length == 0 ? null : kept;
+        var now = read();
+        store.Remember(id, x => { x.Notes ??= []; x.Notes[key] = now ?? ""; });
+        return now;
     }
 
     // MARK: - stopping too early
@@ -1005,6 +1013,8 @@ public sealed class ChatClient(HttpClient? http = null)
             store.Update(id, conversation =>
             {
                 conversation.Summary = summary;
+                // the whole conversation is read anew after a summary anyway: the notes may be brought up to date
+                conversation.Notes = null;
                 conversation.SummaryUpTo = last.Id;
                 conversation.ContextTokens = null;
             });
@@ -1066,14 +1076,14 @@ public sealed class ChatClient(HttpClient? http = null)
         if (s.WebSearch)
             system += " " + L("Je kunt het web doorzoeken met web_search en pagina's lezen met fetch_url. Doe dat voor actuele informatie en noem je bronnen met hun URL.");
         // the user's general notes, for every conversation (the folder's notes come after them)
-        if (AtomicFile.ReadUtf8(Paths.GeneralNotes) is { Length: > 0 } general)
+        if (FrozenNotes("general", () => AtomicFile.ReadUtf8(Paths.GeneralNotes) is { Length: > 0 } g ? g : null) is { } general)
             system += "\n\n" + ChatTexts.GeneralNotes + "\n" + TextLimit.Prefix(general, 8000);
         if (s.WorkspaceTools && WorkspaceTools.Workspace is { } ws)
         {
             system += "\n\n" + ChatTexts.Workspace(ws);
             system += " " + ChatTexts.Outside;
             // the user's own notes for this folder and what was learned here, like CLAUDE.md for Claude Code
-            if (NotesForPrompt(ws) is { } text) system += "\n\n" + ChatTexts.FolderNotes + "\n" + text;
+            if (FrozenNotes("folder:" + ws, () => WorkspaceNotes.ForPrompt(ws)) is { } text) system += "\n\n" + ChatTexts.FolderNotes + "\n" + text;
             var noTools = DeveloperTools.HasDeveloperTools ? "" : " " + ChatTexts.NoDeveloperTools(DeveloperTools.Missing);
             var look = SeesImages() ? " " + L("Wat een programma met een venster laat zien (een spel, een emulator), controleer je zelf: laat het een screenshot als bestand opslaan en bekijk dat met view_image. Zeg pas dat het werkt als je het resultaat hebt gezien.") : "";
             system += "\n\n" + ChatTexts.KeepGoing + look + noTools;
@@ -1081,7 +1091,8 @@ public sealed class ChatClient(HttpClient? http = null)
         // Instellingen → Systeembeheer: nothing is added while they are off
         if (s.AppTools) system += "\n\n" + AppTools.PromptSection(s.Skills);
         if (s.SystemManagement) system += "\n\n" + SystemTools.PromptSection();
-        if (s.Skills && Skills.PromptSection(Skills.All) is { Length: > 0 } section) system += "\n\n" + section;
+        // also as this conversation first saw it: a skill the model rewrites must not change the start of the prompt
+        if (s.Skills && FrozenNotes("skills", () => Skills.PromptSection(Skills.All) is { Length: > 0 } t ? t : null) is { } section) system += "\n\n" + section;
         if (OffersSteps)
             system += "\n\n" + L("Werk je aan een taak van drie stappen of meer, zet die dan eerst op met task_list en werk de lijst bij als een stap begint of klaar is. De gebruiker ziet de lijst boven het invoerveld.");
         foreach (var set in AgentTools.All.Where(x => x.IsOn)) system += "\n\n" + set.PromptSection;
@@ -1234,11 +1245,18 @@ public sealed class ChatClient(HttpClient? http = null)
         return req;
     }
 
+    /// <summary>The model is this run's now: the conversation that had the engine goes to the SSD, and this conversation's state
+    /// comes back from it (SlotKeeper). A run without a conversation (a task step, the heartbeat) only saves the other one.</summary>
+    private static Task EnterEngine(Uri baseUrl) =>
+        SlotKeeper.At(baseUrl) is not { } keeper ? Task.CompletedTask
+        : RunConversation is { } id ? keeper.EnterAsync(id) : keeper.YieldAsync();
+
     /// <summary>A request without streaming; the answer's text, or null when anything went wrong: the callers go on without it.</summary>
     private async Task<string?> CompleteAsync(JsonObject body, Uri baseUrl, int timeoutSeconds, CancellationToken ct)
     {
         var gate = Gate(baseUrl);
         if (!await gate.AcquireAsync(RunConversation ?? Guid.NewGuid(), ct).ConfigureAwait(false)) return null;
+        await EnterEngine(baseUrl).ConfigureAwait(false);
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
         limit.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
         try
@@ -1278,6 +1296,7 @@ public sealed class ChatClient(HttpClient? http = null)
         var body = StreamBody(history, summary, thinkingBudget);
         var gate = Gate(baseUrl);
         if (!await gate.AcquireAsync(RunConversation ?? Guid.NewGuid(), ct).ConfigureAwait(false)) throw new OperationCanceledException(ct);
+        await EnterEngine(baseUrl).ConfigureAwait(false);
         StateChanged?.Invoke();
         using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
         idle.CancelAfter(RequestTimeout);

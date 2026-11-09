@@ -267,6 +267,22 @@ public class LlamaEngineTests : EngineTest
         Assert.Equal("PCI_BUS_ID", env["CUDA_DEVICE_ORDER"]);
     }
 
+    /// <summary>The engine can save a conversation's place to the SlotKeeper's folder, except on a cluster; a state is keyed by
+    /// model, context, vision and draft head.</summary>
+    [Fact]
+    public void TheEngineGetsTheFolderUnlessItIsACluster()
+    {
+        var keeper = new SlotKeeper(Path.Combine(Path.GetTempPath(), "wam-slots-" + Guid.NewGuid().ToString("N")[..8]));
+        var e = new LlamaEngine(port: 9000, slots: keeper);
+        var args = e.Arguments(Start()).ToList();
+        Assert.Equal(keeper.Folder, args[args.IndexOf("--slot-save-path") + 1]);
+        Assert.DoesNotContain("--slot-save-path", e.Arguments(Start() with { Rpc = "10.0.0.2:50052" }));
+        Settings.Shared.KeepEngineMemory = false;
+        try { Assert.DoesNotContain("--slot-save-path", e.Arguments(Start())); }
+        finally { Settings.Shared.KeepEngineMemory = true; }
+        Assert.NotEqual(SlotKeeper.StateKey(Qwen.Id, 65_536, false, false), SlotKeeper.StateKey(Qwen.Id, 65_536, true, false));
+    }
+
     [Fact]
     public void TheClusterPutsHelpersFirst()
     {

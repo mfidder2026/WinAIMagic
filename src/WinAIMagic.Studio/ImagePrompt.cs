@@ -197,6 +197,8 @@ public static class ImagePrompt
     /// <summary>One request to the chat engine at `baseUrl`, with the app's key when it has one.</summary>
     public static Func<JsonObject, Task<JsonObject>> Sender(Uri baseUrl) => async body =>
     {
+        // the chat's conversation in this engine is saved first (SlotKeeper)
+        await SlotKeeper.YieldTo(baseUrl).ConfigureAwait(false);
         using var req = new HttpRequestMessage(HttpMethod.Post, baseUrl.ToString().TrimEnd('/') + "/v1/chat/completions")
         {
             Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
