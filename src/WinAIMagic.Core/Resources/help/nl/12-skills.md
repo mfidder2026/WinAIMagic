@@ -35,3 +35,4 @@ platform: windows
 Schrijf hier de stappen en commando's.
 ```
 3. Een eigen skill met dezelfde naam als een ingebouwde, vervangt die ingebouwde.
+4. Een skill van MacAIMagic (`platform: macos`) kun je met zijn map en scripts zo in de map zetten: hij wordt geladen. Het model ziet in welke map zijn scripts staan, en dat de commando's voor macOS geschreven zijn.

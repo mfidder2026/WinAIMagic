@@ -6,35 +6,41 @@ namespace WinAIMagic.Chat;
 
 /// <summary>A skill: instructions for one subject (taskbar and appearance, energy, network…) with commands that were tested on
 /// this platform. Only the name and description go in the system prompt; the model loads the rest with use_skill, so a local
-/// model does not read every skill on every message.</summary>
-public sealed record Skill(string Name, string Description, string Platform, string Body);
+/// model does not read every skill on every message.
+/// `Folder`: the folder of a skill the user put in the skills folder (null for a built-in one); its scripts sit there.</summary>
+public sealed record Skill(string Name, string Description, string Platform, string Body, string? Folder = null);
 
 public static class Skills
 {
     public const string ToolName = "use_skill";
     public const string ThisPlatform = "windows";
 
-    /// <summary>SKILL.md: front matter between --- lines (name, description, platform), then the instructions.</summary>
-    public static Skill? Parse(string text, string fallbackName)
+    /// <summary>SKILL.md: front matter between --- lines (name, description, platform), then the instructions. `folder` is a
+    /// built-in skill's name, or the full path of a user's skill folder.</summary>
+    public static Skill? Parse(string text, string folder)
     {
         var (fields, body) = FrontMatter.Parse(text);
-        var name = (fields.GetValueOrDefault("name") ?? fallbackName).Trim();
+        bool own = Path.IsPathRooted(folder);
+        var name = (fields.GetValueOrDefault("name") ?? (own ? Path.GetFileName(folder.TrimEnd('\\', '/')) : folder)).Trim();
         if (name.Length == 0 || body.Length == 0) return null;
-        return new Skill(name, fields.GetValueOrDefault("description") ?? "", (fields.GetValueOrDefault("platform") ?? "all").ToLowerInvariant(), body);
+        return new Skill(name, fields.GetValueOrDefault("description") ?? "", (fields.GetValueOrDefault("platform") ?? "all").ToLowerInvariant(), body,
+            own ? folder : null);
     }
 
-    /// <summary>The skills of this platform from these sources, in order; a later one replaces a skill of the same name.</summary>
+    /// <summary>The skills from these sources, in order; a later one replaces a skill of the same name. A built-in skill of another
+    /// platform is left out; one the user put in the skills folder always loads (the owner copied the Mac's C64 skill, with
+    /// "platform: macos", and the app skipped it without a word).</summary>
     public static List<Skill> Load(IEnumerable<IEnumerable<(string Folder, string Text)>> sources, string platform = ThisPlatform)
     {
         var byName = new Dictionary<string, Skill>(StringComparer.OrdinalIgnoreCase);
         foreach (var source in sources)
             foreach (var (folder, text) in source)
-                if (Parse(text, folder) is { } s && (s.Platform == "all" || s.Platform == platform))
+                if (Parse(text, folder) is { } s && (s.Platform == "all" || s.Platform == platform || s.Folder != null))
                     byName[s.Name] = s;
         return byName.Values.OrderBy(s => s.Name, StringComparer.Ordinal).ToList();
     }
 
-    /// <summary>Every SKILL.md one level down in this folder: (the folder's name, the text).</summary>
+    /// <summary>Every SKILL.md one level down in this folder: (the folder's full path, the text).</summary>
     public static IEnumerable<(string Folder, string Text)> FromFolder(string root)
     {
         if (!Directory.Exists(root)) yield break;
@@ -44,7 +50,7 @@ public static class Skills
             string? text = null;
             try { if (File.Exists(file)) text = File.ReadAllText(file); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
-            if (text != null) yield return (Path.GetFileName(dir), text);
+            if (text != null) yield return (Path.GetFullPath(dir), text);
         }
     }
 
@@ -81,9 +87,33 @@ public static class Skills
     {
         skills ??= All;
         var name = (WorkspaceTools.Str(WorkspaceTools.Args(call), "name") ?? "").Trim();
-        if (skills.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) is { } found) return $"# Skill: {found.Name}\n\n{found.Body}";
+        if (skills.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) is { } found) return Text(found);
         return $"There is no skill named \"{name}\". Available: " + string.Join(", ", skills.Select(s => s.Name));
     }
+
+    /// <summary>What the model reads of a skill. A user's skill says where its files are, so its scripts can be found; one written
+    /// for another platform (the Mac's) gets its Mac folder replaced by the real one and a note on what differs here.</summary>
+    public static string Text(Skill s)
+    {
+        var body = s.Body;
+        var head = $"# Skill: {s.Name}\n\n";
+        if (s.Folder is { } folder)
+        {
+            // "$HOME/Library/Application Support/MacAIMagic/Skills/c64-basic-v2" and "~/Library/…": the folder on this pc
+            body = MacSkillFolder.Replace(body, folder.Replace("$", "$$"));
+            head += $"This skill's own files (scripts beside SKILL.md) are in: {folder}\n";
+            if (s.Platform is not ("all" or ThisPlatform))
+                head += $"This skill was written for {s.Platform}, and this pc runs Windows. Adapt its commands: run_command runs PowerShell, "
+                    + "so use `python` instead of `python3`, `$env:USERPROFILE` instead of `$HOME` or `~`, Get-ChildItem instead of ls/mdfind, "
+                    + "Get-Process/Stop-Process instead of pgrep/pkill, and Start-Process instead of `open`. Programs named in it (such as an "
+                    + "emulator) may be installed elsewhere here or not at all: look for them before you use them.\n";
+            head += "\n";
+        }
+        return head + body;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex MacSkillFolder =
+        new(@"(\$HOME|~)/Library/Application Support/MacAIMagic/Skills/[^/""'\s`]+", System.Text.RegularExpressions.RegexOptions.Compiled);
 
     /// <summary>Words that say nothing about a subject.</summary>
     private static readonly HashSet<string> Common =

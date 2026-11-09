@@ -33,6 +33,29 @@ public class SkillsTests : ChatTest
         Assert.Contains("no skill", Skills.Run(new ToolCall("1", "use_skill", """{"name":"nope"}"""), skills));
     }
 
+    /// <summary>The owner copied the Mac's C64 skill into the skills folder by hand; with "platform: macos" the app skipped it without
+    /// a word. A skill the user put there always loads, says where its scripts are, and points its Mac folder at the real one.</summary>
+    [Fact]
+    public void AMacSkillPutInTheFolderLoadsWithItsFolder()
+    {
+        var user = NewFolder("skills");
+        var dir = Path.Combine(user, "c64_basic");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "SKILL.md"), "---\nname: c64-basic-v2\ndescription: Commodore 64 BASIC V2 programmeren met sprites en VICE\nplatform: macos\n---\n"
+            + "S=\"$HOME/Library/Application Support/MacAIMagic/Skills/c64-basic-v2/c64run.py\"\npython3 \"$S\" spel.prg\n");
+        File.WriteAllText(Path.Combine(dir, "c64run.py"), "print('x')");
+        var skill = Assert.Single(Skills.Load([Skills.FromFolder(user)]));
+        Assert.Equal(dir, skill.Folder);
+        var text = Skills.Run(new ToolCall("1", "use_skill", """{"name":"c64-basic-v2"}"""), [skill]);
+        Assert.Contains($"S=\"{dir}/c64run.py\"", text);
+        Assert.DoesNotContain("Library/Application Support", text);
+        Assert.Contains("written for macos", text);
+        // a question about it loads it by itself
+        Assert.Single(Skills.Matching("Schrijf een commodore 64 basic v2 spel met sprites", [skill]));
+        // a built-in skill of another platform still stays out
+        Assert.Empty(Skills.Load([new[] { ("mac", "---\nname: mac\nplatform: macos\n---\nB") }]));
+    }
+
     /// <summary>The eight built-in skills, for Windows, and the read commands they give pass system_read.</summary>
     [Fact]
     public void BuiltInSkillsLoad()

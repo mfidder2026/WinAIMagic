@@ -35,3 +35,4 @@ platform: windows
 Write the steps and commands here.
 ```
 3. Your own skill with the same name as a built-in one replaces the built-in one.
+4. A skill from MacAIMagic (`platform: macos`) can go into the folder as is, with its folder and scripts: it loads. The model sees which folder its scripts are in, and that its commands were written for macOS.
