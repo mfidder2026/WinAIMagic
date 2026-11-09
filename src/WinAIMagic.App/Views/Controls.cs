@@ -313,11 +313,13 @@ public sealed partial class WrapPanel : Panel
 
     protected override Size ArrangeOverride(Size final)
     {
-        double x = 0, y = 0, row = 0;
+        // the parent may hand back a hair less than measured (layout rounding at 125% or 150%): without this slack the last
+        // button dropped to a row nobody made room for (the owner saw "Goedkeuren en maak .docx" under the toolbar)
+        double x = 0, y = 0, row = 0, room = Math.Max(final.Width, DesiredSize.Width) + 1;
         foreach (var c in Children)
         {
             var s = c.DesiredSize;
-            if (x > 0 && x + s.Width > final.Width) { y += row + RowGap; x = 0; row = 0; }
+            if (x > 0 && x + s.Width > room) { y += row + RowGap; x = 0; row = 0; }
             c.Arrange(new Rect(x, y, s.Width, s.Height));
             x += s.Width + Gap;
             row = Math.Max(row, s.Height);
