@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.14.2
+# Parity with MacAIMagic 1.14.5
 
-How this version relates to MacAIMagic at commit `4994a01`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `7729599`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -36,6 +36,11 @@ How this version relates to MacAIMagic at commit `4994a01`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `7729599` (1.14.5)
+
+- `18b8ece` takes over WinAIMagic a320ea0 … 1cf5577 (Ling-3.0-tiny, the loop guard in Documents, the Telegram card): nothing to take back. The Mac's own rule that a small model with experts streams instead of being "too big" does not apply: there is no "too big" here.
+- `7729599` is the Mac's 1.14.5 with new README screenshots: WinAIMagic takes the same number. The screenshots are the Mac's own; Windows' README keeps its own until it gets new ones.
 
 ### Up to `4994a01` (1.14.2): one card per answer, thinking off/low/normal/high
 
