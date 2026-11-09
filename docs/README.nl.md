@@ -20,7 +20,7 @@ Het scherm **Systeem** laat zien wat je pc nog nodig heeft. Vaak is dat een grot
 
 ## Wat het kan
 
-- **Chatten** met een limiet op het denken, afbeeldingen, web zoeken en een contextmeter.
+- **Chatten** met denken uit, laag, normaal of hoog, één kaart per antwoord met het denken, de tekst en de stappen in volgorde, afbeeldingen, web zoeken en een contextmeter.
 - **Werken in een map:** het model leest en schrijft bestanden en voert commando's uit, met jouw toestemming per soort actie.
 - **Documenten:** van notities en bijlagen naar een Word-bestand in je eigen huisstijl.
 - **Beeld:** afbeeldingen maken van een beschrijving, op je eigen pc.

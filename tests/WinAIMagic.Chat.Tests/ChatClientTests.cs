@@ -614,11 +614,11 @@ public class AgentLoopTests : ChatTest
         Assert.Contains(C.Messages, m => m.ToolCalls.Exists(t => t.Name == "run_command"));
         Assert.Contains("exit code", C.Messages.Last(m => m.Role == ChatRole.Tool).Text);
         Assert.Null(C.Messages[^1].Error);
-        // the last visible message carries the steps
-        Assert.Equal(2, C.Messages[^1].Activities.Count);
-        Assert.True(C.Messages[^1].Activities.TrueForAll(a => a.Done));
-        // the tool turns fold away
-        Assert.True(C.Messages.Where(m => m.Role == ChatRole.Assistant && m.ToolCalls.Count > 0).All(m => m.IsHidden));
+        // each round keeps its own step, so the chat shows them in the order they came
+        var rounds = C.Messages.Where(m => m.Role == ChatRole.Assistant && m.ToolCalls.Count > 0).ToList();
+        Assert.Equal(2, rounds.Count);
+        Assert.True(rounds.TrueForAll(m => m.Activities.Count == 1 && m.Activities[0].Done && !m.IsHidden));
+        Assert.Empty(C.Messages[^1].Activities);
     }
 
     [Fact]
@@ -637,7 +637,7 @@ public class AgentLoopTests : ChatTest
         Assert.NotEmpty(C.Messages[^1].Text);
         Assert.Equal("https://example.org/l", C.Messages[^1].Sources.Single().Url);
         Assert.Contains("[1] llama.cpp\nhttps://example.org/l\nnieuw", C.Messages.First(m => m.Role == ChatRole.Tool).Text);
-        Assert.Equal("Zoeken: llama.cpp versie", C.Messages[^1].Activities[0].Label);
+        Assert.Equal("Zoeken: llama.cpp versie", C.Messages.SelectMany(m => m.Activities).Single().Label);
         Assert.Equal(21.5, C.Messages[^1].TokensPerSecond);
     }
 
@@ -716,7 +716,7 @@ public class AgentLoopTests : ChatTest
         Assert.False(last.IsHidden);
         Assert.Equal(ChatRole.Assistant, last.Role);
         Assert.Equal("Het model heeft 200 stappen gezet en pauzeert. Zeg \"ga door\" om verder te gaan.", last.Error);
-        Assert.Equal(200, last.Activities.Count);
+        Assert.Equal(200, C.Messages.Sum(m => m.Activities.Count));
     }
 
     [Fact]
@@ -743,7 +743,7 @@ public class AgentLoopTests : ChatTest
         var result = C.Messages.Single(m => m.Role == ChatRole.Tool).Text;
         Assert.Contains("… (shortened, the output was 30002 characters) …", result);
         Assert.Equal(8000 + "\n… (shortened, the output was 30002 characters) …\n".Length, result.Length);
-        Assert.Equal(4000, C.Messages[^1].Activities[0].Output!.Length);
+        Assert.Equal(4000, C.Messages.SelectMany(m => m.Activities).Single().Output!.Length);
     }
 
     /// <summary>A long task with one question goes on to the end, also in a small context.</summary>
@@ -794,7 +794,7 @@ public class AgentLoopTests : ChatTest
         var engine = new FakeEngine(() => Sse(Chunk(two), "data: [DONE]"));
         var chat = new ChatClient(engine.Client);
         chat.Send("Werk", [], C.Id, store, Base);
-        await Until(() => C.Messages[^1].Activities.Count == 1);
+        await Until(() => C.Messages.Sum(m => m.Activities.Count) == 1);
         await Task.Delay(1500);
         var sw = System.Diagnostics.Stopwatch.StartNew();
         chat.Stop();
@@ -853,7 +853,7 @@ public class AgentLoopTests : ChatTest
         await chat.Completion;
         Assert.False(File.Exists(Path.Combine(work, "a.txt")));
         Assert.Equal("The user's settings do not allow this kind of action (Schrijven). Do not try it again; tell the user what you wanted to do, or continue without it.", C.Messages.Single(m => m.Role == ChatRole.Tool).Text);
-        Assert.True(C.Messages[^1].Activities[0].Denied);
+        Assert.True(C.Messages.SelectMany(m => m.Activities).Single().Denied);
     }
 
     [Fact]
@@ -885,7 +885,7 @@ public class AgentLoopTests : ChatTest
         await chat.Completion;
         Assert.False(File.Exists(Path.Combine(work, "a.txt")));
         Assert.Equal("The user did not allow this. Ask what they want instead, or continue without it.", C.Messages.Single(m => m.Role == ChatRole.Tool).Text);
-        Assert.True(C.Messages[^1].Activities[0].Denied);
+        Assert.True(C.Messages.SelectMany(m => m.Activities).Single().Denied);
     }
 
     /// <summary>"Altijd" goes for this chat, in this session: not for another chat, not for a new session.</summary>

@@ -1,6 +1,6 @@
 # Parity with MacAIMagic 1.14.2
 
-How this version relates to MacAIMagic at commit `6b0d00b`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `4994a01`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -36,6 +36,14 @@ How this version relates to MacAIMagic at commit `6b0d00b`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `4994a01` (1.14.2): one card per answer, thinking off/low/normal/high
+
+- `7a618c5` One answer is one card: thinking, text and steps of all its rounds in the order they came. Taken over: each round keeps its own steps (`ChatClient`), and the chat groups an answer's rounds into one `AnswerRow` (`ChatItem.Group`, `AnswerPart.Of` in `Chat/AnswerTimeline`, testable without a window). While working the latest 14 parts, with "N eerdere stappen"; when done, the work before the last text folds into "Gedachtegang en N stappen". Adapted: a finished step is copied into its own round right away, since Windows keeps copies of the steps per message (the Mac's tests did not need this); the summary line follows the answer that holds the last summarized message.
+- `c40de84` Later rounds of an answer think at most 4,000 tokens (`ChatClient.ThinkingBudget`, `FollowUpThinking`). Taken over as is; "no limit" in the first round is still sent as -1 here, because the second engine otherwise applies its own default. Not measured on Windows: how much faster a long task gets done.
+- `aba4a61` Thinking is one choice: off, low (2,000 tokens, effort low), normal (8,000, medium) or high (the setting, high or max). `Settings.ThinkingLevel`, `ThinkingBudgetNow`. Adapted: the composer's thinking toggle with its budget menu became one button "Denken: hoog" that opens the four choices; the budget stays under Instellingen.
+- `4c5e54f` The label beside the menu said "Denken" twice: does not apply, the Windows button shows only the icon and the choice.
+- `4994a01` "Ga door" (or verder, continue, weiter ...) after an answer that took steps starts with at most 4,000 tokens of thinking (`ChatClient.IsGoOn`, `IsGoOnText`). Taken over as is.
 
 ### Up to `6b0d00b` (1.14.2, WinAIMagic 1.14.3): skills by themselves, long answers, view_image
 

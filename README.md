@@ -20,7 +20,7 @@ WinAIMagic is the Windows version of [MacAIMagic](https://github.com/mfidder2026
 
 ## What it does
 
-- **Chat** with thinking limits, images, web search, and a context meter that summarizes before the model runs out of room. Images have been run on GLM and Qwen3.6; DeepSeek and MiniMax are wired but not yet run with a real image, and each model fetches its image files separately (about 1 to 1.7 GB).
+- **Chat** with thinking off, low, normal or high, one card per answer with its thinking, text and steps in the order they came, images, web search, and a context meter that summarizes before the model runs out of room. Images have been run on GLM and Qwen3.6; DeepSeek and MiniMax are wired but not yet run with a real image, and each model fetches its image files separately (about 1 to 1.7 GB).
 - **Work in a folder.** The model reads and writes files and runs commands there, with your approval per kind of action (read, write, run). It keeps a step list above the input field, keeps going until the job is done, and remembers what it learned. With a model that sees images it checks a program with a window itself, by looking at a screenshot (view_image).
 - **Documents.** Turn notes and attachments into a Word file in your own house style, section by section, with sources. You review the draft before the `.docx` is written.
 - **Images.** Make images from a description, on your own PC.

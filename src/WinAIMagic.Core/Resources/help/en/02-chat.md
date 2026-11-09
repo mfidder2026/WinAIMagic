@@ -16,13 +16,16 @@ When no model runs yet, your question starts it by itself. Another model starts 
 | Button | What it does |
 |---|---|
 | Image | Add an image (also drag, or paste with Ctrl+V). Works when *vision* is on. |
-| Think | The model thinks first. Better for hard questions, but slower. The thinking steps fold away. |
+| Think | Off, low, normal or high: how long the model thinks first (low 2,000 tokens, normal 8,000, high what Settings says). Works with every model that can think. Longer is better for hard questions, but slower. When the model works in steps, it thinks at most 4,000 tokens per step after the first. |
 | Web | The model may search the web and read pages. |
 | Work folder | Choose a folder the model may work in. |
 | R W X | The rights in that folder: read, write, execute. |
 
 ## Context and summarizing
 At the top of the conversation a meter shows how much of the context the conversation uses. At 80% the model summarizes the start; the messages stay visible. **Summarize now** in the meter does it at once.
+
+## An answer in steps
+When the model works in steps (files, commands, the web), the whole answer is in one card: every thought, text and step where it came. A thought is folded, with its start on one line; while the model thinks, you see the last lines of what it thinks now. While it works you see the latest 14 parts, with **earlier steps** for the rest. When the answer is done, all the work before the last text folds into one line **Reasoning and N steps**.
 
 ## When the model stops before it is done
 Local models sometimes stop halfway. The app notices and tells the model to go on; you see that in the conversation. If it stops three times in a row, the app asks you to say "go on" or to give a hint.

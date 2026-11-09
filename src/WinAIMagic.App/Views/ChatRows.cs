@@ -81,8 +81,10 @@ internal static class ChatUi
 /// <summary>What a row keeps when it leaves the screen and comes back.</summary>
 internal sealed class RowMemory
 {
-    public bool Thinking, Steps, Summary;
+    /// <summary>Steps: the earlier parts of a working answer are shown; Work: the folded work of a finished answer is open.</summary>
+    public bool Steps, Work, Summary;
     public readonly HashSet<Guid> OpenSteps = [];
+    public readonly HashSet<string> OpenThoughts = [];
 }
 
 /// <summary>"Hierboven samengevat": where a conversation was compacted, an amber line that opens.</summary>
@@ -117,71 +119,10 @@ public sealed partial class SummaryRow : StackPanel
     }
 }
 
-/// <summary>One message of the chat, in the order of MessageRow in ChatView.swift.</summary>
+/// <summary>A question of the user (MessageRow in ChatView.swift). The model's answer is an <see cref="AnswerRow"/>.</summary>
 public sealed partial class MessageRow : Grid
 {
-    private readonly RowMemory memory;
-    private readonly Action<double>? shifted;
-    private readonly bool assistant;
-    private BrandMark mark = null!;
-    private PulseRing pulse = null!;
-    private Border card = null!;
-    private Disclosure thinking = null!;
-    private MarkdownView? thoughts;
-    private ActivityList steps = null!;
-    private Spinner spinner = null!;
-    /// <summary>Beside the spinner: what the model prepares (a file, a command), or "Bezig…".</summary>
-    private readonly TextBlock busyText = Ui.Label("", 13, Theme.Secondary);
-    private StackPanel busyRow = null!;
-    private MarkdownView answer = null!, answerTail = null!;
-    /// <summary>A very long answer shows its start and end until the user asks for all of it.</summary>
-    private Button showAll = null!;
-    private TextBlock showAllText = null!;
-    private bool showWhole;
-    private string lastText = "";
-    private TextBlock error = null!;
-    private Border sources = null!;
-    private TextBlock stats = null!;
-    private Button copy = null!, speak = null!;
-    private FontIcon speakIcon = null!;
-    private Guid? messageId;
-    private bool wasReading;
-    private FrameworkElement statsRow = null!;
-    private string copyText = "", sourcesShown = "", reasoning = "";
-    private bool wasStreaming;
-
-    internal MessageRow(ChatMessage m, RowMemory memory, Action<double>? shifted, bool streaming)
-    {
-        this.memory = memory;
-        this.shifted = shifted;
-        // only the app's own push-on is a nudge; a skill the app loaded itself shows as a step
-        assistant = m.Role != ChatRole.User;
-        if (m.Automatic == true && m.Role == ChatRole.User && m.Attachments.Count > 0) BuildLook(m);
-        else if (m.Automatic == true && m.Role == ChatRole.User) BuildNudge();
-        else if (m.Role == ChatRole.User) BuildUser(m);
-        else BuildAssistant();
-        Update(m, streaming);
-    }
-
-    private void BuildNudge()
-    {
-        var row = Ui.H(6, Ui.Icon(Glyph.Refresh, 12, Theme.Secondary), Ui.Label(L("Het model was nog niet klaar en gaat automatisch door"), 12, Theme.Secondary));
-        row.HorizontalAlignment = HorizontalAlignment.Center;
-        Children.Add(row);
-    }
-
-    /// <summary>A picture the model asked to look at (view_image): small, so the user sees what it saw.</summary>
-    private void BuildLook(ChatMessage m)
-    {
-        var row = Ui.H(8);
-        row.HorizontalAlignment = HorizontalAlignment.Center;
-        foreach (var a in m.Attachments) row.Children.Add(ChatUi.Thumb(a.Jpeg, 160, 6));
-        var names = string.Join(", ", m.Attachments.Select(a => a.Filename));
-        row.Children.Add(Ui.H(6, Ui.Icon(Glyph.Eye, 12, Theme.Secondary), Ui.Label(L($"Het model bekijkt {names}"), 12, Theme.Secondary)));
-        Children.Add(row);
-    }
-
-    private void BuildUser(ChatMessage m)
+    internal MessageRow(ChatMessage m, Action<double>? shifted)
     {
         var body = new StackPanel { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(80, 0, 0, 0) };
         if (m.Attachments.Count > 0)
@@ -209,161 +150,6 @@ public sealed partial class MessageRow : Grid
             });
         }
         Children.Add(body);
-    }
-
-    private void BuildAssistant()
-    {
-        ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        ColumnDefinitions.Add(new ColumnDefinition());
-        ColumnSpacing = 12;
-        mark = new BrandMark(30) { VerticalAlignment = VerticalAlignment.Top };
-        pulse = new PulseRing(30) { VerticalAlignment = VerticalAlignment.Top };
-        Children.Add(pulse);
-        Children.Add(mark);
-
-        thinking = new Disclosure(Glyph.Think, false, on =>
-        {
-            memory.Thinking = on;
-            if (on && thoughts == null)
-            {
-                thoughts = new MarkdownView(shifted, true, 13, Theme.Secondary);
-                var rule = new Border { Child = thoughts, BorderBrush = Theme.Solid(Colors.White, 0.18), BorderThickness = new Thickness(2, 0, 0, 0), Padding = new Thickness(10, 0, 0, 0), Margin = new Thickness(0, 4, 0, 0) };
-                thinking.Content = rule;
-                thoughts.Set(LongText.ThinkingEnd(reasoning));
-            }
-        });
-        if (memory.Thinking) thinking.SetOpen(true);
-        steps = new ActivityList(memory);
-        spinner = new Spinner(16, false) { VerticalAlignment = VerticalAlignment.Center };
-        busyText.VerticalAlignment = VerticalAlignment.Center;
-        busyRow = Ui.H(8, spinner, busyText);
-        busyRow.HorizontalAlignment = HorizontalAlignment.Left;
-        answer = new MarkdownView(shifted);
-        error = Ui.Caption("", new SolidColorBrush(Theme.Red), 13);
-        error.IsTextSelectionEnabled = true;
-        sources = new Border { Visibility = Visibility.Collapsed };
-        stats = Ui.Label("", 12, Theme.Tertiary);
-        copy = ChatUi.Plain(Ui.Icon(Glyph.Copy, 12, Theme.Tertiary), () => Ui.Copy(copyText), L("Kopieer"));
-        copy.Width = 26;
-        copy.Height = 22;
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(copy, L("Kopieer"));
-        speakIcon = Ui.Icon(Glyph.Speaker, 12, Theme.Tertiary);
-        speak = ChatUi.Plain(speakIcon, () => { if (messageId is { } mid) Speech.Shared.Speak(copyText, mid); }, L("Lees voor"));
-        speak.Width = 26;
-        speak.Height = 22;
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(speak, L("Lees voor"));
-        statsRow = Ui.H(10, stats, copy, speak);
-
-        answerTail = new MarkdownView(shifted);
-        showAllText = Ui.Label("", 13, new SolidColorBrush(Theme.Accent));
-        showAll = ChatUi.Plain(showAllText, () => { showWhole = true; ShowText(lastText); }, L("Toon alles"));
-        showAll.HorizontalAlignment = HorizontalAlignment.Left;
-        var body = Ui.V(10, thinking, steps, busyRow, answer, showAll, answerTail, error, sources, statsRow);
-        card = new Border
-        {
-            Child = body, Padding = new Thickness(16), CornerRadius = new CornerRadius(18), HorizontalAlignment = HorizontalAlignment.Left,
-            Background = Theme.Solid(Colors.White, 0.05), BorderBrush = Theme.Solid(Colors.White, 0.07), BorderThickness = new Thickness(1),
-        };
-        Grid.SetColumn(card, 1);
-        Children.Add(card);
-    }
-
-    /// <summary>The answer; a very long one as its start and end with "Toon alles" between them.</summary>
-    private void ShowText(string text)
-    {
-        lastText = text;
-        answer.Show(text.Length > 0);
-        var folded = showWhole ? null : LongText.Folded(text);
-        showAll.Show(folded != null);
-        answerTail.Show(folded != null);
-        if (folded is { } f)
-        {
-            answer.Set(f.Head);
-            answerTail.Set(f.Tail);
-            var hidden = f.Hidden.ToString("N0", AppLanguages.Current.Culture());
-            showAllText.SetIfChanged(L($"… {hidden} tekens verborgen · Toon alles"));
-        }
-        else answer.Set(text);
-    }
-
-    /// <summary>Show the message as it is now; cheap when nothing changed.</summary>
-    internal void Update(ChatMessage m, bool streaming)
-    {
-        if (!assistant) return;
-        bool waiting = streaming && m.Text.Length == 0;
-        thinking.Show(m.Reasoning.Length > 0);
-        if (m.Reasoning.Length > 0)
-        {
-            thinking.SetTitle(waiting ? L("Denkt na…") : L("Gedachtegang"), waiting);
-            reasoning = m.Reasoning;
-            thoughts?.Set(LongText.ThinkingEnd(reasoning));
-        }
-        steps.Show(m.Activities.Count > 0);
-        if (m.Activities.Count > 0) steps.Update(m.Activities, streaming);
-        // the model writes a tool call (a file, a command): say what, so the chat does not look idle
-        bool preparing = streaming && m.Text.Length == 0 && m.Error == null && m.Preparing != null;
-        bool spin = preparing || m.Text.Length == 0 && m.Reasoning.Length == 0 && streaming && m.Error == null;
-        spinner.Active = spin;
-        busyRow.Show(spin);
-        if (spin) busyText.SetIfChanged(preparing ? m.Preparing! : L("Bezig…"));
-        ShowText(m.Text);
-        error.Show(m.Error != null);
-        if (m.Error != null) error.SetIfChanged(m.Error);
-        UpdateSources(m.Sources);
-
-        statsRow.Show(m.TokensPerSecond != null && !streaming);
-        if (m.TokensPerSecond is { } tps && !streaming)
-        {
-            var culture = AppLanguages.Current.Culture();
-            var line = tps.ToString("0.0", culture) + " tok/s";
-            if (m.PromptTokensPerSecond is { } p) line += "   prompt " + p.ToString("0", culture) + " tok/s";
-            stats.SetIfChanged(line);
-            copyText = m.Text;
-        }
-        messageId = m.Id;
-        speak.Show(Settings.Shared.FeatureVoice);
-        bool reading = Speech.Shared.Speaking == m.Id;
-        if (reading != wasReading)
-        {
-            wasReading = reading;
-            speakIcon.Glyph = reading ? Glyph.SpeakerOff : Glyph.Speaker;
-            speak.Tip(reading ? L("Stop met voorlezen") : L("Lees voor"));
-        }
-        if (streaming != wasStreaming)
-        {
-            wasStreaming = streaming;
-            mark.Active = streaming;
-            pulse.Active = streaming;
-            card.BorderBrush = streaming
-                ? Theme.Gradient(new Point(0, 0), new Point(1, 1), Theme.Alpha(Theme.Accent, 0.6), Theme.Alpha(Theme.Violet, 0.6), Theme.Alpha(Theme.Pink, 0.6))
-                : Theme.Solid(Colors.White, 0.07);
-        }
-    }
-
-    private void UpdateSources(List<Source> list)
-    {
-        var key = string.Join("\n", list.Take(10).Select(s => s.Url));
-        sources.Show(list.Count > 0);
-        if (key == sourcesShown) return;
-        sourcesShown = key;
-        var row = Ui.H(8);
-        foreach (var s in list.Take(10))
-        {
-            if (ChatUi.WebLink(s.Url) is not { } url) continue;
-            var host = url.Host.Replace("www.", "");
-            var chip = ChatUi.Plain(Ui.H(4, Ui.Icon(Glyph.Globe, 11, Theme.Secondary), Ui.Label(host.Length > 0 ? host : s.Title, 12, Theme.Secondary)),
-                () => _ = Windows.System.Launcher.LaunchUriAsync(url), s.Title);
-            chip.Padding = new Thickness(8, 3, 8, 4);
-            chip.CornerRadius = new CornerRadius(11);
-            chip.Background = Theme.Solid(Colors.White, 0.08);
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(chip, host);
-            row.Children.Add(chip);
-        }
-        sources.Child = new ScrollViewer
-        {
-            Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollMode = ScrollMode.Auto,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollMode = ScrollMode.Disabled, ZoomMode = ZoomMode.Disabled,
-        };
     }
 }
 
@@ -505,77 +291,6 @@ public sealed partial class Disclosure : StackPanel
         if (content == null) return;
         if (on && !Children.Contains(content)) Children.Add(content);
         else if (!on) Children.Remove(content);
-    }
-}
-
-/// <summary>The steps of an answer. While the model works the list grows, so every step shows as it comes (the latest twelve, with
-/// how many came before); when the answer is done it folds into one line, since the chat is about the answer. Up to 3 are simply shown.</summary>
-public sealed partial class ActivityList : StackPanel
-{
-    private const int FoldAbove = 3;
-    /// <summary>While working, at most this many of the latest steps.</summary>
-    private const int Live = 12;
-    private readonly RowMemory memory;
-    private string shown = "";
-    private List<ToolActivity> last = [];
-    private bool streaming;
-
-    internal ActivityList(RowMemory memory)
-    {
-        this.memory = memory;
-        Spacing = 4;
-        // the steps stay on the left, also when the list opens
-        HorizontalAlignment = HorizontalAlignment.Stretch;
-    }
-
-    public void Update(List<ToolActivity> list, bool stream)
-    {
-        last = list;
-        streaming = stream;
-        var key = $"{stream}{memory.Steps}" + string.Join(",", list.Select(a => $"{a.Id}{a.Done}{a.Denied}{a.Output?.Length}"));
-        if (key == shown) return;
-        shown = key;
-        Rebuild();
-    }
-
-    private void Rebuild()
-    {
-        Children.Clear();
-        if (last.Count <= FoldAbove) foreach (var a in last) Add(new ActivityRow(a, memory));
-        else if (streaming && !memory.Steps)
-        {
-            int hidden = last.Count - Live;
-            if (hidden > 0)
-            {
-                var earlier = ChatUi.Plain(Ui.H(6, Ui.Icon(Glyph.Bullets, 13, Theme.Tertiary), Ui.Label(L($"{hidden} eerdere stappen"), 13, Theme.Tertiary)), () =>
-                {
-                    memory.Steps = true;
-                    shown = "";
-                    Update(last, streaming);
-                });
-                earlier.Padding = new Thickness(2, 1, 6, 2);
-                Add(earlier);
-            }
-            foreach (var a in last.Skip(Math.Max(0, hidden))) Add(new ActivityRow(a, memory));
-        }
-        else
-        {
-            var fold = new Disclosure(Glyph.Bullets, memory.Steps, on =>
-            {
-                if (memory.Steps == on) return;
-                memory.Steps = on;
-                DispatcherQueue.TryEnqueue(() => { shown = ""; Update(last, streaming); });
-            });
-            fold.SetTitle(L($"{last.Count} stappen"), false);
-            Add(fold);
-            if (memory.Steps) foreach (var a in last) Add(new ActivityRow(a, memory));
-        }
-    }
-
-    private void Add(FrameworkElement e)
-    {
-        e.HorizontalAlignment = HorizontalAlignment.Left;
-        Children.Add(e);
     }
 }
 

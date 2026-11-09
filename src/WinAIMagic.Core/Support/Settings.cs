@@ -7,6 +7,9 @@ using System.Text.Json;
 
 namespace WinAIMagic.Core.Support;
 
+/// <summary>How long the model thinks first: the four choices of the button under the input field.</summary>
+public enum ThinkingLevel { Off, Low, Normal, High }
+
 /// <summary>User settings: settings.json in the app data folder, written atomically; API keys encrypted with DPAPI.</summary>
 public sealed class Settings : INotifyPropertyChanged
 {
@@ -54,6 +57,24 @@ public sealed class Settings : INotifyPropertyChanged
     public string ReasoningEffort { get => Get("high"); set => Set(value); }
     /// <summary>At most this many tokens of thinking, then the model writes its answer (0: no limit).</summary>
     public int ThinkingBudget { get => Get(16_000); set => Set(value); }
+
+    /// <summary>Thinking as one choice, the button under the input field. It sets <see cref="Thinking"/> and <see cref="ReasoningEffort"/>,
+    /// and how many tokens the model may think: only some templates read reasoning_effort (DeepSeek), while the engine stops the
+    /// thinking of every model at the budget. High uses the setting "Maximaal nadenken"; "max" from Settings counts as high.</summary>
+    public ThinkingLevel ThinkingLevel
+    {
+        get => !Thinking ? ThinkingLevel.Off : ReasoningEffort switch { "low" => ThinkingLevel.Low, "medium" => ThinkingLevel.Normal, _ => ThinkingLevel.High };
+        set
+        {
+            Thinking = value != ThinkingLevel.Off;
+            if (value == ThinkingLevel.Low) ReasoningEffort = "low";
+            else if (value == ThinkingLevel.Normal) ReasoningEffort = "medium";
+            else if (value == ThinkingLevel.High && ReasoningEffort != "max") ReasoningEffort = "high";
+        }
+    }
+
+    /// <summary>How many tokens the model may think in an answer's first round now (0: no limit).</summary>
+    public int ThinkingBudgetNow => ThinkingLevel switch { ThinkingLevel.Off => 0, ThinkingLevel.Low => 2_000, ThinkingLevel.Normal => 8_000, _ => ThinkingBudget };
     public bool WebSearch { get => Get(true); set => Set(value); }
     [Secret] public string BraveKey { get => Get(""); set => Set(value); }
     public double Temperature { get => Get(1.0); set => Set(value); }
@@ -195,8 +216,10 @@ public sealed class Settings : INotifyPropertyChanged
         File.Move(tmp, Paths.SettingsFile, true);
     }
 
+    // ThinkingLevel is made of Thinking and ReasoningEffort, which are stored themselves
     private static IEnumerable<PropertyInfo> Stored() =>
-        typeof(Settings).GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanWrite && p.CanRead && p.GetIndexParameters().Length == 0);
+        typeof(Settings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanWrite && p.CanRead && p.GetIndexParameters().Length == 0 && p.Name != nameof(ThinkingLevel));
 
     private static string Protect(string text) =>
         text.Length == 0 ? "" : Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(text), null, DataProtectionScope.CurrentUser));

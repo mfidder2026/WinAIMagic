@@ -51,6 +51,7 @@ public sealed partial class Composer : Grid
     private string beforeSpeaking = "";
     private readonly ToggleButton think, web, folder;
     private readonly TextBlock folderName = Ui.Label("", 12, null, FontWeights.Medium);
+    private readonly TextBlock thinkName = Ui.Label("", 12, null, FontWeights.Medium);
     private readonly RightsButton rights;
     private Guid? conversation;
     private string? workspace, imageReason;
@@ -89,7 +90,11 @@ public sealed partial class Composer : Grid
         image = Small(Ui.Icon(Glyph.Image, 14), () => _ = PickImages(), L("Afbeelding toevoegen"));
         Automation.SetName(image, L("Afbeelding toevoegen"));
         var s = Settings.Shared;
-        think = Toggle(Glyph.Think, L("Denken"), L("Laat het model eerst nadenken (beter, maar trager)"), on => s.Thinking = on);
+        // one choice, off to high: the button names it and opens the menu
+        think = Toggle(Glyph.Think, thinkName, _ => FlyoutBase.ShowAttachedFlyout(think));
+        think.Tip(L("Hoe lang het model eerst nadenkt: langer is beter bij lastige vragen, maar trager"));
+        Automation.SetName(think, L("Denken"));
+        FlyoutBase.SetAttachedFlyout(think, ThinkMenu());
         web = Toggle(Glyph.Globe, L("Web"), L("Het model mag het web doorzoeken en pagina's lezen"), on => s.WebSearch = on);
         folder = Toggle(Glyph.Folder, folderName, on =>
         {
@@ -127,7 +132,7 @@ public sealed partial class Composer : Grid
             Speech.Shared.Problem = null;
         });
         Children.Add(micProblem);
-        var tools = Ui.H(6, image, Pair(think, ThinkMenu()), web, Pair(folder, FolderMenu()), rights);
+        var tools = Ui.H(6, image, think, web, Pair(folder, FolderMenu()), rights);
         var sendHost = new Grid { Children = { send, stop } };
         loading.VerticalAlignment = VerticalAlignment.Center;
         var content = Ui.V(8, thumbsHost, imageNote, box, Ui.Row("*,auto", 8, tools, Ui.H(8, loading, mic, sendHost)));
@@ -206,6 +211,7 @@ public sealed partial class Composer : Grid
         workspace = c?.Workspace;
         updating = true;
         if (think.IsChecked != s.Thinking) think.IsChecked = s.Thinking;
+        thinkName.SetIfChanged(ThinkingName(s.ThinkingLevel));
         if (web.IsChecked != s.WebSearch) web.IsChecked = s.WebSearch;
         bool active = s.WorkspaceTools && workspace != null;
         if (folder.IsChecked != active) folder.IsChecked = active;
@@ -473,18 +479,27 @@ public sealed partial class Composer : Grid
         return Ui.H(1, toggle, more);
     }
 
-    private static MenuFlyout ThinkMenu()
+    internal static string ThinkingName(ThinkingLevel level) => level switch
     {
-        var menu = new MenuFlyout();
+        ThinkingLevel.Off => L("Denken: uit"),
+        ThinkingLevel.Low => L("Denken: laag"),
+        ThinkingLevel.Normal => L("Denken: normaal"),
+        _ => L("Denken: hoog"),
+    };
+
+    /// <summary>Off, low, normal or high: the engine stops the thinking at 2,000 or 8,000 tokens, or at the setting "Maximaal nadenken".</summary>
+    private MenuFlyout ThinkMenu()
+    {
+        var menu = new MenuFlyout { Placement = FlyoutPlacementMode.TopEdgeAlignedLeft, ShouldConstrainToRootBounds = true };
+        ChatUi.Dress(menu);
         menu.Opening += (_, _) =>
         {
             menu.Items.Clear();
             var s = Settings.Shared;
-            menu.Items.Add(new MenuFlyoutItem { Text = L("Maximaal nadenken"), IsEnabled = false });
-            foreach (var (label, n) in new[] { ("4K", 4_000), ("8K", 8_000), ("16K", 16_000), ("32K", 32_000), (L("Onbeperkt"), 0) })
+            foreach (var level in Enum.GetValues<ThinkingLevel>())
             {
-                var item = new RadioMenuFlyoutItem { Text = label, GroupName = "think", IsChecked = s.ThinkingBudget == n };
-                item.Click += (_, _) => s.ThinkingBudget = n;
+                var item = new RadioMenuFlyoutItem { Text = ThinkingName(level), GroupName = "think", IsChecked = s.ThinkingLevel == level };
+                item.Click += (_, _) => { s.ThinkingLevel = level; Refresh(); };
                 menu.Items.Add(item);
             }
         };

@@ -101,7 +101,7 @@ public static class SettingsDialog
             Section(L("Antwoorden"),
                 Row(L("Denkniveau"), Pick([(L("Laag"), "low"), (L("Gemiddeld"), "medium"), (L("Hoog"), "high"), (L("Maximaal"), "max")], s.ReasoningEffort, v => s.ReasoningEffort = v)),
                 Row(L("Maximaal nadenken"), Pick(new[] { 4_000, 8_000, 16_000, 32_000 }.Select(n => (L($"{n:N0} tokens"), n)).Append((L("Onbeperkt"), 0)), s.ThinkingBudget, v => s.ThinkingBudget = v)),
-                Note(L("Daarna schrijft het model zijn antwoord. Zonder grens kan een model bij een lastige vraag blijven twijfelen en nooit antwoorden.")),
+                Note(L("Geldt voor Denken: hoog. Daarna schrijft het model zijn antwoord. Zonder grens kan een model bij een lastige vraag blijven twijfelen en nooit antwoorden. Laag is 2.000 tokens, normaal 8.000.")),
                 Ui.Row("*,auto", 8, temperature, slider),
                 Stacked(L("Systeemprompt"), prompt),
                 Ui.Row("*,auto", 12,

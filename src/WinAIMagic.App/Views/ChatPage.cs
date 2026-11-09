@@ -44,10 +44,10 @@ public sealed class ChatPage : IPage
     private readonly Border stepsHost = new() { MaxWidth = 860, Margin = new Thickness(24, 4, 24, 0), Visibility = Visibility.Collapsed };
     private string stepsKey = "";
     private bool stepsOpen = true;
-    private readonly Dictionary<Guid, ChatMessage> visible = new();
+    private readonly Dictionary<Guid, ChatItem> visible = new();
     private readonly Dictionary<Guid, RowMemory> memory = new();
     private readonly TextBlock emptyTitle = Ui.Label("", 36, Theme.Brand, FontWeights.Bold, display: true);
-    private Guid? shown, lastMessage;
+    private Guid? shown, lastItem;
     private Approval? approvalShown;
     private string bannerKey = "";
     private string? summaryText;
@@ -183,7 +183,9 @@ public sealed class ChatPage : IPage
         if (key is SummaryKey s)
             return new SummaryRow(summaryText ?? "", Shift, () => Memory(s.Conversation).Summary, on => Memory(s.Conversation).Summary = on);
         var id = (Guid)key;
-        return new MessageRow(visible[id], Memory(id), Shift, shown is { } c && app.Chat.IsBusy(c) && id == lastMessage);
+        var item = visible[id];
+        if (!item.IsAnswer) return new MessageRow(item.Question!, Shift);
+        return new AnswerRow(item.Rounds, Memory(id), Shift, shown is { } c && app.Chat.IsBusy(c) && id == lastItem);
     }
 
     private RowMemory Memory(Guid id)
@@ -195,8 +197,15 @@ public sealed class ChatPage : IPage
     /// <summary>The height of a row that was not on screen yet.</summary>
     private double Estimate(object key, double width)
     {
-        if (key is SummaryKey || !visible.TryGetValue((Guid)key, out var m)) return 22;
-        if (m.Automatic == true && m.Role == ChatRole.User) return m.Attachments.Count > 0 ? 170 : 20;
+        if (key is SummaryKey || !visible.TryGetValue((Guid)key, out var item)) return 22;
+        if (!item.IsAnswer) return Estimate(item.Question!, width);
+        // a finished answer shows its last text, with the work before it folded into one line
+        var answer = item.Rounds.LastOrDefault(m => m.Role == ChatRole.Assistant);
+        return (answer == null ? 0 : Estimate(answer, width)) + (item.Rounds.Count > 1 ? 30 : 0);
+    }
+
+    private static double Estimate(ChatMessage m, double width)
+    {
         double perLine = Math.Max((width - (m.Role == ChatRole.User ? 112 : 74)) / 7.4, 20);
         int breaks = 0;
         foreach (char c in m.Text) if (c == '\n') breaks++;
@@ -282,30 +291,45 @@ public sealed class ChatPage : IPage
     /// <summary>A path cut in the middle: its end says the most.</summary>
     private static string Middle(string path) => path.Length <= 48 ? path : path[..18] + "…" + path[^29..];
 
+    /// <summary>The rows: each question of the user, and one card per answer with all its rounds in the order they came.</summary>
     private void UpdateList(Conversation c)
     {
         var last = c.Messages[^1].Id;
-        lastMessage = last;
         bool busy = app.Chat.IsBusy(c.Id);
-        var keys = new List<object>(c.Messages.Count);
         visible.Clear();
         summaryText = c.Summary;
-        bool nudged = false;
+        var shownMessages = new List<ChatMessage>(c.Messages.Count);
+        // the summary line follows the last shown message it covers
+        Guid? summaryAfter = null;
+        bool summaryFirst = false, nudged = false;
         foreach (var m in c.Messages)
         {
             bool blank = m.Role == ChatRole.Assistant && m.Text.Length == 0 && m.Reasoning.Length == 0 && m.Error == null && m.Activities.Count == 0 && !(busy && m.Id == last);
             bool nudge = m.Automatic == true && m.Role == ChatRole.User && m.Attachments.Count == 0;
             if (!m.IsHidden && !blank && !(nudge && nudged))
             {
-                keys.Add(m.Id);
-                visible[m.Id] = m;
+                shownMessages.Add(m);
                 nudged = nudge;
             }
-            if (m.Id == c.SummaryUpTo && c.Summary != null) keys.Add(new SummaryKey(c.Id));
+            if (m.Id == c.SummaryUpTo && c.Summary != null)
+            {
+                summaryAfter = shownMessages.Count > 0 ? shownMessages[^1].Id : null;
+                summaryFirst = shownMessages.Count == 0;
+            }
+        }
+        var items = ChatItem.Group(shownMessages);
+        lastItem = items.Count > 0 ? items[^1].Id : null;
+        var keys = new List<object>(items.Count + 1);
+        if (summaryFirst) keys.Add(new SummaryKey(c.Id));
+        foreach (var item in items)
+        {
+            keys.Add(item.Id);
+            visible[item.Id] = item;
+            if (summaryAfter is { } after && item.Contains(after)) keys.Add(new SummaryKey(c.Id));
         }
         list.SetKeys(keys);
         foreach (var (key, row) in list.Live)
-            if (key is Guid id && row is MessageRow message && visible.TryGetValue(id, out var m)) message.Update(m, busy && id == last);
+            if (key is Guid id && row is AnswerRow answer && visible.TryGetValue(id, out var item)) answer.Update(item.Rounds, busy && id == lastItem);
     }
 
     private void UpdateSpeed()

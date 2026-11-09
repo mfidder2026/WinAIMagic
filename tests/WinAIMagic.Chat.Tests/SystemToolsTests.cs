@@ -318,7 +318,7 @@ public class SystemLoopTests : ChatTest
         Assert.Equal(Environment.MachineName, tools[1].Trim(), ignoreCase: true);
         Assert.Contains("system_undo id", tools[2]);
         Assert.Null(C.Messages[^1].Error);
-        Assert.Equal(["Skill laden: uiterlijk", "Systeem lezen: hostname", "Systeemwijziging: Kleur op groen"], C.Messages[^1].Activities.Select(a => a.Label));
+        Assert.Equal(["Skill laden: uiterlijk", "Systeem lezen: hostname", "Systeemwijziging: Kleur op groen"], C.Messages.SelectMany(m => m.Activities).Select(a => a.Label));
 
         // undo through the model, with the card that says each step is put back
         var id = SystemTools.Load().Single().Id;

@@ -300,6 +300,10 @@ public sealed class ChatClient(HttpClient? http = null)
         bool changedFiles = false;
         // rounds of tools since the model last updated its step list: a model forgets to tick steps off
         int roundsSinceSteps = 0;
+        // a step was taken in an earlier round of this answer
+        bool tookSteps = false;
+        // "ga door" on work that is under way: the plan was made, so even the first round only takes the next step
+        bool goingOn = store.Find(id) is { } started && IsGoOn(started);
         try
         {
             for (int round = 0; round < rounds; round++)
@@ -307,7 +311,11 @@ public sealed class ChatClient(HttpClient? http = null)
                 if (store.Find(id)?.ContextTokens is { } used && used > ContextLimit * CompactAt)
                     await CompactAsync(id, store, baseUrl, null, ct);
                 if (ct.IsCancellationRequested) return;
-                var reply = new ChatMessage { Role = ChatRole.Assistant, Activities = Copy(activities), Sources = [.. sources] };
+                // each round keeps its own steps, so the chat shows thinking, text and steps in the order they came
+                if (activities.Count > 0) tookSteps = true;
+                activities = [];
+                var reply = new ChatMessage { Role = ChatRole.Assistant, Sources = [.. sources] };
+                int budget = ThinkingBudget(Settings.Shared.ThinkingBudgetNow, goingOn ? round + 1 : round);
                 store.Update(id, c => c.Messages.Add(reply));
 
                 var throttle = new StreamThrottle((content, reasoning) =>
@@ -333,7 +341,7 @@ public sealed class ChatClient(HttpClient? http = null)
                     history.RemoveAt(history.Count - 1);
                     try
                     {
-                        result = await Task.Run(() => StreamAsync(history, c.Summary, baseUrl, throttle, ct), CancellationToken.None);
+                        result = await Task.Run(() => StreamAsync(history, c.Summary, baseUrl, throttle, budget, ct), CancellationToken.None);
                         await throttle.DrainAsync();
                         break;
                     }
@@ -369,7 +377,7 @@ public sealed class ChatClient(HttpClient? http = null)
                 if (result.ToolCalls.Count == 0)
                 {
                     bool cutOff = result.FinishReason == "length";
-                    if (!LooksUnfinished(reply.Text, reply.Reasoning, cutOff, WorkspaceActive || activities.Count > 0, changedFiles))
+                    if (!LooksUnfinished(reply.Text, reply.Reasoning, cutOff, WorkspaceActive || tookSteps || activities.Count > 0, changedFiles))
                     {
                         // KLAAR is a word for the app, not for the user
                         store.Update(id, _ => reply.Text = WithoutDoneWord(reply.Text));
@@ -382,7 +390,7 @@ public sealed class ChatClient(HttpClient? http = null)
                         return;
                     }
                     nudges++;
-                    store.Update(id, _ => { reply.Activities = []; if (cutOff) reply.CutOff = true; });
+                    if (cutOff) store.Update(id, _ => reply.CutOff = true);
                     // "go on where you were" made a model that plans aloud write the same plan again, without end
                     var nudge = cutOff ? L("Je antwoord werd te lang en is afgekapt; je krijgt alleen het begin en het eind terug. Denk of plan niet opnieuw in tekst: doe nu meteen de volgende stap met gereedschap. Schrijf grote code in delen: één bestand of één deel per write_file.")
                         : L("Je stopte zonder gereedschap te gebruiken. Is de taak nog niet af, roep dan nu meteen het volgende gereedschap aan, zonder het eerst aan te kondigen; werkt iets niet, probeer dan een andere aanpak. Is de taak wel af en gecontroleerd, begin je bericht dan met het woord KLAAR en zeg kort wat het resultaat is.");
@@ -397,7 +405,7 @@ public sealed class ChatClient(HttpClient? http = null)
                 var stepsNudge = WorkSteps.Reminder(store.Find(id)?.Steps, roundsSinceSteps);
                 if (stepsNudge != null) roundsSinceSteps = 0;
 
-                // run the tools; the next round's message carries the activity list, this one folds away
+                // run the tools; their steps stay with this round, the sources go on to the next
                 for (int place = 0; place < result.ToolCalls.Count; place++)
                 {
                     var call = result.ToolCalls[place];
@@ -529,7 +537,8 @@ public sealed class ChatClient(HttpClient? http = null)
                     var withNudge = place == result.ToolCalls.Count - 1 && stepsNudge != null ? text + "\n\n" + stepsNudge : text;
                     store.Update(id, c =>
                     {
-                        reply.Activities = [];
+                        // the step is done (or denied) in its own round
+                        reply.Activities = Copy(activities);
                         reply.Sources = [];
                         c.Messages.Add(new ChatMessage { Role = ChatRole.Tool, Text = withNudge, ToolCallId = call.Id });
                     });
@@ -544,7 +553,6 @@ public sealed class ChatClient(HttpClient? http = null)
             store.Update(id, c => c.Messages.Add(new ChatMessage
             {
                 Role = ChatRole.Assistant,
-                Activities = Copy(activities),
                 Sources = [.. sources],
                 Error = L($"Het model heeft {rounds} stappen gezet en pauzeert. Zeg \"ga door\" om verder te gaan."),
             }));
@@ -1147,9 +1155,47 @@ public sealed class ChatClient(HttpClient? http = null)
         return TextLimit.Prefix(text, keep) + "\n\n[" + L($"… {left} tekens weggelaten …") + "]\n\n" + TextLimit.Suffix(text, keep);
     }
 
-    internal JsonObject StreamBody(IEnumerable<ChatMessage> history, string? summary)
+    /// <summary>Thinking in the later rounds of one answer. The first round plans the work; after that a round only takes the next
+    /// step, and on the Mac DeepSeek-V4.1-Flash used the full 16,000 tokens in nearly every round (14 minutes a step). So later rounds
+    /// get at most this much, also when the setting has no limit.</summary>
+    public const int FollowUpThinking = 4_000;
+
+    /// <summary>The user only says to go on ("ga door", "verder", "continue") with work the model was doing: its last answer took
+    /// steps. Such a round needs no new plan; on the Mac its first round thought 16,328 tokens, 14 minutes (DeepSeek-V4.1-Flash).</summary>
+    public static bool IsGoOn(Conversation c)
+    {
+        int i = c.Messages.FindLastIndex(m => m.Role == ChatRole.User && m.Automatic != true);
+        if (i < 0 || !IsGoOnText(c.Messages[i].Text)) return false;
+        for (int j = i - 1; j >= 0; j--)
+        {
+            var m = c.Messages[j];
+            if (m.Role == ChatRole.User && m.Automatic != true) break;
+            if (m.Role == ChatRole.Assistant && m.ToolCalls.Count > 0) return true;
+        }
+        return false;
+    }
+
+    private static readonly string[] GoOnWords = ["ga door", "ga verder", "ga maar door", "doorgaan", "verder", "door", "ga door aub", "ga door graag",
+        "go on", "continue", "keep going", "carry on", "weiter", "mach weiter", "continue s'il te plaît", "continuez", "vas-y"];
+
+    public static bool IsGoOnText(string text)
+    {
+        var t = text.ToLowerInvariant().Trim().Trim(GoOnTrim);
+        if (t.Length > 40) return false;
+        // "ga door graag" yes, "door welke deur?" no: only a phrase of two words or more may have a few after it
+        return GoOnWords.Contains(t) || GoOnWords.Any(w => w.Contains(' ') && t.StartsWith(w + " ", StringComparison.Ordinal) && t.Length <= w.Length + 12);
+    }
+
+    private static readonly char[] GoOnTrim = [.. " \t\r\n.,!?;:'\"()-…".ToCharArray()];
+
+    /// <summary>The thinking budget of round <paramref name="turn"/> (0 is the first) of an answer; 0 means no limit.</summary>
+    public static int ThinkingBudget(int setting, int turn) =>
+        turn == 0 ? setting : setting == 0 ? FollowUpThinking : Math.Min(setting, FollowUpThinking);
+
+    internal JsonObject StreamBody(IEnumerable<ChatMessage> history, string? summary, int? thinkingBudget = null)
     {
         var s = Settings.Shared;
+        int budget = thinkingBudget ?? s.ThinkingBudgetNow;
         var body = new JsonObject
         {
             ["model"] = ModelName,
@@ -1165,9 +1211,9 @@ public sealed class ChatClient(HttpClient? http = null)
         // without a limit a model can keep doubting on a hard question and never get to its answer
         // off means off: GLM's template ignores enable_thinking and always opens with <think>
         if (!s.Thinking) body["thinking_budget_tokens"] = 0;
-        else if (s.ThinkingBudget > 0)
+        else if (budget > 0)
         {
-            body["thinking_budget_tokens"] = s.ThinkingBudget;
+            body["thinking_budget_tokens"] = budget;
             body["reasoning_budget_message"] = "\n\n" + L("Genoeg nagedacht; nu schrijf ik het antwoord.") + "\n";
         }
         // no limit asked: said out loud, because the tiered server otherwise applies its own default
@@ -1226,10 +1272,10 @@ public sealed class ChatClient(HttpClient? http = null)
         return payload.Length == 0 ? null : payload;
     }
 
-    private async Task<StreamResult> StreamAsync(List<ChatMessage> history, string? summary, Uri baseUrl, StreamThrottle throttle, CancellationToken ct)
+    private async Task<StreamResult> StreamAsync(List<ChatMessage> history, string? summary, Uri baseUrl, StreamThrottle throttle, int thinkingBudget, CancellationToken ct)
     {
         // the model writes for one conversation at a time; the others wait here (and a stop while waiting is a stop)
-        var body = StreamBody(history, summary);
+        var body = StreamBody(history, summary, thinkingBudget);
         var gate = Gate(baseUrl);
         if (!await gate.AcquireAsync(RunConversation ?? Guid.NewGuid(), ct).ConfigureAwait(false)) throw new OperationCanceledException(ct);
         StateChanged?.Invoke();

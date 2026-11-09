@@ -11,7 +11,7 @@ keywords: problem error does not work slow will not start stuck memory VRAM down
 ## Writing is slow
 - Look under **Live** whether a lot is read from the SSD, and whether the VRAM is full. Then the model does not fit entirely: choose a compact model or close other programs.
 - A page file that is too small makes the engine much slower: **System** says so and offers **Set up**.
-- Turn **Think** off for simple questions.
+- Set **Think** to low or off for simple questions.
 - A long context makes prompt reading slower. Start a new conversation, or let the conversation be summarized.
 
 ## The model stops halfway or repeats itself

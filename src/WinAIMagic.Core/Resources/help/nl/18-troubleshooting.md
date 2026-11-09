@@ -11,7 +11,7 @@ keywords: probleem fout werkt niet traag start niet vastgelopen geheugen VRAM do
 ## Schrijven is traag
 - Kijk onder **Live** of er veel van de SSD wordt gelezen, en of het VRAM vol is. Dan past het model niet helemaal: kies een compact model of sluit andere programma's.
 - Een te klein wisselbestand maakt de engine veel trager: **Systeem** zegt het en biedt **Stel in**.
-- Zet **Denken** uit voor eenvoudige vragen.
+- Zet **Denken** op laag of uit voor eenvoudige vragen.
 - Een lange context maakt het prompt lezen trager. Begin een nieuw gesprek, of laat het gesprek samenvatten.
 
 ## Het model stopt halverwege of herhaalt zich
