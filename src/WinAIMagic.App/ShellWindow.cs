@@ -368,6 +368,7 @@ public sealed partial class ShellWindow : Window
         app.TestState = Arg("fake-state") switch
         {
             "starting" => Engine.EngineState.Starting(L("Model laden…")),
+            "stopping" => Engine.EngineState.Stopping(L("Model ontladen…")),
             "failed" => Engine.EngineState.Failed(L($"Engine gestopt (code {1}): {"fake"}")),
             _ => args.Contains("--fake-engine") ? Engine.EngineState.Running : null,
         };

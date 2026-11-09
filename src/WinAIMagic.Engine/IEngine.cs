@@ -8,15 +8,17 @@ using static WinAIMagic.Core.Support.Lang;
 
 namespace WinAIMagic.Engine;
 
-public enum EngineStatus { Stopped, Starting, Running, Failed }
+public enum EngineStatus { Stopped, Starting, Running, Failed, Stopping }
 
-/// <summary>Stopped, Starting(text), Running or Failed(text), as EngineController.State on the Mac.</summary>
+/// <summary>Stopped, Starting(text), Running or Failed(text), as EngineController.State on the Mac; Stopping(text) while a model
+/// is unloaded (its memory comes back only when the process is gone).</summary>
 public readonly record struct EngineState(EngineStatus Status, string Message = "")
 {
     public static readonly EngineState Stopped = new(EngineStatus.Stopped);
     public static readonly EngineState Running = new(EngineStatus.Running);
     public static EngineState Starting(string text) => new(EngineStatus.Starting, text);
     public static EngineState Failed(string text) => new(EngineStatus.Failed, text);
+    public static EngineState Stopping(string text) => new(EngineStatus.Stopping, text);
     public bool IsRunning => Status == EngineStatus.Running;
     public bool IsActive => Status is EngineStatus.Running or EngineStatus.Starting;
 }
@@ -93,6 +95,9 @@ public abstract class EngineBase : IEngine
     private volatile bool stopRequested;
     private EngineState state = EngineState.Stopped;
     private double loadProgress;
+    // the gauge: when loading or unloading began, and how long it took last time
+    private DateTime phaseStarted;
+    private TimeSpan phaseExpected;
     private bool startedWithVision;
     private bool? reportedVision;
 
@@ -110,7 +115,18 @@ public abstract class EngineBase : IEngine
     public event Action<EngineState>? StateChanged;
     public event Action? Changed;
     public ModelInfo? Model { get; private set; }
-    public double LoadProgress => loadProgress;
+    /// <summary>How far loading (while Starting) or unloading (while Stopping) is, 0..1: what the engine reports, or the clock
+    /// against the time it took last time when that is further (LoadClock).</summary>
+    public double LoadProgress => state.Status switch
+    {
+        EngineStatus.Starting => LoadClock.Fraction(loadProgress, DateTime.UtcNow - phaseStarted, phaseExpected),
+        EngineStatus.Stopping => LoadClock.Fraction(0, DateTime.UtcNow - phaseStarted, phaseExpected),
+        EngineStatus.Running => 1,
+        _ => loadProgress,
+    };
+
+    /// <summary>Seconds still to go while loading or unloading, when the time it took before says so.</summary>
+    public int? SecondsLeft => state.Status is EngineStatus.Starting or EngineStatus.Stopping ? LoadClock.Remaining(DateTime.UtcNow - phaseStarted, phaseExpected) : null;
     public IReadOnlyList<string> LogTail { get { lock (gate) return tail.ToList(); } }
     public IReadOnlyList<string> Warnings { get { lock (gate) return warnings.ToList(); } }
     protected string LogPath => logFile;
@@ -121,10 +137,22 @@ public abstract class EngineBase : IEngine
         protected set
         {
             if (state == value) return;
+            Timed(state.Status, value.Status);
             state = value;
             StateChanged?.Invoke(value);
             Changed?.Invoke();
         }
+    }
+
+    /// <summary>Starts the clock of a load or an unload, and remembers how long the last one took.</summary>
+    private void Timed(EngineStatus from, EngineStatus to)
+    {
+        if (from == to || Model is not { } m) return;
+        var now = DateTime.UtcNow;
+        if (from == EngineStatus.Starting && to == EngineStatus.Running) LoadClock.Record("load:" + m.Id, now - phaseStarted);
+        if (from == EngineStatus.Stopping && to == EngineStatus.Stopped) LoadClock.Record("unload:" + m.Id, now - phaseStarted);
+        if (to == EngineStatus.Starting) { phaseStarted = now; phaseExpected = LoadClock.Expected("load:" + m.Id, LoadClock.FirstLoad(m.TotalSize)); }
+        if (to == EngineStatus.Stopping) { phaseStarted = now; phaseExpected = LoadClock.Expected("unload:" + m.Id, LoadClock.FirstUnload); }
     }
 
     /// <summary>Only the app's own engine can be open to the network: 0.0.0.0 only with a key (brief 10, API).</summary>
@@ -243,6 +271,7 @@ public abstract class EngineBase : IEngine
         lock (gate) p = process;
         if (p == null) return;
         stopRequested = true;
+        State = EngineState.Stopping(L("Model ontladen…"));
         AskToStop(p);
         var wait = StopWait;
         Task.Run(async () =>

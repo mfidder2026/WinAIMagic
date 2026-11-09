@@ -362,6 +362,50 @@ public class LlamaEngineTests : EngineTest
         Assert.Equal(held, SleepGuard.Holds);
     }
 
+    /// <summary>The owner found loading and unloading unclear: a stop now says "Model ontladen…" until the process is gone, and
+    /// the times of both are remembered, so the next gauge runs on the clock.</summary>
+    [Fact]
+    public async Task UnloadingIsAStateOfItsOwnAndBothTimesAreRemembered()
+    {
+        using var e = Fake("--ignore-break");
+        e.StopWait = TimeSpan.FromMilliseconds(600);
+        var states = new List<EngineState>();
+        e.StateChanged += s => { lock (states) states.Add(s); };
+        e.Start(Start());
+        Assert.True(WaitUntil(() => e.State.IsRunning));
+        Assert.Equal(1, e.LoadProgress);
+        e.Stop();
+        Assert.Equal(EngineStatus.Stopping, e.State.Status);
+        Assert.Equal("Model ontladen…", e.State.Message);
+        Assert.False(e.State.IsActive);
+        Assert.InRange(e.LoadProgress, 0, 0.99);
+        Assert.True(WaitUntil(() => e.State == EngineState.Stopped), e.State.ToString());
+        lock (states) Assert.Equal([EngineStatus.Starting, EngineStatus.Running, EngineStatus.Stopping, EngineStatus.Stopped], states.Select(s => s.Status).Distinct());
+        Assert.True(LoadClock.Expected("load:" + Qwen.Id, TimeSpan.FromHours(1)) < TimeSpan.FromMinutes(1));
+        Assert.True(LoadClock.Expected("unload:" + Qwen.Id, TimeSpan.FromHours(1)) < TimeSpan.FromMinutes(1));
+        await e.StopAndWait();
+    }
+
+    [Fact]
+    public void TheGaugeRunsOnTheClockAndNeverFillsBeforeTheEngineAnswers()
+    {
+        var expected = TimeSpan.FromSeconds(30);
+        Assert.Equal(0.5, LoadClock.Fraction(0, TimeSpan.FromSeconds(15), expected), 3);
+        Assert.Equal(0.8, LoadClock.Fraction(0.8, TimeSpan.FromSeconds(3), expected), 3); // the engine's own report when further
+        Assert.InRange(LoadClock.Fraction(0, TimeSpan.FromMinutes(5), expected), 0.95, 0.99); // late: creeps, never full
+        Assert.True(LoadClock.Fraction(0, TimeSpan.FromSeconds(40), expected) > LoadClock.Fraction(0, TimeSpan.FromSeconds(30), expected));
+        Assert.Equal(15, LoadClock.Remaining(TimeSpan.FromSeconds(15), expected));
+        Assert.Null(LoadClock.Remaining(TimeSpan.FromSeconds(31), expected));
+        // the first guess from the size: Qwen3.6-35B (20.7 GB) took 31 s on the owner's PC
+        Assert.InRange(LoadClock.FirstLoad(20_700_000_000).TotalSeconds, 25, 40);
+        // remembered, the newest weighing most
+        LoadClock.Record("load:test", TimeSpan.FromSeconds(10));
+        Assert.Equal(10, LoadClock.Expected("load:test", expected).TotalSeconds, 3);
+        LoadClock.Record("load:test", TimeSpan.FromSeconds(20));
+        Assert.Equal(16, LoadClock.Expected("load:test", expected).TotalSeconds, 3);
+        Assert.Equal(expected, LoadClock.Expected("load:other", expected));
+    }
+
     [Fact]
     public async Task AStopThatIsIgnoredEndsTheHardWay()
     {

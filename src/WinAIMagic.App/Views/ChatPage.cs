@@ -284,6 +284,7 @@ public sealed class ChatPage : IPage
             EngineStatus.Running => L("Model geladen"),
             EngineStatus.Starting => state.Message,
             EngineStatus.Failed => L("Engine fout"),
+            EngineStatus.Stopping => state.Message,
             _ => L("Model niet geladen"),
         };
         if (!Equals(ToolTipService.GetToolTip(modelChip), status)) ToolTipService.SetToolTip(modelChip, status);
@@ -371,11 +372,23 @@ public sealed class ChatPage : IPage
         UIElement content;
         switch (s.Status)
         {
-            case EngineStatus.Starting:
-                // only a large model takes minutes; a small one is there in seconds
+            case EngineStatus.Starting or EngineStatus.Stopping:
+            {
+                // a gauge with the percentage, what the engine does, and how long it took last time
+                var gauge = new LoadGauge(app, 34);
                 var gb = (long)((app.ChatModel?.TotalSize ?? 0) / 1_000_000_000);
-                content = Ui.Row("auto,*", 8, new Spinner(16), Ui.Caption(gb >= 50 ? L($"{s.Message} Het eerste laden van {gb} GB duurt enkele minuten.") : s.Message, Theme.Primary, 13));
+                var what = s.Status == EngineStatus.Stopping ? L("Het geheugen komt vrij zodra het model gestopt is.")
+                    : gb >= 50 ? L($"Het eerste laden van {gb} GB duurt enkele minuten.") : "";
+                var left = Ui.Caption("", Theme.Secondary, 12);
+                gauge.Ticked += (_, seconds, _) =>
+                {
+                    var parts = new[] { seconds is { } n ? L($"nog ongeveer {n} s") : "", what }.Where(t => t.Length > 0);
+                    left.SetIfChanged(string.Join(" · ", parts));
+                    left.Show(left.Text.Length > 0);
+                };
+                content = Ui.Row("auto,*", 10, gauge, Ui.V(1, Ui.Caption(s.Message, Theme.Primary, 13), left));
                 break;
+            }
             case EngineStatus.Failed:
                 var again = Ui.Btn(L("Opnieuw"), app.StartEngine);
                 again.IsEnabled = can;

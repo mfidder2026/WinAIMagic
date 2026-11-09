@@ -484,7 +484,7 @@ public sealed class EngineCard
         var host = app.Host;
         var state = app.EngineState;
         model.SetIfChanged(host.SelectedModel?.Name ?? "");
-        bar.Show(state.Status == EngineStatus.Starting);
+        bar.Show(state.Status is EngineStatus.Starting or EngineStatus.Stopping);
         bar.Value = host.Engine?.LoadProgress ?? 0;
         failed.SetIfChanged(state.Status == EngineStatus.Failed ? state.Message : "");
         failed.Show(failed.Text.Length > 0);

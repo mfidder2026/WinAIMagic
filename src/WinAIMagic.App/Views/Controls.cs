@@ -482,6 +482,9 @@ public sealed partial class StatusPill : Grid
     private readonly TextBlock text = Ui.Label("", 13, null, FontWeights.Medium);
     private readonly AppState app;
     private readonly bool all;
+    // while the chat model loads or unloads: a small gauge instead of the dot, and the percentage after the text
+    private readonly LoadGauge gauge;
+    private string said = "";
 
     /// <summary>`all` false: only the app's own engine, beside its Start and Stop.</summary>
     public StatusPill(AppState app, bool all = true)
@@ -494,7 +497,12 @@ public sealed partial class StatusPill : Grid
         Background = Theme.Solid(Colors.White, 0.06);
         VerticalAlignment = VerticalAlignment.Center;
         text.MaxWidth = 300;
-        Children.Add(Ui.H(7, dot, text));
+        gauge = new LoadGauge(app, 13);
+        gauge.Ticked += (f, _, status) =>
+        {
+            if (status is EngineStatus.Starting or EngineStatus.Stopping) text.SetIfChanged($"{said} {Math.Round(f * 100):0}%");
+        };
+        Children.Add(Ui.H(7, new Grid { Children = { dot, gauge } }, text));
         this.Tip(all ? L("Welk model er draait. Klik om een model te starten of te stoppen.") : L("Engine-status: klik voor het live dashboard"));
         // at the top: a menu to start or stop a model on every page
         if (all) Tapped += (_, _) => Menu().ShowAt(this, new Microsoft.UI.Xaml.Controls.Primitives.FlyoutShowOptions { Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.BottomEdgeAlignedLeft });
@@ -552,6 +560,7 @@ public sealed partial class StatusPill : Grid
         EngineStatus.Running => (role == null ? L($"{name ?? "Model"} actief") : L($"{name ?? "Model"} actief ({role})"), Theme.Mint, 1),
         EngineStatus.Starting => (role == null ? L($"{name ?? "Model"} laden…") : L($"{name ?? "Model"} laden… ({role})"), Theme.Amber, 2),
         EngineStatus.Failed => (L($"{name ?? "Model"}: fout"), Theme.Pink, 3),
+        EngineStatus.Stopping => (L($"{name ?? "Model"} ontladen…"), Theme.Accent, 2),
         _ => null,
     };
 
@@ -565,19 +574,29 @@ public sealed partial class StatusPill : Grid
         if (app.Host.Images.Busy) parts.Add((L($"{app.Host.ImageModel?.ShortName ?? L("Beeld")} tekent"), Theme.Mint, 1));
         var color = parts.Count == 0 ? Theme.Rgb(140, 145, 160) : parts.MaxBy(p => p.Rank).Color;
         text.MaxWidth = 520;
-        text.SetIfChanged(parts.Count == 0 ? L("Geen model · klik om te starten") : string.Join(" · ", parts.Select(p => p.Text)));
+        Say(parts.Count == 0 ? L("Geen model · klik om te starten") : string.Join(" · ", parts.Select(p => p.Text)));
         dot.Fill = new SolidColorBrush(color);
         BorderBrush = Theme.Solid(color, 0.4);
+    }
+
+    /// <summary>The text, and the gauge in place of the dot while the chat model loads or unloads.</summary>
+    private void Say(string value)
+    {
+        said = value;
+        bool moving = app.EngineState.Status is EngineStatus.Starting or EngineStatus.Stopping;
+        gauge.Show(moving);
+        dot.Show(!moving);
+        if (!moving) text.SetIfChanged(value);
     }
 
     private void UpdateOwn()
     {
         var s = app.EngineState;
         var color = Theme.StatusColor(s.Status);
-        text.SetIfChanged(s.Status switch
+        Say(s.Status switch
         {
             EngineStatus.Running => L($"{app.Host.Engine?.Model?.ShortName ?? "Model"} actief"),
-            EngineStatus.Starting => s.Message,
+            EngineStatus.Starting or EngineStatus.Stopping => s.Message,
             EngineStatus.Failed => L("Engine fout"),
             _ => L("Engine uit"),
         });

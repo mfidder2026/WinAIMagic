@@ -43,6 +43,7 @@ public static class Theme
         WinAIMagic.Engine.EngineStatus.Running => Mint,
         WinAIMagic.Engine.EngineStatus.Starting => Amber,
         WinAIMagic.Engine.EngineStatus.Failed => Pink,
+        WinAIMagic.Engine.EngineStatus.Stopping => Accent,
         _ => Rgb(140, 145, 160),
     };
 
