@@ -236,6 +236,14 @@ internal static class FakeEngine
             await ToolCall(s, "run_command", "{\"command\":\"Get-ChildItem -Recurse | Measure-Object\"}", "call_r");
             finish = "tool_calls";
         }
+        else if (ask.Contains("denkregels"))
+        {
+            // thinking over several lines, slowly: the closed thought shows its last lines one below the other
+            await Words(s, "reasoning_content", "Eerst de vorm van de sprite.\nHij is 24 tekens breed en 21 regels hoog.\n"
+                + "Regel een: ......XX..XX......\nRegel twee: .....XXXX.XXXX.....\nDat is nog niet herkenbaar, ik probeer het opnieuw.\n"
+                + "Nu de kleuren: geel lichaam en rode wangen.", 150);
+            await Send(s, new JsonObject { ["content"] = "KLAAR." });
+        }
         else if (ask.Contains("nudge") && nudges == 0)
         {
             await Words(s, "reasoning_content", "Ik denk hier alleen over na en stop dan.", delay);

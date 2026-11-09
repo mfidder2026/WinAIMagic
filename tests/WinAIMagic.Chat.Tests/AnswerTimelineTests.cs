@@ -70,8 +70,14 @@ public class AnswerTimelineTests
     public void Gist()
     {
         Assert.Equal("regel een regel twee", AnswerPart.Gist("regel een\nregel twee", false));
-        Assert.EndsWith("einde", AnswerPart.Gist(new string('a', 500) + "einde", true));
-        Assert.Equal(400, AnswerPart.Gist(new string('a', 500) + "einde", true).Length);
+        // while thinking: the last lines one below the other, not one block that runs together
+        Assert.Equal("twee\ndrie\nvier\nvijf", AnswerPart.Gist("een\ntwee\n\n  drie\nvier\nvijf", true));
+        // the line being written keeps its end, an earlier long one its start
+        var live = AnswerPart.Gist(new string('b', 300) + "\n" + new string('a', 500) + "einde", true).Split('\n');
+        Assert.Equal(AnswerPart.GistWidth, live[0].Length);
+        Assert.EndsWith("…", live[0]);
+        Assert.EndsWith("einde", live[1]);
+        Assert.Equal(AnswerPart.GistWidth, live[1].Length);
     }
 }
 

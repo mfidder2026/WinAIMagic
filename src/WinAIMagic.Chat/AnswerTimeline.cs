@@ -66,10 +66,24 @@ public sealed record AnswerPart(PartKind Kind, string Id, string Text = "", bool
         return 0;
     }
 
-    /// <summary>The thinking as one line: its end while the model thinks, its start afterwards.</summary>
+    /// <summary>Lines of thinking shown while the model thinks, and how long each may be.</summary>
+    public const int GistLines = 4, GistWidth = 120;
+
+    /// <summary>The thinking without opening it. While the model thinks: its last lines, one below the other (the owner saw the
+    /// lines run together into one fast-moving block); the line being written keeps its end, an earlier one its start. Afterwards:
+    /// its start as one line.</summary>
     public static string Gist(string text, bool live)
     {
-        var flat = string.Join(" ", text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
-        return live ? flat[Math.Max(0, flat.Length - 400)..] : flat[..Math.Min(200, flat.Length)];
+        var lines = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+        if (!live)
+        {
+            var flat = string.Join(" ", lines);
+            return flat[..Math.Min(200, flat.Length)];
+        }
+        var last = lines.Skip(Math.Max(0, lines.Count - GistLines)).ToList();
+        for (int i = 0; i < last.Count; i++)
+            if (last[i].Length > GistWidth)
+                last[i] = i == last.Count - 1 ? "…" + last[i][^(GistWidth - 1)..] : last[i][..(GistWidth - 1)] + "…";
+        return string.Join("\n", last);
     }
 }

@@ -301,7 +301,9 @@ public sealed partial class PartView : StackPanel
                 reasoning = p.Text;
                 thoughts?.Set(LongText.ThinkingEnd(reasoning));
                 // what it thinks now, or what it thought: the gist without opening it
-                gist!.MaxLines = p.Live ? 3 : 1;
+                // live: its last lines one below the other, each kept short by Gist (a limit here would cut the newest off)
+                gist!.MaxLines = p.Live ? 0 : 1;
+                gist.TextWrapping = p.Live ? TextWrapping.NoWrap : TextWrapping.Wrap;
                 gist.SetIfChanged(AnswerPart.Gist(p.Text, p.Live));
                 gist.Show(!memory.OpenThoughts.Contains(p.Id));
                 break;
