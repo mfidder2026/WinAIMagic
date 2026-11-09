@@ -1,12 +1,15 @@
 ---
 title: Werken in een map
 icon: Folder
-keywords: werkmap map bestanden schrijven lezen uitvoeren commando rechten LSU toestaan vragen weigeren WINAIMAGIC.md geleerd PowerShell
+keywords: werkmap bestanden paneel broncode ontwikkelaar map bestanden schrijven lezen uitvoeren commando rechten LSU toestaan vragen weigeren WINAIMAGIC.md geleerd PowerShell
 ---
 Geef het model een map, en het kan daar echt werken: bestanden lezen en schrijven, scripts uitvoeren, logbestanden lezen en net zo lang verbeteren tot het werkt. Commando's draaien in PowerShell.
 
 ## Een werkmap kiezen
 Klik in de chat op **Werkmap** en kies een map. De map geldt voor dat gesprek.
+
+## De bestanden ernaast
+De knop **</>** naast de werkmap zet rechts van de chat een paneel aan met de bestanden van de werkmap. Klik een map open, of klik een bestand om de tekst te lezen. Wat het model schrijft, staat er binnen een seconde in, ook in het bestand dat open staat. Het paneel leest alleen; sleep de linkerrand om het breder te maken.
 
 ## Rechten: L S U
 Naast de werkmapknop staan drie letters. Per soort actie kies je **Toestaan**, **Eerst vragen** of **Weigeren**:

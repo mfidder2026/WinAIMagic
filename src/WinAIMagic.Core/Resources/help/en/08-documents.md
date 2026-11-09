@@ -14,6 +14,6 @@ Make Word documents without a cloud AI. A **project** is a folder with:
 3. You get a **draft in Markdown** with numbered sources. There you change all text.
 4. Last, the app makes the **.docx** in your house style: cover page, headers and footers, numbered headings, tables and a table of contents.
 
-What goes on the cover page you fill in once per project. The documents are in `Documents\WinAIMagic`.
+What goes on the cover page you fill in once per project. The documents are in `Documents\WinAIMagic`. Done with a project? Choose **Delete project…** in the project menu: to the Recycle Bin, or only off the list.
 
 > A fast model does the small work (notes per page, spelling) and a heavy model the writing. Choose the fast one under Models with **Fast**; the heavy one is the model you start with **Start this model**. The fast model runs on the processor, beside the heavy one on the graphics card.

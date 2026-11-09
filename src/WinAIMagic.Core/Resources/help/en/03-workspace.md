@@ -1,12 +1,15 @@
 ---
 title: Working in a folder
 icon: Folder
-keywords: work folder folder files write read execute command rights allow ask deny WINAIMAGIC.md learned PowerShell
+keywords: work folder files panel source code developer folder files write read execute command rights allow ask deny WINAIMAGIC.md learned PowerShell
 ---
 Give the model a folder, and it can really work there: read and write files, run scripts, read logs and keep improving until it works. Commands run in PowerShell.
 
 ## Choosing a work folder
 Click **Work folder** in the chat and choose a folder. The folder applies to that conversation.
+
+## The files alongside
+The **</>** button next to the work folder turns on a panel to the right of the chat with the files of the work folder. Click a folder to open it, or a file to read its text. What the model writes shows up within a second, also in the file that is open. The panel only reads; drag its left edge to make it wider.
 
 ## Rights: R W X
 Next to the folder button are three letters. For each kind of action you choose **Allow**, **Ask first** or **Deny**:

@@ -14,6 +14,6 @@ Maak Word-documenten zonder cloud-AI. Een **project** is een map met:
 3. Je krijgt een **concept in Markdown** met genummerde bronnen. Daar pas je alle tekst aan.
 4. Als laatste maakt de app de **.docx** in je huisstijl: voorblad, kop- en voetteksten, genummerde koppen, tabellen en inhoudsopgave.
 
-Wat er op het voorblad moet, vul je één keer per project in. De documenten staan in `Documenten\WinAIMagic`.
+Wat er op het voorblad moet, vul je één keer per project in. De documenten staan in `Documenten\WinAIMagic`. Een project weg? Kies in het projectmenu **Verwijder project…**: naar de prullenbak, of alleen uit de lijst.
 
 > Een snel model doet het kleine werk (notities per pagina, spelling) en een zwaar model het schrijven. Kies onder Modellen het snelle met **Snel**; het zware is het model dat je met **Start dit model** start. Het snelle model draait op de processor, naast het zware op de videokaart.

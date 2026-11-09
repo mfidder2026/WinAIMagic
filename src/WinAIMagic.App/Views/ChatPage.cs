@@ -3,6 +3,7 @@ using Microsoft.UI;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using WinAIMagic.Chat;
@@ -26,6 +27,10 @@ public sealed class ChatPage : IPage
     private readonly TextBlock modelName = Ui.Label("", 13, null, FontWeights.SemiBold), folderName = Ui.Label("", 13);
     private readonly Microsoft.UI.Xaml.Shapes.Ellipse modelDot = new() { Width = 9, Height = 9 };
     private readonly Button folderChip;
+    /// <summary>Beside the chat, on the right: the working folder's files, turned on and off by filesToggle.</summary>
+    private readonly Grid outer = new();
+    private readonly FilesPanel files = new();
+    private readonly ToggleButton filesToggle;
     private readonly FrameworkElement modelChip;
     private readonly ContextMeter meter;
     private readonly MiniSpark spark = new(Theme.Violet, 22) { Width = 160 };
@@ -56,7 +61,7 @@ public sealed class ChatPage : IPage
     private double lastOffset;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? noticeTimer;
 
-    public FrameworkElement View => root;
+    public FrameworkElement View => outer;
     public Composer Composer { get; }
 
     public ChatPage(AppState app)
@@ -72,7 +77,19 @@ public sealed class ChatPage : IPage
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(folderChip, L("Werkmap"));
         meter = new ContextMeter(app);
         modelChip = ChatUi.Capsule(Ui.H(6, modelDot, modelName));
-        var top = Ui.Row("auto,auto,*,auto,auto,auto", 12, modelChip, folderChip, null, meter, spark, speed);
+        filesToggle = new ToggleButton
+        {
+            Content = Ui.Icon(Glyph.Code, 14), Width = 34, Height = 30, Padding = new Thickness(0), CornerRadius = new CornerRadius(8),
+            IsChecked = Settings.Shared.FilesPanel, VerticalAlignment = VerticalAlignment.Center,
+        };
+        filesToggle.Tip(L("Bestanden van de werkmap ernaast tonen of verbergen"));
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(filesToggle, L("Bestanden van de werkmap"));
+        filesToggle.Click += (_, _) =>
+        {
+            Settings.Shared.FilesPanel = filesToggle.IsChecked == true;
+            Refresh();
+        };
+        var top = Ui.Row("auto,auto,auto,*,auto,auto,auto", 12, modelChip, folderChip, filesToggle, null, meter, spark, speed);
         top.Padding = new Thickness(20, 4, 20, 8);
         spark.VerticalAlignment = VerticalAlignment.Center;
         root.Children.Add(top.At(0));
@@ -123,6 +140,13 @@ public sealed class ChatPage : IPage
             catch (System.Runtime.InteropServices.COMException x) { App.Log(x); }
             finally { wait.Complete(); }
         };
+
+        outer.ColumnDefinitions.Add(new ColumnDefinition());
+        outer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        outer.Children.Add(root);
+        Grid.SetColumn(files, 1);
+        files.Visibility = Visibility.Collapsed;
+        outer.Children.Add(files);
 
         app.Watch(root, Refresh);
         app.WatchSamples(root, UpdateSpeed);
@@ -291,7 +315,12 @@ public sealed class ChatPage : IPage
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(modelName, status); // a border has no automation peer; its text does
         bool hasFolder = Settings.Shared.WorkspaceTools && c?.Workspace != null;
         folderChip.Show(hasFolder);
+        filesToggle.Show(hasFolder);
         if (hasFolder) folderName.SetIfChanged(Middle(c!.Workspace!));
+        bool showFiles = hasFolder && Settings.Shared.FilesPanel;
+        if (filesToggle.IsChecked != Settings.Shared.FilesPanel) filesToggle.IsChecked = Settings.Shared.FilesPanel;
+        files.SetFolder(showFiles ? c!.Workspace : null);
+        files.Show(showFiles);
         meter.Update(c);
         UpdateSpeed();
         UpdateEngineBanner();

@@ -86,6 +86,9 @@ public sealed class Settings : INotifyPropertyChanged
     /// <summary>The folder the model may work in (files and commands), and whether that is on.</summary>
     public string Workspace { get => Get(""); set => Set(value); }
     public bool WorkspaceTools { get => Get(true); set => Set(value); }
+    /// <summary>The working folder's files beside the chat (a developer view), and how wide that panel is.</summary>
+    public bool FilesPanel { get => Get(false); set => Set(value); }
+    public double FilesPanelWidth { get => Get(380.0); set => Set(value); }
     /// <summary>The project open in the documents module.</summary>
     public string DocumentFolder { get => Get(""); set => Set(value); }
     /// <summary>The folders of the projects, one per line.</summary>
