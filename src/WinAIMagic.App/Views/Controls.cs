@@ -573,13 +573,7 @@ public sealed partial class StatusPill : Grid
     private void UpdateOwn()
     {
         var s = app.EngineState;
-        var color = s.Status switch
-        {
-            EngineStatus.Running => Theme.Mint,
-            EngineStatus.Starting => Theme.Amber,
-            EngineStatus.Failed => Theme.Pink,
-            _ => Theme.Rgb(140, 145, 160),
-        };
+        var color = Theme.StatusColor(s.Status);
         text.SetIfChanged(s.Status switch
         {
             EngineStatus.Running => L($"{app.Host.Engine?.Model?.ShortName ?? "Model"} actief"),

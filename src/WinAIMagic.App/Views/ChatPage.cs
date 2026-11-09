@@ -26,6 +26,7 @@ public sealed class ChatPage : IPage
     private readonly TextBlock modelName = Ui.Label("", 13, null, FontWeights.SemiBold), folderName = Ui.Label("", 13);
     private readonly Microsoft.UI.Xaml.Shapes.Ellipse modelDot = new() { Width = 9, Height = 9 };
     private readonly Button folderChip;
+    private readonly FrameworkElement modelChip;
     private readonly ContextMeter meter;
     private readonly MiniSpark spark = new(Theme.Violet, 22) { Width = 160 };
     private readonly TextBlock speed = Ui.Label("", 13, new SolidColorBrush(Theme.Cyan), FontWeights.SemiBold, display: true);
@@ -70,7 +71,8 @@ public sealed class ChatPage : IPage
         folderName.MaxWidth = 380;
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(folderChip, L("Werkmap"));
         meter = new ContextMeter(app);
-        var top = Ui.Row("auto,auto,*,auto,auto,auto", 12, ChatUi.Capsule(Ui.H(6, modelDot, modelName)), folderChip, null, meter, spark, speed);
+        modelChip = ChatUi.Capsule(Ui.H(6, modelDot, modelName));
+        var top = Ui.Row("auto,auto,*,auto,auto,auto", 12, modelChip, folderChip, null, meter, spark, speed);
         top.Padding = new Thickness(20, 4, 20, 8);
         spark.VerticalAlignment = VerticalAlignment.Center;
         root.Children.Add(top.At(0));
@@ -274,7 +276,18 @@ public sealed class ChatPage : IPage
 
         var model = app.ChatModel;
         modelName.SetIfChanged(model?.Name ?? L("Geen model"));
-        modelDot.Fill = Theme.FamilyGradient(model?.Family ?? "deepseek");
+        // the dot says whether the model is loaded, like the status at the top (a family colour read as "off")
+        var state = app.EngineState;
+        modelDot.Fill = new SolidColorBrush(Theme.StatusColor(state.Status));
+        string status = state.Status switch
+        {
+            EngineStatus.Running => L("Model geladen"),
+            EngineStatus.Starting => state.Message,
+            EngineStatus.Failed => L("Engine fout"),
+            _ => L("Model niet geladen"),
+        };
+        if (!Equals(ToolTipService.GetToolTip(modelChip), status)) ToolTipService.SetToolTip(modelChip, status);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(modelName, status); // a border has no automation peer; its text does
         bool hasFolder = Settings.Shared.WorkspaceTools && c?.Workspace != null;
         folderChip.Show(hasFolder);
         if (hasFolder) folderName.SetIfChanged(Middle(c!.Workspace!));

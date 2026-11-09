@@ -37,6 +37,15 @@ public static class Theme
 
     public static Color Family(string f) => f == "glm" ? Mint : f == "qwen" ? Amber : Accent;
 
+    /// <summary>The colour of an engine's state: green runs, amber loads, pink failed, grey off.</summary>
+    public static Color StatusColor(WinAIMagic.Engine.EngineStatus s) => s switch
+    {
+        WinAIMagic.Engine.EngineStatus.Running => Mint,
+        WinAIMagic.Engine.EngineStatus.Starting => Amber,
+        WinAIMagic.Engine.EngineStatus.Failed => Pink,
+        _ => Rgb(140, 145, 160),
+    };
+
     public static LinearGradientBrush FamilyGradient(string f) => f switch
     {
         "glm" => Gradient(new Point(0, 0), new Point(1, 1), Mint, Cyan),
