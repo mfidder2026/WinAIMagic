@@ -373,6 +373,27 @@ internal sealed class DocumentSidePanel
         Add(L("Nieuw project…"), () => _ = NewProject());
         Add(L("Open een bestaande map…"), () => _ = ChooseFolder());
         Add(L("Toon in Verkenner"), () => DocUi.Reveal(studio.Folder));
+        if (!studio.Busy && studio.Projects.Any(p => string.Equals(IOPath.GetFullPath(p), IOPath.GetFullPath(studio.Folder), StringComparison.OrdinalIgnoreCase)))
+        {
+            menu.Items.Add(new MenuFlyoutSeparator());
+            Add(L("Verwijder project…"), () => _ = RemoveProject(studio.Folder));
+        }
+    }
+
+    /// <summary>The open project: to the Recycle Bin with all it holds, or only off the list (a folder opened from
+    /// elsewhere may hold more than this project).</summary>
+    private async Task RemoveProject(string path)
+    {
+        var dialog = Ui.Dialog(app);
+        dialog.Title = L($"Project {DocUi.Name(path)} verwijderen?");
+        dialog.Content = Ui.Label(L("Naar de prullenbak gaat de hele map: concepten, .docx-bestanden, bijlagen en huisstijl. Daar kun je hem terughalen. Alleen uit de lijst laat de map staan."), 14, Theme.Secondary, wrap: true);
+        dialog.PrimaryButtonText = L("Naar de prullenbak");
+        dialog.SecondaryButtonText = L("Alleen uit de lijst");
+        dialog.CloseButtonText = L("Annuleren");
+        dialog.DefaultButton = ContentDialogButton.Close;
+        var answer = await dialog.ShowAsync();
+        if (answer == ContentDialogResult.None) return;
+        studio.RemoveProject(path, trash: answer == ContentDialogResult.Primary);
     }
 
     private async Task NewProject()

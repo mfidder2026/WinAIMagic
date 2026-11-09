@@ -577,6 +577,28 @@ public sealed class DocumentStudioTests : StudioTest
     }
 
     [Fact]
+    public void AProjectCanBeRemoved()
+    {
+        var root = Path.Combine(Folder, "wortel");
+        var s = NewStudio(Folder, root);
+        s.Trash = p => Directory.Delete(p, true);
+        s.CreateProject("Weg");
+        var gone = s.Folder;
+        s.NewDocument("Concept");
+        s.CreateProject("Blijft");
+        var kept = s.Folder;
+        s.Choose(gone);
+        Assert.True(s.RemoveProject(gone, trash: true));
+        Assert.False(Directory.Exists(gone));                      // nothing wrote the draft back into it
+        Assert.Equal(kept, s.Folder);                              // the next project opens
+        Assert.DoesNotContain(s.Projects, p => p == gone);
+        Assert.DoesNotContain(NewStudio(null, root).Projects, p => p == gone);
+        Assert.True(s.RemoveProject(kept, trash: false));          // only off the list: the folder stays
+        Assert.True(Directory.Exists(kept));
+        Assert.DoesNotContain(s.Projects, p => p == kept);
+    }
+
+    [Fact]
     public void ProjectFileIsTheMacsFormat()
     {
         var macFile = "{\"fields\":[{\"value\":\"RIVM\",\"id\":\"E621E1F8-C36C-495A-93FC-0C247A3E6E5F\",\"key\":\"Klant\"}]}";

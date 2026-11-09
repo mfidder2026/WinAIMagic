@@ -538,6 +538,48 @@ public sealed class DocumentStudio : INotifyPropertyChanged
         Refresh();
     }
 
+    /// Takes a project off the list; with `trash` its folder goes to the Recycle Bin too (the owner could not get rid of a
+    /// project). When it was the open one, the first other project opens, or a fresh "Mijn project". False when the folder
+    /// could not be moved: then it stays on the list and `Problem` says why.
+    public bool RemoveProject(string path, bool trash)
+    {
+        if (Busy) return false;
+        bool open = SamePath(path, Folder);
+        if (open)
+        {
+            // write the draft now: nothing may write into the folder once it is in the Recycle Bin
+            Save();
+            Selected = null;
+            SetText("");
+        }
+        if (trash && Path.Exists(path))
+        {
+            try { Trash(path); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                Problem = e.Message;
+                if (open) loaded = false;
+                Refresh();
+                return false;
+            }
+        }
+        var rest = Projects.Where(p => !SamePath(p, path)).ToList();
+        Projects = rest;
+        Settings.Shared.DocumentProjects = string.Join("\n", rest);
+        if (open)
+        {
+            var next = rest.FirstOrDefault(Path.Exists) ?? Path.Combine(root, L("Mijn project"));
+            Settings.Shared.DocumentFolder = next;
+            Folder = next;
+            loaded = false;
+            Previous = null;
+            Report = null;
+            Page = StudioPage.Draft;
+            Refresh();
+        }
+        return true;
+    }
+
     public void Delete(string path)
     {
         TryTrash(path);
