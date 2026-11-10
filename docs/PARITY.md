@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.14.10
+# Parity with MacAIMagic 1.14.12
 
-How this version relates to MacAIMagic at commit `475ef67`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `089c43c`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -37,6 +37,13 @@ How this version relates to MacAIMagic at commit `475ef67`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `089c43c` (1.14.12): watching along, and the chat no longer scrolls into empty space
+
+- `4443d5b`: while the model works only the newest text in the answer card is whole; an earlier text shows its first 3 lines (without a code fence) and "… N tekens verborgen · Toon alles", the same for the texts in the opened fold of a finished answer. On the Mac three rounds of assembler made the card 8,876 points high and it shrank by thousands when a text left the 14 live parts. Taken over in `AnswerPart.NewestText` and `AnswerPart.Preview` (the logic) and `PartView` (shortened). Tests: OnlyTheNewestTextIsShownWholeWhileTheModelWorks (here: which text is whole and that the others are three lines; the Mac measures the real view), APreviewIsTheFirstLinesWithoutTheCodeFence. Checked in the app with the fake engine's script `meekijken` through UI Automation: an earlier text shows "… 2.864 tekens verborgen · Toon alles", the three screenshots are buttons under the folded work, and the conversation saves them. The window captures came out black, so how it looks was not seen; the height of a real long C64 task was not measured here.
+- `98c1fb4`: after run_command the app looks for pictures the command made (the work folder two folders deep, changed since the command started, and image paths named in the command or its output, quoted paths with spaces, `%TEMP%` and `$env:TEMP` too). The newest 4 get a small copy (at most 360 pixels, JPEG 0.6) on the step (`ToolActivity.Images`), shown in a row under the step line; after the answer a row of at most 8 under "Gedachtegang en N stappen"; a click shows one at 540 with its file name. Adapted: no 1-second margin on the file time (NTFS keeps 100 ns; with the margin a screenshot of the step before showed again). Help: "Meekijken" / "Watching along" in the chat page. Tests: TheImagesACommandMadeAreFound, TheChatCopyIsSmall, EachPictureShowsOnceWithItsNewestCopy, AnOldStepWithoutImagesStillLoads, plus APathInTempIsFoundThroughItsVariable and AScreenshotACommandMakesShowsWithItsStep (through the chat client). The Mac's view height test AFinishedAnswerShowsItsScreenshotsUnderTheFoldedSteps is not taken over: no UI test host here.
+- `d38ac5f`: takes over WinAIMagic 46c0d7a; its help sentence differs here on purpose ("tot ruim een GB", measured on this PC). Nothing to do.
+- `089c43c`: the Mac's release 1.14.12. The version here is 1.14.12 as well.
 
 ### Up to `475ef67` (after 1.14.10): the right C64 skill, the answer in view, ngram-mod
 

@@ -26,6 +26,8 @@ public sealed record ToolActivity
     public bool Done { get; set; }
     /// <summary>What the tool returned (shortened), shown when the user opens the step.</summary>
     public string? Output { get; set; }
+    /// <summary>Small copies of the pictures the step made (an emulator screenshot), so the user can watch along.</summary>
+    public List<Attachment>? Images { get; set; }
     public bool? Denied { get; set; }
 }
 

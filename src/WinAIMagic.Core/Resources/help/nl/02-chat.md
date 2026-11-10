@@ -1,7 +1,7 @@
 ---
 title: Chatten
 icon: Chat
-keywords: gesprek vraag denken nadenken temperatuur systeemprompt context samenvatting ga door afbeelding plakken kopiëren stop nieuw gesprek verwijderen prullenbak
+keywords: gesprek vraag denken nadenken temperatuur systeemprompt context samenvatting ga door afbeelding plakken kopiëren stop nieuw gesprek verwijderen prullenbak schermafdruk screenshot meekijken
 ---
 ## Een vraag stellen
 Typ je vraag onderin en druk op **Enter**. Met **Shift+Enter** begin je een nieuwe regel. Het antwoord verschijnt terwijl het model schrijft; **Stop** breekt het af.
@@ -25,7 +25,10 @@ Staat er nog geen model aan, dan start je vraag het vanzelf. Een ander model sta
 Bovenin het gesprek laat een meter zien hoeveel van de context het gesprek gebruikt. Bij 80% vat het model het begin samen; de berichten blijven zichtbaar. Met **Nu samenvatten** in de meter doe je dat zelf meteen.
 
 ## Een antwoord in stappen
-Werkt het model in stappen (bestanden, opdrachten, het web), dan staat het hele antwoord in één kaart: elke gedachte, tekst en stap op de plek waar die kwam. Een gedachte is ingeklapt, met het begin ervan op één regel; terwijl het model nadenkt, zie je de laatste regels van wat het nu denkt. Tijdens het werk zie je de laatste 14 delen, met **eerdere stappen** voor de rest. Is het antwoord klaar, dan klapt al het werk voor de laatste tekst in tot één regel **Gedachtegang en N stappen**.
+Werkt het model in stappen (bestanden, opdrachten, het web), dan staat het hele antwoord in één kaart: elke gedachte, tekst en stap op de plek waar die kwam. Een gedachte is ingeklapt, met het begin ervan op één regel; terwijl het model nadenkt, zie je de laatste regels van wat het nu denkt. Tijdens het werk zie je de laatste 14 delen, met **eerdere stappen** voor de rest; alleen de nieuwste tekst staat er helemaal, van een eerdere zie je de eerste regels en **Toon alles**. Is het antwoord klaar, dan klapt al het werk voor de laatste tekst in tot één regel **Gedachtegang en N stappen**.
+
+## Meekijken
+Maakt het model onderweg een schermafdruk (van een programma of de C64-emulator), dan staat er een kleine versie bij die stap. Na het antwoord blijven ze in een rijtje onder **Gedachtegang** staan; klik erop voor een grotere versie.
 
 ## Als het model stopt voordat het klaar is
 Lokale modellen stoppen soms halverwege. De app merkt dat en zegt het model door te gaan; je ziet dat in het gesprek. Stopt het drie keer achter elkaar, dan vraagt de app jou om "ga door" te zeggen of een aanwijzing te geven.

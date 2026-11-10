@@ -602,6 +602,28 @@ public class AgentLoopTests : ChatTest
     private static Func<HttpResponseMessage> Write(string name, string id = "w") => () => Call("write_file", new JsonObject { ["path"] = name, ["content"] = "x" }, id);
     private static string Content(JsonObject body) => body["messages"]![0]!["content"]!.GetValue<string>();
 
+    /// <summary>A screenshot a command makes shows small with its step, so the user watches along (the Mac's 98c1fb4).</summary>
+    [Fact]
+    public async Task AScreenshotACommandMakesShowsWithItsStep()
+    {
+        var png = Convert.ToBase64String(ScreenshotThumbnailTests.Png());
+        var engine = new FakeEngine(
+            () => Call("run_command", new JsonObject { ["command"] = $"[IO.File]::WriteAllBytes(\"$PWD\\shots\\intro.png\", [Convert]::FromBase64String('{png}')); 'screenshot: shots\\intro.png'" }, "a"),
+            () => Call("run_command", new JsonObject { ["command"] = "'geen plaatje'" }, "b"),
+            () => Say("KLAAR"));
+        Directory.CreateDirectory(Path.Combine(work, "shots"));
+        await Ask("Maak een schermafdruk", engine);
+        var steps = C.Messages.SelectMany(m => m.Activities).ToList();
+        Assert.Equal(2, steps.Count);
+        var shot = Assert.Single(steps[0].Images ?? []);
+        Assert.Equal("intro.png", shot.Filename);
+        Assert.InRange(shot.Jpeg.Length, 100, 40_000);
+        Assert.Null(steps[1].Images);
+        // saved with the conversation, and shown under the folded work of the finished answer
+        var parts = AnswerPart.Of(ChatItem.Group(C.Messages.Where(m => !m.IsHidden)).Last().Rounds, false);
+        Assert.Equal(["intro.png"], AnswerPart.Pictures(parts).Select(a => a.Filename));
+    }
+
     [Fact]
     public async Task ModelCreatesAndRunsFiles()
     {

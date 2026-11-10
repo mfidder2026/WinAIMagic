@@ -227,6 +227,26 @@ internal static class FakeEngine
             await Send(s, new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = 0, ["function"] = new JsonObject { ["arguments"] = "\"}" } }) });
             finish = "tool_calls";
         }
+        else if (ask.Contains("meekijken"))
+        {
+            // three rounds of code, each with a screenshot made by a command: earlier texts shorten while it works, the pictures
+            // show with their steps, and stay in a row under the folded work when it is done
+            if (tools < 3)
+            {
+                var code = new StringBuilder($"Ronde {tools + 1}, hier is de code:\n\n```asm\n");
+                for (int i = 1; i <= 60; i++) code.Append($"        lda #${i:x2}          ; regel {i} van ronde {tools + 1}\n");
+                code.Append("```");
+                await Words(s, "content", code.ToString(), delay / 4);
+                string[] colors = ["Red", "SeaGreen", "RoyalBlue"];
+                var shot = "Add-Type -AssemblyName System.Drawing; New-Item -ItemType Directory -Force shots | Out-Null; "
+                    + "$b = New-Object System.Drawing.Bitmap 384,272; $g = [System.Drawing.Graphics]::FromImage($b); "
+                    + $"$g.Clear([System.Drawing.Color]::{colors[tools]}); $g.DrawString('RONDE {tools + 1}', (New-Object System.Drawing.Font 'Consolas',28), [System.Drawing.Brushes]::White, 90, 110); "
+                    + $"$b.Save(\"$PWD\\shots\\scherm{tools + 1}.png\"); 'screenshot: shots\\scherm{tools + 1}.png'";
+                await ToolCall(s, "run_command", new JsonObject { ["command"] = shot }.ToJsonString(), $"call_m{tools}");
+                finish = "tool_calls";
+            }
+            else await Words(s, "content", "KLAAR: het intro werkt, de rand wisselt van kleur.", delay);
+        }
         else if (ask.Contains("tabel") && tools == 0)
         {
             await Words(s, "content", "Je pc heeft **150 GB** vrij.\n\n| Schijf | Totaal | Vrij |\n|---|--:|--:|\n| C: | 1,8 TB | 150 GB |\n| **D:** | 4 TB | 2,1 TB |\n\nDe rest staat elders.", delay);

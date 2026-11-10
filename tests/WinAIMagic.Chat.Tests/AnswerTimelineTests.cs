@@ -238,4 +238,38 @@ public class GoOnThinkingTests : LoopTest
         var again = await Ask("ga door", new FakeEngine(() => Say("KLAAR")));
         Assert.Equal(4_000, again.Requests[0]["thinking_budget_tokens"]!.GetValue<int>());
     }
+
+    private static string Code(int lines) =>
+        "Hier is de code:\n\n```asm\n" + string.Join("\n", Enumerable.Range(1, lines).Select(n => $"        lda #${n % 256:x2}          ; regel {n} van de intro")) + "\n```";
+
+    /// <summary>While a C64 task ran on the Mac the chat scrolled into empty space: the live card showed its last 14 parts in full, and
+    /// three rounds of assembler code made it thousands of pixels high. Here: which text is whole (the view follows NewestText).</summary>
+    [Fact]
+    public void OnlyTheNewestTextIsShownWholeWhileTheModelWorks()
+    {
+        var rounds = Enumerable.Range(0, 6).Select(_ => new ChatMessage
+        {
+            Role = ChatRole.Assistant, Text = Code(330), Reasoning = "Ik denk na over de volgende stap.",
+            Activities = [new ToolActivity { Label = "Schrijven: intro.asm", Done = true }, new ToolActivity { Label = "Uitvoeren: c64kbuild.py", Done = true }],
+        }).ToList();
+        var parts = AnswerPart.Of(rounds, true);
+        var newest = AnswerPart.NewestText(parts);
+        Assert.Equal(rounds[^1].Id + "t", newest);
+        // every earlier text is a few lines
+        foreach (var p in parts.Where(p => p.Kind == PartKind.Text && p.Id != newest))
+            Assert.True(AnswerPart.Preview(p.Text) is { } f && f.Shown.Split('\n').Length <= AnswerPart.PreviewLines);
+        Assert.Null(AnswerPart.NewestText([.. parts.Where(p => p.Kind != PartKind.Text)]));
+    }
+
+    [Fact]
+    public void APreviewIsTheFirstLinesWithoutTheCodeFence()
+    {
+        var p = AnswerPart.Preview(Code(50));
+        Assert.NotNull(p);
+        Assert.Equal(AnswerPart.PreviewLines, p.Value.Shown.Split('\n').Length);
+        Assert.StartsWith("Hier is de code:", p.Value.Shown);
+        Assert.DoesNotContain("```", p.Value.Shown);
+        Assert.Equal(Code(50).Length - p.Value.Shown.Length, p.Value.Hidden);
+        Assert.Null(AnswerPart.Preview("Kort."));
+    }
 }

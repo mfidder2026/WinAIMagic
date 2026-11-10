@@ -113,6 +113,73 @@ public static class WorkspaceTools
         },
     };
 
+    // MARK: - pictures a command made
+
+    public static readonly IReadOnlySet<string> ImageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        { ".png", ".jpg", ".jpeg", ".gif", ".tif", ".tiff", ".bmp", ".webp" };
+
+    // a path in quotes may hold spaces ("D:\04. AI\shot.png"), one without ends at a space
+    private static readonly System.Text.RegularExpressions.Regex ImageNames = new(
+        @"""([^""\r\n]+\.(?:png|jpe?g|gif|tiff?|bmp|webp))""|'([^'\r\n]+\.(?:png|jpe?g|gif|tiff?|bmp|webp))'|([^\s'""`<>|;=(){}\[\]]+\.(?:png|jpe?g|gif|tiff?|bmp|webp))\b",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>The pictures a command made: image files in the work folder (two folders deep) changed since it started, and image
+    /// files its command line or output names (a screenshot in %TEMP% too). The newest `limit`, oldest first.</summary>
+    public static List<string> NewImages(DateTime sinceUtc, string mentioned, int limit = 4)
+    {
+        var found = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        void Consider(string path)
+        {
+            try
+            {
+                if (!ImageExtensions.Contains(Path.GetExtension(path))) return;
+                var info = new FileInfo(path);
+                // NTFS keeps the time to 100 ns, so no margin: a picture of the step before is not this step's
+                if (!info.Exists || info.LastWriteTimeUtc < sinceUtc) return;
+                found[info.FullName] = info.LastWriteTimeUtc;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { }
+        }
+        var root = Workspace;
+        if (root != null && Directory.Exists(root))
+        {
+            int seen = 0;
+            void Walk(string dir, int depth)
+            {
+                IEnumerable<string> entries;
+                try { entries = Directory.EnumerateFileSystemEntries(dir); }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return; }
+                foreach (var entry in entries)
+                {
+                    if (++seen > 5000) return;
+                    FileAttributes attributes;
+                    try { attributes = File.GetAttributes(entry); }
+                    catch (Exception e) when (e is IOException or UnauthorizedAccessException) { continue; }
+                    if ((attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0) continue;
+                    // a\b\shot.png is two folders deep; deeper folders, and links to elsewhere, are not read
+                    if ((attributes & FileAttributes.Directory) != 0)
+                    {
+                        if (depth < 2 && (attributes & FileAttributes.ReparsePoint) == 0) Walk(entry, depth + 1);
+                    }
+                    else Consider(entry);
+                }
+            }
+            Walk(root, 0);
+        }
+        foreach (System.Text.RegularExpressions.Match m in ImageNames.Matches(mentioned))
+        {
+            var name = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value;
+            name = Environment.ExpandEnvironmentVariables(System.Text.RegularExpressions.Regex.Replace(name, @"\$env:(\w+)",
+                v => Environment.GetEnvironmentVariable(v.Groups[1].Value) ?? v.Value, System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+            name = name.Replace('/', '\\');
+            if (name == "~" || name.StartsWith("~\\", StringComparison.Ordinal))
+                name = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + name[1..];
+            if (Path.IsPathFullyQualified(name)) Consider(name);
+            else if (root != null) Consider(Path.Combine(root, name));
+        }
+        return [.. found.OrderBy(f => f.Value).Select(f => f.Key).TakeLast(limit)];
+    }
+
     // MARK: - paths
 
     /// <summary>The conversation's own folder while the chat client runs its tools; falls back to the last chosen folder.

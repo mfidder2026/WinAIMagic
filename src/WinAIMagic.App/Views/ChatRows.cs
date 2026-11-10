@@ -65,6 +65,38 @@ internal static class ChatUi
         return fill;
     }
 
+    /// <summary>Small pictures in a row (screenshots a step made), each at most 190 x 135; a click shows one at 540 with its file name.</summary>
+    public static FrameworkElement Thumbnails(IEnumerable<Attachment> images)
+    {
+        var row = Ui.H(8);
+        foreach (var a in images)
+        {
+            var small = new BitmapImage { DecodePixelWidth = 380, DecodePixelType = DecodePixelType.Logical };
+            Load(small, a.Jpeg);
+            var picture = new Border
+            {
+                Child = new Image { Source = small, Stretch = Stretch.Uniform, MaxWidth = 190, MaxHeight = 135 },
+                CornerRadius = new CornerRadius(6), BorderBrush = Theme.Solid(Colors.White, 0.12), BorderThickness = new Thickness(1),
+            };
+            var button = Plain(picture, () => { }, a.Filename);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, a.Filename);
+            button.Click += (_, _) =>
+            {
+                var large = new BitmapImage();
+                Load(large, a.Jpeg);
+                Popover(Ui.V(6, new Image { Source = large, Stretch = Stretch.Uniform, Width = 540 }, Ui.Label(a.Filename, 12, Theme.Secondary)), 600)
+                    .ShowAt(button);
+            };
+            row.Children.Add(button);
+        }
+        return new ScrollViewer
+        {
+            Content = row, MaxHeight = 140, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollMode = ScrollMode.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollMode = ScrollMode.Disabled, ZoomMode = ZoomMode.Disabled,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+    }
+
     private static async void Load(BitmapImage image, byte[] jpeg)
     {
         try
@@ -336,6 +368,8 @@ public sealed partial class ActivityRow : StackPanel
         button.Padding = new Thickness(2, 1, 4, 2);
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, a.Label);
         Children.Add(button);
+        // the pictures the step made (an emulator screenshot), so the user watches along
+        if (a.Images is { Count: > 0 } images) Children.Add(ChatUi.Thumbnails(images));
         Show(memory.OpenSteps.Contains(a.Id));
     }
 }

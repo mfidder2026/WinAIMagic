@@ -26,6 +26,9 @@ public sealed partial class AnswerRow : Grid
     private readonly TextBlock earlierText = Ui.Label("", 13, Theme.Tertiary);
     private readonly Disclosure work;
     private readonly StackPanel workParts = new() { Spacing = 10, Margin = new Thickness(0, 6, 0, 0) };
+    /// <summary>Under the folded work: what the model saw on the way (emulator screenshots) stays in view.</summary>
+    private readonly ContentControl pictures = new() { HorizontalContentAlignment = HorizontalAlignment.Left };
+    private string picturesShown = "";
     private readonly Spinner spinner = new(16, false) { VerticalAlignment = VerticalAlignment.Center };
     /// <summary>Beside the spinner: what the model prepares (a file, a command), or "Bezig…".</summary>
     private readonly TextBlock busyText = Ui.Label("", 13, Theme.Secondary);
@@ -99,19 +102,19 @@ public sealed partial class AnswerRow : Grid
         this.rounds = rounds;
         this.streaming = streaming;
         var all = AnswerPart.Of(rounds, streaming);
-        foreach (var p in all)
-        {
-            if (!views.TryGetValue(p.Id, out var v)) views[p.Id] = v = new PartView(p, memory, shifted);
-            v.Update(p);
-        }
 
         // what stands in the card, and what in the fold of a finished answer
         List<AnswerPart> folded = [], main;
         int hidden = 0;
+        // a text shown whole: while working only the newest (a card of earlier texts of code grew thousands of pixels high, and
+        // shrank by thousands when one left the window: the chat scrolled into empty space); when finished the texts in view
+        Func<AnswerPart, bool> whole;
         if (streaming)
         {
             hidden = memory.Steps ? 0 : Math.Max(0, all.Count - Live);
             main = all.GetRange(hidden, all.Count - hidden);
+            var newest = AnswerPart.NewestText(all);
+            whole = p => p.Id == newest;
         }
         else
         {
@@ -125,8 +128,22 @@ public sealed partial class AnswerRow : Grid
                 folded = before;
                 main = all.GetRange(tail, all.Count - tail);
             }
+            var work = before.Select(p => p.Id).ToHashSet();
+            whole = p => !work.Contains(p.Id);
         }
-        var key = $"{streaming}|{hidden}|{memory.Work}|{string.Join(",", folded.Select(p => p.Id))}|{string.Join(",", main.Select(p => p.Id))}";
+        foreach (var p in all)
+        {
+            if (!views.TryGetValue(p.Id, out var v)) views[p.Id] = v = new PartView(p, memory, shifted);
+            v.Update(p, !whole(p));
+        }
+        var shots = folded.Count > 0 && !memory.Work ? AnswerPart.Pictures(folded).TakeLast(AnswerPart.MaxPictures).ToList() : [];
+        var shotsKey = string.Join(",", shots.Select(a => a.Id));
+        if (shotsKey != picturesShown)
+        {
+            picturesShown = shotsKey;
+            pictures.Content = shots.Count > 0 ? ChatUi.Thumbnails(shots) : null;
+        }
+        var key = $"{streaming}|{hidden}|{memory.Work}|{shots.Count > 0}|{string.Join(",", folded.Select(p => p.Id))}|{string.Join(",", main.Select(p => p.Id))}";
         if (key != layout)
         {
             layout = key;
@@ -143,6 +160,7 @@ public sealed partial class AnswerRow : Grid
                 work.SetTitle(steps == 0 ? L("Gedachtegang") : steps == 1 ? L("Gedachtegang en 1 stap") : L($"Gedachtegang en {steps} stappen"), false);
                 parts.Children.Add(work);
                 if (memory.Work) foreach (var p in folded) workParts.Children.Add(views[p.Id]);
+                if (shots.Count > 0) parts.Children.Add(pictures);
             }
             foreach (var p in main) parts.Children.Add(views[p.Id]);
         }
@@ -228,9 +246,10 @@ public sealed partial class PartView : StackPanel
     private string stepKey = "";
     // text
     private MarkdownView? text, tail;
+    private TextBlock? preview;
     private Button? showAll;
     private TextBlock? showAllText;
-    private bool showWhole;
+    private bool showWhole, compact;
     private string lastText = "";
     // an error
     private TextBlock? error;
@@ -268,7 +287,13 @@ public sealed partial class PartView : StackPanel
                 showAllText = Ui.Label("", 13, new SolidColorBrush(Theme.Accent));
                 showAll = ChatUi.Plain(showAllText, () => { showWhole = true; ShowText(lastText); }, L("Toon alles"));
                 showAll.HorizontalAlignment = HorizontalAlignment.Left;
+                preview = new TextBlock
+                {
+                    FontSize = 13, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxLines = AnswerPart.PreviewLines, Visibility = Visibility.Collapsed,
+                };
                 Spacing = 10;
+                Children.Add(preview);
                 Children.Add(text);
                 Children.Add(showAll);
                 Children.Add(tail);
@@ -292,7 +317,9 @@ public sealed partial class PartView : StackPanel
         }
     }
 
-    internal void Update(AnswerPart p)
+    /// <summary>`shortened`: a text shows its first lines only (an earlier text while the model works, and the texts in the folded
+    /// work), until the user asks for all of it.</summary>
+    internal void Update(AnswerPart p, bool shortened = false)
     {
         switch (kind)
         {
@@ -308,7 +335,7 @@ public sealed partial class PartView : StackPanel
                 gist.Show(!memory.OpenThoughts.Contains(p.Id));
                 break;
             case PartKind.Step when p.Step is { } a:
-                var key = $"{a.Label}{a.Done}{a.Denied}{a.Output?.Length}";
+                var key = $"{a.Label}{a.Done}{a.Denied}{a.Output?.Length}{a.Images?.Count}";
                 if (key == stepKey) break;
                 stepKey = key;
                 Children.Clear();
@@ -316,7 +343,11 @@ public sealed partial class PartView : StackPanel
                 Children.Add(step);
                 break;
             case PartKind.Text:
-                ShowText(p.Text);
+                if (shortened != compact || p.Text != lastText)
+                {
+                    compact = shortened;
+                    ShowText(p.Text);
+                }
                 break;
             case PartKind.Error:
                 error!.SetIfChanged(p.Text);
@@ -328,6 +359,18 @@ public sealed partial class PartView : StackPanel
     private void ShowText(string value)
     {
         lastText = value;
+        var first = compact && !showWhole ? AnswerPart.Preview(value) : null;
+        preview!.Show(first != null);
+        text!.Show(first == null);
+        if (first is { } shortText)
+        {
+            preview.SetIfChanged(shortText.Shown);
+            tail!.Show(false);
+            showAll!.Show(true);
+            var count = shortText.Hidden.ToString("N0", AppLanguages.Current.Culture());
+            showAllText!.SetIfChanged(L($"… {count} tekens verborgen · Toon alles"));
+            return;
+        }
         var folded = showWhole ? null : LongText.Folded(value);
         showAll!.Show(folded != null);
         tail!.Show(folded != null);

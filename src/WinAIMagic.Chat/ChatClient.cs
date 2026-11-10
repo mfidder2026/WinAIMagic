@@ -435,6 +435,7 @@ public sealed class ChatClient(HttpClient? http = null)
                     activities.Add(step);
                     store.Update(id, _ => reply.Activities = Copy(activities));
                     string text;
+                    List<Attachment>? shots = null;
                     if (agent != null)
                     {
                         var output = await RunAgent(agent, call, id, ct);
@@ -469,7 +470,15 @@ public sealed class ChatClient(HttpClient? http = null)
                             }
                             catch (ToolError e) { text = "Error: " + e.Message; }
                         }
-                        else text = await WorkspaceTools.RunAsync(call, ct);
+                        else
+                        {
+                            var commandStart = DateTime.UtcNow;
+                            text = await WorkspaceTools.RunAsync(call, ct);
+                            // the pictures the step makes (an emulator screenshot): small, beside the step, so the user watches along
+                            if (call.Name == "run_command")
+                                foreach (var file in WorkspaceTools.NewImages(commandStart, (WorkspaceTools.Str(callArgs, "command") ?? "") + "\n" + text))
+                                    if (await ImageScaler.ThumbnailAsync(file) is { } shot) (shots ??= []).Add(shot);
+                        }
                     }
                     else if (isSystem)
                     {
@@ -535,6 +544,7 @@ public sealed class ChatClient(HttpClient? http = null)
                         text = TextLimit.Prefix(text, room * 3 / 4) + $"\n… (shortened, the output was {text.Length} characters) …\n" + TextLimit.Suffix(text, room / 4);
                     step.Done = true;
                     step.Output = TextLimit.Prefix(text, 4000);
+                    if (shots != null) step.Images = shots;
                     // the reminder rides on the round's last result: a message of its own would break the tool turn, and on the last
                     // one the engine's cache of the conversation stays valid
                     var withNudge = place == result.ToolCalls.Count - 1 && stepsNudge != null ? text + "\n\n" + stepsNudge : text;

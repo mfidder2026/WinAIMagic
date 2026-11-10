@@ -1,7 +1,7 @@
 ---
 title: Chat
 icon: Chat
-keywords: conversation question thinking temperature system prompt context summary go on image paste copy stop new conversation delete trash
+keywords: conversation question thinking temperature system prompt context summary go on image paste copy stop new conversation delete trash screenshot watch along
 ---
 ## Asking a question
 Type your question at the bottom and press **Enter**. **Shift+Enter** starts a new line. The answer appears while the model writes; **Stop** breaks it off.
@@ -25,7 +25,10 @@ When no model runs yet, your question starts it by itself. Another model starts 
 At the top of the conversation a meter shows how much of the context the conversation uses. At 80% the model summarizes the start; the messages stay visible. **Summarize now** in the meter does it at once.
 
 ## An answer in steps
-When the model works in steps (files, commands, the web), the whole answer is in one card: every thought, text and step where it came. A thought is folded, with its start on one line; while the model thinks, you see the last lines of what it thinks now. While it works you see the latest 14 parts, with **earlier steps** for the rest. When the answer is done, all the work before the last text folds into one line **Reasoning and N steps**.
+When the model works in steps (files, commands, the web), the whole answer is in one card: every thought, text and step where it came. A thought is folded, with its start on one line; while the model thinks, you see the last lines of what it thinks now. While it works you see the latest 14 parts, with **earlier steps** for the rest; only the newest text is shown whole, of an earlier one you see its first lines and **Show all**. When the answer is done, all the work before the last text folds into one line **Reasoning and N steps**.
+
+## Watching along
+When the model takes a screenshot on the way (of a program or the C64 emulator), a small copy shows with that step. After the answer they stay in a row under **Reasoning**; click one for a larger copy.
 
 ## When the model stops before it is done
 Local models sometimes stop halfway. The app notices and tells the model to go on; you see that in the conversation. If it stops three times in a row, the app asks you to say "go on" or to give a hint.

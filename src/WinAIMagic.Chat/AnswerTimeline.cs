@@ -74,6 +74,42 @@ public sealed record AnswerPart(PartKind Kind, string Id, string Text = "", bool
 
     /// <summary>Lines of thinking shown while the model thinks, and how long each may be.</summary>
     public const int GistLines = 4, GistWidth = 120;
+    /// <summary>Lines of an earlier text while the model works (and of a text in the folded work).</summary>
+    public const int PreviewLines = 3;
+    /// <summary>Pictures under the folded work of a finished answer.</summary>
+    public const int MaxPictures = 8;
+
+    /// <summary>The id of the text shown whole while the model works: the newest. Earlier texts show their first lines; a card of
+    /// several texts of code grew thousands of pixels high on the Mac and shrank by thousands when one left the window, and the chat
+    /// scrolled into empty space.</summary>
+    public static string? NewestText(IReadOnlyList<AnswerPart> parts) => parts.LastOrDefault(p => p.Kind == PartKind.Text)?.Id;
+
+    /// <summary>The first lines of a text (without a code fence), and how many characters are not shown; null when it is short.</summary>
+    public static (string Shown, int Hidden)? Preview(string text)
+    {
+        var lines = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim())
+            .Where(l => l.Length > 0 && !l.StartsWith("```", StringComparison.Ordinal));
+        var shown = string.Join("\n", lines.Take(PreviewLines).Select(l => l.Length > GistWidth ? l[..GistWidth] : l));
+        int hidden = text.Length - shown.Length;
+        return hidden > 200 ? (shown, hidden) : null;
+    }
+
+    /// <summary>The pictures among these parts, in order: what the steps made and what the model looked at, each file once (its newest
+    /// copy, so a screenshot made again shows how it looks now).</summary>
+    public static List<Attachment> Pictures(IEnumerable<AnswerPart> parts)
+    {
+        var list = new List<Attachment>();
+        foreach (var p in parts)
+        {
+            var found = p.Kind == PartKind.Step ? p.Step?.Images ?? [] : p.Kind == PartKind.Looked ? p.Attachments ?? [] : [];
+            foreach (var a in found)
+            {
+                list.RemoveAll(x => string.Equals(x.Filename, a.Filename, StringComparison.OrdinalIgnoreCase));
+                list.Add(a);
+            }
+        }
+        return list;
+    }
 
     /// <summary>The thinking without opening it. While the model thinks: its last lines, one below the other (the owner saw the
     /// lines run together into one fast-moving block); the line being written keeps its end, an earlier one its start. Afterwards:
