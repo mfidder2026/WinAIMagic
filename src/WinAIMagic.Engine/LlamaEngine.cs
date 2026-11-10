@@ -18,6 +18,9 @@ public sealed class LlamaEngine : EngineBase
     public SlotKeeper Slots { get; }
 
     /// <summary>States are kept unless switched off, and not on a cluster (not tried there).</summary>
+    /// <summary>The context checkpoints the engine keeps per conversation while conversations are kept (its default is 32).</summary>
+    public const string KeptCheckpoints = "4";
+
     private static bool KeepsStates(EngineStart s) => Settings.Shared.KeepEngineMemory && s.Rpc == null;
 
     protected override void OnStarted(EngineStart s, ChildStart command)
@@ -92,7 +95,10 @@ public sealed class LlamaEngine : EngineBase
         if (plan.EightBitKv) args.AddRange(new[] { "--cache-type-k", "q8_0", "--cache-type-v", "q8_0" });
         if (s.Vision != null) args.AddRange(new[] { "--mmproj", s.Vision });
         // a conversation's place in the engine can be saved and read back (SlotKeeper)
-        if (KeepsStates(s)) args.AddRange(new[] { "--slot-save-path", Slots.Folder });
+        // with only the last checkpoints: a hybrid model (Qwen 3.6) adds a few per turn, ~63 MB each, and a saved state carries
+        // them all; with the engine's default of 32 a long conversation was 2 GB to write after every answer (6 s on the test PC's
+        // C:, the engine busy all that time). The last ones are what the next turn needs; measured: a follow-up still reads 22 tokens.
+        if (KeepsStates(s)) args.AddRange(new[] { "--slot-save-path", Slots.Folder, "--ctx-checkpoints", KeptCheckpoints });
         // cluster: the helpers' GPUs join as RPC devices
         if (s.Rpc != null) args.AddRange(new[] { "--rpc", s.Rpc });
         // multi-token prediction: a small head guesses the next tokens, the model checks them in one pass. Not for a model

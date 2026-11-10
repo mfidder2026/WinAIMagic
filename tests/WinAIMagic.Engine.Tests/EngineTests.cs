@@ -276,9 +276,10 @@ public class LlamaEngineTests : EngineTest
         var e = new LlamaEngine(port: 9000, slots: keeper);
         var args = e.Arguments(Start()).ToList();
         Assert.Equal(keeper.Folder, args[args.IndexOf("--slot-save-path") + 1]);
+        Assert.Equal(LlamaEngine.KeptCheckpoints, args[args.IndexOf("--ctx-checkpoints") + 1]);
         Assert.DoesNotContain("--slot-save-path", e.Arguments(Start() with { Rpc = "10.0.0.2:50052" }));
         Settings.Shared.KeepEngineMemory = false;
-        try { Assert.DoesNotContain("--slot-save-path", e.Arguments(Start())); }
+        try { Assert.DoesNotContain("--slot-save-path", e.Arguments(Start())); Assert.DoesNotContain("--ctx-checkpoints", e.Arguments(Start())); }
         finally { Settings.Shared.KeepEngineMemory = true; }
         Assert.NotEqual(SlotKeeper.StateKey(Qwen.Id, 65_536, false, false), SlotKeeper.StateKey(Qwen.Id, 65_536, true, false));
     }

@@ -85,6 +85,8 @@ public sealed partial class ShellWindow : Window
         app.Changed += UpdateTray;
         Closed += (_, _) =>
         {
+            // the app may still notify while it saves and stops the engine: the window and its AppWindow are gone by then
+            app.Changed -= UpdateTray;
             AppWindow.Hide();   // the rest of the closing may take a few seconds: the engine stops with the app
             Tray.Dispose();
             Notifier.Shutdown();
