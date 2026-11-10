@@ -58,9 +58,15 @@ public sealed record AnswerPart(PartKind Kind, string Id, string Text = "", bool
         return parts;
     }
 
-    /// <summary>Where the tail of a finished answer starts: its last text and errors stay in view, all before folds away.</summary>
+    /// <summary>Where the tail of a finished answer starts: its last text stays in view with what came after it, all before folds
+    /// away. The steps after the answer, such as "WINAIMAGIC.md bijgewerkt" from learning, folded the answer itself away on the Mac
+    /// in 1.14.10 (only "Gedachtegang en 28 stappen" was left). A text the model wrote before more work is no answer: then only a
+    /// step or two may follow it, and no thinking.</summary>
     public static int TailStart(IReadOnlyList<AnswerPart> parts)
     {
+        int t = -1;
+        for (int i = parts.Count - 1; i >= 0; i--) if (parts[i].Kind == PartKind.Text) { t = i; break; }
+        if (t >= 0 && parts.Count - t - 1 <= 2 && !parts.Skip(t + 1).Any(p => p.Kind == PartKind.Thought)) return t;
         for (int i = parts.Count - 1; i >= 0; i--)
             if (parts[i].Kind is not (PartKind.Text or PartKind.Error)) return i + 1;
         return 0;

@@ -115,10 +115,15 @@ public sealed class LlamaEngine : EngineBase
         if (s.Rpc != null) args.AddRange(new[] { "--rpc", s.Rpc });
         // multi-token prediction: a small head guesses the next tokens, the model checks them in one pass. Not for a model
         // larger than memory: checking 3 tokens needs more experts from the SSD, and the head runs without the expert cache
+        // ngram-mod beside it ("Herhaalde tekst sneller schrijven"): when the model writes again what is already in the
+        // conversation (code it changes, a file it rewrites, a quote) it proposes the rest of that stretch at once. Measured on the
+        // Mac (M3 Max, Qwen3.8-Flash-Next Q4): changing code 52-53 -> 115-122 tok/s, other text as fast as MTP alone. Not measured
+        // on a PC, where part of the experts may be in RAM (--n-cpu-moe) and checking a long stretch costs CPU work there.
         if (settings.Mtp && model.HasMtp && plan.ExpertCache == 0)
         {
-            if (model.Mtp == "file" && s.Draft != null) args.AddRange(new[] { "--spec-type", "draft-mtp", "--model-draft", s.Draft, "--spec-draft-n-max", "2" });
-            else if (model.Mtp == "builtin") args.AddRange(new[] { "--spec-type", "draft-mtp", "--spec-draft-n-max", "2" });
+            var types = settings.NgramMod ? "draft-mtp,ngram-mod" : "draft-mtp";
+            if (model.Mtp == "file" && s.Draft != null) args.AddRange(new[] { "--spec-type", types, "--model-draft", s.Draft, "--spec-draft-n-max", "2" });
+            else if (model.Mtp == "builtin") args.AddRange(new[] { "--spec-type", types, "--spec-draft-n-max", "2" });
         }
         return args;
     }

@@ -1,6 +1,6 @@
 # Parity with MacAIMagic 1.14.10
 
-How this version relates to MacAIMagic at commit `985eac3`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `475ef67`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -37,6 +37,12 @@ How this version relates to MacAIMagic at commit `985eac3`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `475ef67` (after 1.14.10): the right C64 skill, the answer in view, ngram-mod
+
+- `475ef67`: the skill the app loads by itself. Two words next to each other also count as one ("kick assembler" is "kickassembler", "commodore 64" is "c64"), a word of six letters or more inside a longer one counts, and the name word found must be the skill's own, not shared with another skill's name. Taken over as on the Mac (`Skills.QuestionWords`, `Skills.Matching`). Tests: AnAssemblerQuestionLoadsTheAssemblerSkill, WithAllSkillsTheRightC64SkillLoads, TwoWordsTogetherCountAsTheirName. On the test PC there is only the owner's BASIC skill, so an assembler question still loads that one: the rule picks between two skills on one subject, and there is no assembler skill here.
+- `e080175`: a finished answer keeps its last text in view with at most two steps after it (the learning step "WINAIMAGIC.md bijgewerkt" folded the answer away). Here in `AnswerPart.TailStart`. Test: TheAnswerStaysInViewWithAStepAfterIt. Not seen on screen.
+- `0909551` and `b834de4`: `--spec-type draft-mtp,ngram-mod` beside MTP, with the switch "Herhaalde tekst sneller schrijven" (on by default, greyed out without MTP, `NgramMod` for the model). Taken over as on the Mac, in `LlamaEngine` and the settings. Test: MtpFollowsTheSettingAndTheCache (the Mac's testMTPComesWithNgramModOnlyForAModelInMemory). Not measured on a PC: the Mac asked for a measurement first, but the test PC has no model that runs MTP on the main engine (Qwen3.8-Flash-Next is not downloaded; GLM-5.3 compact 24 runs on the second engine). The main engine here knows `ngram-mod` (its --help). Left out: the Mac's `tools/spec_bench.py` and its RESEARCH.md section.
 
 ### Up to `985eac3` (1.14.10 and after): the code review fixes, Documents' cover, long sections and sources
 

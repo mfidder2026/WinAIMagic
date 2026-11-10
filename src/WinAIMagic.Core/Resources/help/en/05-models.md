@@ -1,7 +1,7 @@
 ---
 title: Models
 icon: Library
-keywords: model download compact Q4 MTP memory VRAM RAM SSD stream update delete fast heavy start stop images model folder
+keywords: model download compact Q4 MTP memory VRAM RAM SSD stream update delete fast heavy start stop images model folder repeated text ngram
 ---
 ## Which model?
 A large model does not have to fit in memory entirely here. Each card says for this PC:
@@ -14,7 +14,7 @@ A large model does not have to fit in memory entirely here. Each card says for t
 |---|---|
 | **Compact** | Made smaller, so more of it fits in VRAM + RAM. |
 | **Q4** | Closer to the original weights, but larger: the most used experts sit on the graphics card, the rest in RAM or on the SSD. |
-| **MTP** | GLM and Qwen guess the next tokens ahead; the same answers, written faster. On/off under Settings → Engine. |
+| **MTP** | GLM and Qwen guess the next tokens ahead; the same answers, written faster. On/off under Settings → Engine. Below it, **Write repeated text faster**: text already in the conversation, such as code the model changes, is written in large pieces at once. |
 
 ## Two engines
 The **main engine** divides a large model over VRAM, RAM and SSD. The **second engine** runs smaller models, the fast model, and the limited mode on a PC with little VRAM.

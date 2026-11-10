@@ -316,8 +316,13 @@ public class LlamaEngineTests : EngineTest
         var glm = ModelCatalog.Shared.Model("glm-5.3-flash-compact")!;
         var plan = MemoryPlanner.Plan(TestModels.IndexOf(glm), SystemInfo.Simulated(FakeGpuBackend.Nvidia(16), 128, 10), 65_536, false);
         var e = new LlamaEngine(port: 9000);
-        var withMtp = e.Arguments(new EngineStart(glm, new[] { "a" }, plan, Card));
-        Assert.Contains("draft-mtp", withMtp);
+        var withMtp = e.Arguments(new EngineStart(glm, new[] { "a" }, plan, Card)).ToList();
+        Assert.Equal("draft-mtp,ngram-mod", withMtp[withMtp.IndexOf("--spec-type") + 1]);
+        // "Herhaalde tekst sneller schrijven" off: MTP alone
+        Settings.Shared.NgramMod = false;
+        var alone = e.Arguments(new EngineStart(glm, new[] { "a" }, plan, Card)).ToList();
+        Assert.Equal("draft-mtp", alone[alone.IndexOf("--spec-type") + 1]);
+        Settings.Shared.NgramMod = true;
         Settings.Shared.Mtp = false;
         Assert.DoesNotContain("draft-mtp", e.Arguments(new EngineStart(glm, new[] { "a" }, plan, Card)));
         Settings.Shared.Mtp = true;

@@ -145,6 +145,9 @@ public sealed class Settings : INotifyPropertyChanged
     public bool AutoApprove { get => Get(false); set => Set(value); }
     /// <summary>Speculative decoding with the model's multi-token prediction head (GLM, Qwen).</summary>
     public bool Mtp { get => Get(true); set => Set(value); }
+    /// <summary>ngram-mod beside MTP: what the model writes again from the conversation (code it changes, a file it rewrites) is
+    /// proposed in long stretches at once ("Herhaalde tekst sneller schrijven").</summary>
+    public bool NgramMod { get => Get(true); set => Set(value); }
     /// <summary>Save a conversation's place in the main engine when another one takes it or the engine stops, and read it back
     /// (SlotKeeper): going on with a long conversation then does not read it all again.</summary>
     public bool KeepEngineMemory { get => Get(true); set => Set(value); }

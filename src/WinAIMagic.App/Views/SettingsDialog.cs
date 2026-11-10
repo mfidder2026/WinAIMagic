@@ -155,12 +155,17 @@ public static class SettingsDialog
             Note(L("Wat de engine van een gesprek gelezen heeft, gaat naar de SSD als een ander gesprek of een taak het model krijgt, of als de engine stopt. Verder gaan leest het dan niet opnieuw: bij DeepSeek scheelt dat minuten. Hooguit 40 GB, de oudste gaan eerst.")),
             clear);
 
+        var ngramRow = Toggle(L("Herhaalde tekst sneller schrijven"), s.NgramMod, v => s.NgramMod = v);
+        var ngram = ngramRow.Children.OfType<ToggleSwitch>().First();
+        ngram.IsEnabled = s.Mtp;
         return Tab(
             Section(L("Model"),
                 Row(L("Context"), Pick([("32K", 32_768), ("64K", 65_536), ("128K", 131_072), ("256K", 262_144), ("512K", 524_288), ("1M", 1_048_576)], s.ContextSize, v => s.ContextSize = v)),
                 Note(L("Meer context kost geheugen (KV-cache): bij 1M ~6 GB voor DeepSeek, ~20 GB voor GLM. Qwen gaat tot 256K. Een vol gesprek wordt automatisch samengevat.")),
                 Toggle(L("Afbeeldingen (vision, 1 GB extra)"), s.Vision, v => s.Vision = v),
-                Toggle(L("Sneller schrijven met MTP (GLM en Qwen)"), s.Mtp, v => s.Mtp = v),
+                Toggle(L("Sneller schrijven met MTP (GLM en Qwen)"), s.Mtp, v => { s.Mtp = v; ngram.IsEnabled = v; }),
+                ngramRow,
+                Note(L("Neemt het model tekst over die al in het gesprek staat, zoals code die het aanpast of een bestand dat het herschrijft, dan schrijft het die in grote stukken tegelijk: tot twee keer zo snel. Het antwoord blijft hetzelfde. Werkt samen met MTP en geldt na het herstarten van de engine.")),
                 Toggle(L("Gesprekken in de engine bewaren"), s.KeepEngineMemory, v => s.KeepEngineMemory = v),
                 keep,
                 Row(SkipExpertsTitle, Pick(SkipExpertsOptions(), s.SkipExperts, v => s.SkipExperts = v)),

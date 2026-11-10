@@ -51,6 +51,26 @@ public class AnswerTimelineTests
         Assert.Equal(5, AnswerPart.TailStart(parts));
     }
 
+    /// <summary>On the Mac in 1.14.10 the learning step after the answer ("MACAIMAGIC.md bijgewerkt") folded the answer away: only
+    /// "Gedachtegang en 28 stappen" was left in the chat.</summary>
+    [Fact]
+    public void TheAnswerStaysInViewWithAStepAfterIt()
+    {
+        static List<string> Kinds(IEnumerable<AnswerPart> parts) => parts.Select(p => p.Kind == PartKind.Thought ? "denk" : p.Text).ToList();
+        static (List<AnswerPart> Work, List<AnswerPart> Tail) Split(List<AnswerPart> parts)
+        {
+            int t = AnswerPart.TailStart(parts);
+            return (parts.GetRange(0, t), parts.GetRange(t, parts.Count - t));
+        }
+        var (work, tail) = Split(AnswerPart.Of([Round("", "plan", "Uitvoeren: c64run"), Round("De tekst breekt nu op spaties af.", "klaar", "WINAIMAGIC.md bijgewerkt")], false));
+        Assert.Equal(["denk", "Uitvoeren: c64run", "denk"], Kinds(work));
+        Assert.Equal(["De tekst breekt nu op spaties af.", "WINAIMAGIC.md bijgewerkt"], Kinds(tail));
+        // a text before much more work folds with that work; the last parts after it stay in view
+        Assert.Empty(Split(AnswerPart.Of([Round("Ik begin.", "", "a", "b", "c"), Round("", "")], false)).Tail);
+        // a text and then thinking: the old rule
+        Assert.Empty(Split(AnswerPart.Of([Round("Tussendoor."), Round("", "denk verder", "x")], false)).Tail);
+    }
+
     [Fact]
     public void OnlyTheLastRoundThinksLive()
     {

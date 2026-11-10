@@ -22,7 +22,7 @@ public sealed class AppControl : IAppControl
     {
         ["Language"] = ["nl", "en", "de", "fr"],
         ["ContextSize"] = ["32768", "65536", "131072", "262144", "524288", "1048576"],
-        ["Vision"] = null, ["Thinking"] = null, ["WebSearch"] = null, ["Mtp"] = null, ["AutoStart"] = null, ["AnimatedBackground"] = null,
+        ["Vision"] = null, ["Thinking"] = null, ["WebSearch"] = null, ["Mtp"] = null, ["NgramMod"] = null, ["AutoStart"] = null, ["AnimatedBackground"] = null,
         ["WorkspaceTools"] = null, ["LearnFromChats"] = null, ["ImageImprove"] = null, ["Skills"] = null, ["SystemManagement"] = null,
         ["ReasoningEffort"] = ["low", "medium", "high", "max"],
         ["ThinkingBudget"] = ["0", "4000", "8000", "16000", "32000"],
@@ -326,7 +326,7 @@ public sealed class AppControl : IAppControl
                     p.SetValue(Settings.Shared, Parse(p.PropertyType, Arg(a, "value")));
                     if (p.Name == "FeatureTelegram") app.Telegram.Restart();
                     app.Notify();
-                    var later = p.Name is "ContextSize" or "Mtp" or "SkipExperts" or "Vision" ? " It counts after the engine restarts." : "";
+                    var later = p.Name is "ContextSize" or "Mtp" or "NgramMod" or "SkipExperts" or "Vision" ? " It counts after the engine restarts." : "";
                     return $"{p.Name} is now {Convert.ToString(p.GetValue(Settings.Shared), CultureInfo.InvariantCulture)}.{later}";
                 }
             case "find_helpers":

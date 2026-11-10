@@ -135,26 +135,63 @@ public static class Skills
         return words;
     }
 
-    /// <summary>The skills a question is clearly about: a word of the skill's name, and at least three words of its name and
-    /// description together in the question. A small model often skips use_skill; then the app loads these itself.</summary>
+    /// <summary>The words of a question, and what two words next to each other also mean: "kick assembler" is "kickassembler",
+    /// and "commodore 64" is "c64" (a name's first letter with its number, also "amiga 500" for "a500").</summary>
+    internal static HashSet<string> QuestionWords(string text)
+    {
+        var list = new List<string>();
+        var word = new System.Text.StringBuilder();
+        foreach (var ch in text.ToLowerInvariant() + " ")
+        {
+            if (char.IsLetterOrDigit(ch)) { word.Append(ch); continue; }
+            if (word.Length > 0) { list.Add(word.ToString()); word.Clear(); }
+        }
+        var words = new HashSet<string>(list);
+        for (int i = 0; i + 1 < list.Count; i++)
+        {
+            string a = list[i], b = list[i + 1];
+            words.Add(a + b);
+            if (a.All(char.IsLetter) && b.All(char.IsDigit)) words.Add(a[0] + b);
+        }
+        return words;
+    }
+
+    /// <summary>The skills a question is clearly about: a word of the skill's name that no other skill has, and at least three
+    /// words of its name and description together in the question. A small model often skips use_skill; then the app loads
+    /// these itself. Two skills on one subject (C64 BASIC and C64 assembler) share "c64" and "commodore", so the question must
+    /// name what sets one apart ("basic", "assembler"): "commodore 64 assembler programmeur" loaded the BASIC skill and never
+    /// the assembler one (2026-11-10).</summary>
     public static List<Skill> Matching(string question, IReadOnlyList<Skill>? skills = null)
     {
-        var asked = Words(question);
-        // "sprite" counts for "sprites": a shared start of at least four letters
+        var list = skills ?? All;
+        var asked = QuestionWords(question);
+        // "sprite" counts for "sprites" (a shared start of four letters), "assembler" for "kickassembler" (six inside)
         bool Found(string term) => asked.Any(a => a == term
-            || (Math.Min(a.Length, term.Length) >= 4 && (a.StartsWith(term, StringComparison.Ordinal) || term.StartsWith(a, StringComparison.Ordinal))));
-        var scored = new List<(Skill Skill, int Hits)>();
-        foreach (var s in skills ?? All)
+            || (Math.Min(a.Length, term.Length) >= 4 && (a.StartsWith(term, StringComparison.Ordinal) || term.StartsWith(a, StringComparison.Ordinal)))
+            || (Math.Min(a.Length, term.Length) >= 6 && (term.Contains(a, StringComparison.Ordinal) || a.Contains(term, StringComparison.Ordinal))));
+        var sets = list.Select(s =>
         {
             var name = Words(s.Name.Replace('-', ' '));
             name.ExceptWith(Common);
             var terms = new HashSet<string>(name);
             terms.UnionWith(Words(s.Description).Where(w => w.Length >= 4 || w.Any(char.IsDigit)));
             terms.ExceptWith(Common);
-            int hits = terms.Count(Found);
-            if (name.Any(Found) && hits >= 3) scored.Add((s, hits));
+            return (Name: name, All: terms);
+        }).ToList();
+        var scored = new List<(Skill Skill, int Own, int Hits)>();
+        for (int i = 0; i < list.Count; i++)
+        {
+            var (name, all) = sets[i];
+            var others = new HashSet<string>();
+            var ownName = new HashSet<string>(name);
+            for (int j = 0; j < sets.Count; j++)
+                if (j != i) { others.UnionWith(sets[j].All); ownName.ExceptWith(sets[j].Name); }
+            var hits = all.Where(Found).ToList();
+            // a word of the name that no other skill has: "basic" or "v2", "kickassembler"; "c64" does not tell them apart
+            if (!(ownName.Count == 0 ? name : ownName).Any(Found) || hits.Count < 3) continue;
+            scored.Add((list[i], hits.Count(h => !others.Contains(h)), hits.Count));
         }
-        return scored.OrderByDescending(x => x.Hits).Take(2).Select(x => x.Skill).ToList();
+        return scored.OrderByDescending(x => x.Own).ThenByDescending(x => x.Hits).Take(2).Select(x => x.Skill).ToList();
     }
 
     /// <summary>The step of a skill the app loaded itself.</summary>
