@@ -144,6 +144,34 @@ public class SystemToolsTests : ChatTest
         Assert.Null(SystemTools.ReadableCheck(@"Set-ItemProperty -Path HKCU:\x -Name a -Value 1 2>$null"));
     }
 
+    /// <summary>The Mac's name: there Qwen3.8 left out the check of a defaults write, so the card showed no current value. Here
+    /// the same for one registry value written with reg add or Set-ItemProperty.</summary>
+    [Fact]
+    public void ACheckIsDerivedForADefaultsWrite()
+    {
+        Assert.Equal(@"reg query HKCU\Control\Panel\Desktop /v WallpaperStyle",
+            SystemTools.DerivedCheck(@"reg add HKCU\Control\Panel\Desktop /v WallpaperStyle /t REG_SZ /d 10 /f; Stop-Process -Name explorer"));
+        Assert.Equal(@"reg query ""HKCU\Software\My App"" /v Mode", SystemTools.DerivedCheck(@"reg add ""HKCU\Software\My App"" /v Mode /d 1 /f"));
+        Assert.Equal(@"Get-ItemPropertyValue -Path 'HKCU:\Software\X' -Name Theme",
+            SystemTools.DerivedCheck(@"Set-ItemProperty -Path 'HKCU:\Software\X' -Name Theme -Value 0"));
+        Assert.Equal(@"Get-ItemPropertyValue -Path HKCU:\Software\X -Name Theme",
+            SystemTools.DerivedCheck(@"New-ItemProperty -Name Theme -Path HKCU:\Software\X -Value 0 -PropertyType DWord -Force"));
+        // two values, or no registry write, or a name that is no name: no guess
+        Assert.Null(SystemTools.DerivedCheck(@"reg add HKCU\x /v a /d 1 /f; reg add HKCU\x /v b /d 2 /f"));
+        Assert.Null(SystemTools.DerivedCheck("powercfg /change monitor-timeout-ac 30"));
+        Assert.Null(SystemTools.DerivedCheck(@"reg add HKCU\x /ve /d 1 /f"));
+        Assert.Null(SystemTools.DerivedCheck(@"reg add HKCU\x /v $env:USERNAME /d 1 /f"));
+        // the same value twice is one value
+        Assert.Equal(@"reg query HKCU\x /v a", SystemTools.DerivedCheck(@"reg add HKCU\x /v a /d 1 /f; reg add HKCU\x /v a /d 1 /f"));
+
+        var call = new ToolCall("1", "system_change", """
+            {"summary":"Stijl","steps":[{"title":"Stijl","apply":"reg add HKCU\\x /v a /d 1 /f","undo":"reg delete HKCU\\x /v a /f"},{"title":"Eigen","check":"reg query HKCU\\x /v b","apply":"reg add HKCU\\x /v c /d 1 /f","undo":"x"}]}
+            """);
+        var steps = SystemTools.Plan(call).Steps;
+        Assert.Equal(@"reg query HKCU\x /v a", steps[0].Check);
+        Assert.Equal(@"reg query HKCU\x /v b", steps[1].Check);     // the model's own check stays
+    }
+
     private static SystemTools.Step Step(string apply, string undo = "x", bool admin = true) => new("t", "", apply, undo, admin);
 
     [Fact]

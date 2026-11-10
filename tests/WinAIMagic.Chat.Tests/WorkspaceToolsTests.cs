@@ -35,6 +35,18 @@ public class WorkspaceToolsTests : ChatTest
         WorkspaceTools.Resolve("new/deeper/file.txt");
     }
 
+    /// <summary>A negative tail or limit stopped the Mac app; here it gave an empty answer. Both are ignored now.</summary>
+    [Fact]
+    public async Task ANegativeTailOrLimitDoesNotStopTheApp()
+    {
+        await Call("write_file", new JsonObject { ["path"] = "log.txt", ["content"] = "een\ntwee\ndrie\n" });
+        var t = await Call("read_file", new JsonObject { ["path"] = "log.txt", ["tail"] = -50 });
+        Assert.Contains("een", t);
+        Assert.Contains("drie", t);
+        var l = await Call("read_file", new JsonObject { ["path"] = "log.txt", ["limit"] = -1 });
+        Assert.Contains("1\teen", l);
+    }
+
     [Fact]
     public async Task WriteReadEditList()
     {

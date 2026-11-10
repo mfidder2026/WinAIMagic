@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.14.9
+# Parity with MacAIMagic 1.14.10
 
-How this version relates to MacAIMagic at commit `5d78a65`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `985eac3`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -37,6 +37,19 @@ How this version relates to MacAIMagic at commit `5d78a65`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `985eac3` (1.14.10 and after): the code review fixes, Documents' cover, long sections and sources
+
+- **Taken over:**
+  - `38b5413`: read_file ignores a tail of 0 or less and takes a limit of at least 1 (here it gave an empty answer, on the Mac the app stopped). The lessons asked after a task go with the same template settings as the answers (`ChatClient.TemplateKwargs`; thinking is stopped by the budget only), so the engine does not read the whole conversation again. A picture in a conversation while the engine runs without vision goes as a line of text, and Telegram says it cannot look at the photo. A second Telegram message that came in while the model loaded now gets "nog bezig". A stop saves the conversation only when the engine is idle (`SlotKeeper.EngineBusyAsync`, GET /slots), and after the stop nothing more is saved (`WillStop`); quitting does the same. An engine address typed in Settings that makes no URI falls back to this PC, and IPv6 gets brackets (`EngineBase.Url`). The help says that another thinking level mid-conversation makes DeepSeek read it once more. The Mac's fake_engine.py (GET /slots, /kwargs, the DRIE script). Tests: WorkspaceToolsTests.ANegativeTailOrLimitDoesNotStopTheApp, SlotKeeperTests.TheLessonsAskedAfterATaskKeepThePromptsStart and AStopDoesNotWaitForAnAnswerBeingWritten, ViewImageTests.WithoutVisionAPictureGoesAsText, EngineTests.AnAddressThatMakesNoUriFallsBackToThisPc.
+  - `65c82b0`: the cover is read from what a small model writes (`DocumentStudio.CoverValues`: a "veld:" label, a bullet, bold, quotes; "onbekend" is no value), with the new prompt. Test: TheCoverReadsWhatASmallModelWrites.
+  - `985eac3`: a section cut off at the token limit goes on from its last whole paragraph or sentence (at most twice), a page's own footnote marks are taken out, the writer is told how many sources there are, and each question gets twice its share of hits as stand-ins; only a question without any usable page is named. Tests: APageThatFailsIsReplacedAndOnlyAQuestionWithoutPagesIsNamed, ALongSectionGoesOnWhereItStopped, ACutOffTextEndsOnAWholeSentence; SourcesAreCheckedAndNumberedByTheApp changed as on the Mac.
+- **Adapted:**
+  - `65c82b0`, the derived check of a system change: here from one registry value, `reg add k /v n` → `reg query k /v n` and `Set-ItemProperty`/`New-ItemProperty -Path p -Name n` → `Get-ItemPropertyValue -Path p -Name n`, only when it passes `IsReadOnly` and the step writes one key (`SystemTools.DerivedCheck`). Test under the Mac's name ACheckIsDerivedForADefaultsWrite.
+  - `9fa2d5d` (a start that waits for the cluster check): Documents already waited for the whole start here (`DocumentEngineHost.heavyStarting`). A scheduled task now awaits `StartEngineTask` (which covers the second engine making room and the cluster check) and then counts an old "failed"/"stopped" only after it saw "starting" or after 15 s, as `38b5413` does on the Mac.
+- **Already so here:** write_file through a link to outside for a path that does not exist yet (`FinalOfExisting` resolves the deepest part that exists; test JunctionsLeadingOut); the Telegram loop clears only its own handle (`poll == cts`); a command that ignores the stop (the job object ends the whole tree at once); the image description saves the chat's conversation first (`ImagePrompt`); the files panel keeps its place and shows the file in a TextBox; the stop and wait covers the save and the terminate.
+- **Not needed:** `7a86a39` (the Mac's release; WinAIMagic keeps its own number until it releases); the Mac's test fixes for its own catalog (FastModelTests, testAProjectCanBeRemoved).
+- **Not measured here:** any of this with a real model; only the tests ran.
 
 ### Up to `5d78a65` (1.14.9): a conversation keeps its place in the engine
 

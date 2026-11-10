@@ -132,17 +132,24 @@ public sealed partial class AppState
         if (EngineState.Status != EngineStatus.Starting)
         {
             if (!Host.CanStart) return false;
-            StartEngine();
             modelStartedByTasks = true;
+            // the start may first wait for the second engine to make room or for the cluster check: until it has begun,
+            // the engine's state is the old one (the Mac's startBegun)
+            await StartEngineTask();
         }
         var start = DateTime.UtcNow;
+        // a "failed" or "stopped" from before this start is old news: only after the engine was starting (or after a grace)
+        // does it mean this start failed. Before, a task gave up at once and the engine loaded anyway.
+        bool sawStarting = false;
         while ((DateTime.UtcNow - start).TotalSeconds < 1800)
         {
+            double waited = (DateTime.UtcNow - start).TotalSeconds;
             switch (EngineState.Status)
             {
                 case EngineStatus.Running: return true;
-                case EngineStatus.Failed: return false;
-                case EngineStatus.Stopped when (DateTime.UtcNow - start).TotalSeconds > 10: return false;
+                case EngineStatus.Starting: sawStarting = true; break;
+                case EngineStatus.Failed when sawStarting || waited > 15: return false;
+                case EngineStatus.Stopped when sawStarting || waited > 15: return false;
             }
             await Task.Delay(1000);
         }

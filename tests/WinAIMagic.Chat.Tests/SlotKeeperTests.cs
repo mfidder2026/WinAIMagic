@@ -108,6 +108,57 @@ public sealed class SlotKeeperTests : ChatTest
         Assert.Contains("iets nieuws", systems[2]);           // a new conversation reads the notes as they are now
     }
 
+    /// <summary>The lessons asked after a task go with the same template settings as the answers: with thinking off DeepSeek's
+    /// template changes the start of the prompt, and the engine read the whole conversation again after every task.</summary>
+    [Fact]
+    public async Task TheLessonsAskedAfterATaskKeepThePromptsStart()
+    {
+        Settings.Shared.WorkspaceTools = true;
+        Settings.Shared.LearnFromChats = true;
+        Settings.Shared.RightWrite = "allow";
+        Settings.Shared.Thinking = true;
+        var ws = NewFolder("taak");
+        var (store, a, _) = TwoConversations(ws);
+        var chat = new ChatClient();
+        await Answer(chat, "DRIE bestanden", a.Id, store, Url);
+        await Until(() => !chat.Learning);
+        var all = JsonNode.Parse(await Http.GetStringAsync(new Uri(Url, "kwargs")))!.AsArray();
+        var lesson = all.LastOrDefault(n => n!["stream"]!.GetValue<bool>() == false);
+        Assert.NotNull(lesson);     // the lessons were asked
+        var answer = all.First(n => n!["stream"]!.GetValue<bool>());
+        Assert.Equal(answer!["kwargs"]!.ToJsonString(), lesson!["kwargs"]!.ToJsonString());
+        Assert.True(lesson["kwargs"]!["enable_thinking"]!.GetValue<bool>());
+    }
+
+    /// <summary>A stop while the engine writes an answer does not wait for it: the engine holds a save back until the slot is
+    /// free, so the model went on writing under "Model ontladen…".</summary>
+    [Fact]
+    public async Task AStopDoesNotWaitForAnAnswerBeingWritten()
+    {
+        var keeper = new SlotKeeper(dir);
+        var a = Guid.NewGuid();
+        keeper.Started(Url, "k");
+        await keeper.EnterAsync(a);
+        var lines = new List<string>();
+        keeper.Note = lines.Add;
+        // an answer is being written (the stand-in sleeps 0.4 s per request)
+        var body = new JsonObject { ["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = "hallo" }), ["stream"] = false };
+        var answer = Http.PostAsync(new Uri(Url, "v1/chat/completions"), new StringContent(body.ToJsonString(), System.Text.Encoding.UTF8, "application/json"));
+        await Task.Delay(150);
+        Assert.True(await keeper.EngineBusyAsync());
+        await keeper.SaveCurrentAsync(onlyWhenIdle: true);
+        Assert.Empty(await SlotCalls());     // nothing is saved while it writes
+        Assert.Contains("nog bezig", lines[0]);
+        (await answer).Dispose();
+        await keeper.SaveCurrentAsync(onlyWhenIdle: true);
+        Assert.Equal(["save " + Id(a)], await SlotCalls());     // idle again: saved
+        // once the engine is told to stop, nothing more is saved
+        await keeper.EnterAsync(Guid.NewGuid());
+        keeper.WillStop();
+        await keeper.SaveCurrentAsync();
+        Assert.Single(await SlotCalls());
+    }
+
     [Fact]
     public async Task AnotherEngineSetupDoesNotRestoreAndOffSavesNothing()
     {

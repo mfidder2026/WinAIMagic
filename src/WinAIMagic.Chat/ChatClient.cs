@@ -831,8 +831,12 @@ public sealed class ChatClient(HttpClient? http = null)
                 ["stream"] = false,
                 ["temperature"] = 0.2,
                 ["max_tokens"] = 400,
-                ["chat_template_kwargs"] = new JsonObject { ["enable_thinking"] = false, ["reasoning_effort"] = Settings.Shared.ReasoningEffort },
-                ["thinking_budget_tokens"] = 0,    // GLM's template ignores enable_thinking and always opens with <think>
+                // the same template settings as the conversation's own requests: with thinking off DeepSeek's template drops
+                // "Reasoning Effort" from the start of the system prompt and the old thoughts, so the engine read the whole
+                // conversation again after every task (the Mac measured 52,232 tokens, 383 s). Thinking is stopped by the
+                // budget instead, which does not change the prompt.
+                ["chat_template_kwargs"] = TemplateKwargs(),
+                ["thinking_budget_tokens"] = 0,
             };
             // the same tools as the conversation, so its start stays the same for the engine; it must only write here
             var tools = RunTools();
@@ -1105,12 +1109,21 @@ public sealed class ChatClient(HttpClient? http = null)
         // older pictures the model looked at itself go as a line of text; the user's own pictures always go
         var list = history as IList<ChatMessage> ?? history.ToList();
         var keptLooks = list.Where(m => m.Automatic == true && m.Attachments.Count > 0).TakeLast(ImagesKept).Select(m => m.Id).ToHashSet();
+        bool sees = SeesImages();
         foreach (var m in list)
         {
             switch (m.Role)
             {
                 case ChatRole.User:
-                    if (m.Automatic == true && m.Attachments.Count > 0 && !keptLooks.Contains(m.Id))
+                    if (m.Attachments.Count > 0 && !sees)
+                    {
+                        // the engine runs without vision: it refuses every request with a picture, and the picture stays in the
+                        // conversation, so each later question failed too. It goes as a line of text instead.
+                        var names = string.Join(", ", m.Attachments.Select(a => a.Filename));
+                        var note = L($"(Hier stond een afbeelding: {names}. Het model draait nu zonder afbeeldingen (vision); zeg dat als het ertoe doet.)");
+                        o.Add(new JsonObject { ["role"] = "user", ["content"] = m.Text.Length == 0 ? note : note + "\n\n" + m.Text });
+                    }
+                    else if (m.Automatic == true && m.Attachments.Count > 0 && !keptLooks.Contains(m.Id))
                     {
                         var seen = string.Join(", ", m.Attachments.Select(a => a.Filename));
                         o.Add(new JsonObject { ["role"] = "user", ["content"] = L($"(Hier stond een afbeelding die je eerder bekeek: {seen}.)") });
@@ -1203,6 +1216,12 @@ public sealed class ChatClient(HttpClient? http = null)
     public static int ThinkingBudget(int setting, int turn) =>
         turn == 0 ? setting : setting == 0 ? FollowUpThinking : Math.Min(setting, FollowUpThinking);
 
+    /// <summary>What the chat template is rendered with, the same for every request about a conversation (its answers and
+    /// the lessons after them): these change the start of the prompt (DeepSeek writes "Reasoning Effort" into the system
+    /// part and drops old thoughts without thinking), and then the engine reads the whole conversation again.</summary>
+    public static JsonObject TemplateKwargs() =>
+        new() { ["enable_thinking"] = Settings.Shared.Thinking, ["reasoning_effort"] = Settings.Shared.ReasoningEffort };
+
     internal JsonObject StreamBody(IEnumerable<ChatMessage> history, string? summary, int? thinkingBudget = null)
     {
         var s = Settings.Shared;
@@ -1217,7 +1236,7 @@ public sealed class ChatClient(HttpClient? http = null)
             ["top_p"] = 1.0,
             ["max_tokens"] = MaxAnswerTokens,
             // enable_thinking is understood by both templates (DeepSeek maps it to thinking_mode)
-            ["chat_template_kwargs"] = new JsonObject { ["enable_thinking"] = s.Thinking, ["reasoning_effort"] = s.ReasoningEffort },
+            ["chat_template_kwargs"] = TemplateKwargs(),
         };
         // without a limit a model can keep doubting on a hard question and never get to its answer
         // off means off: GLM's template ignores enable_thinking and always opens with <think>

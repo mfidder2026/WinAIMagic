@@ -267,6 +267,20 @@ public class LlamaEngineTests : EngineTest
         Assert.Equal("PCI_BUS_ID", env["CUDA_DEVICE_ORDER"]);
     }
 
+    /// <summary>An address typed in Settings that makes no URI stopped the Mac app (Settings sets it per keystroke here too):
+    /// it falls back to this PC, and IPv6 gets its brackets.</summary>
+    [Fact]
+    public void AnAddressThatMakesNoUriFallsBackToThisPc()
+    {
+        Assert.Equal(new Uri("http://127.0.0.1:8080"), EngineBase.Url("my pc", 8080));
+        Assert.Equal(new Uri("http://127.0.0.1:8080"), EngineBase.Url("localhost:", 8080));
+        Assert.Equal(new Uri("http://127.0.0.1:8080"), EngineBase.Url("", 8080));
+        Assert.Equal(new Uri("http://127.0.0.1:8080"), EngineBase.Url("0.0.0.0", 8080));
+        Assert.Equal("[::1]", EngineBase.Url("::1", 8080).Host);
+        Assert.Equal(new Uri("http://192.168.1.20:8080"), EngineBase.Url(" 192.168.1.20 ", 8080));
+        Assert.Equal(new Uri("http://localhost:8080"), EngineBase.Url("localhost", 8080));
+    }
+
     /// <summary>The engine can save a conversation's place to the SlotKeeper's folder, except on a cluster; a state is keyed by
     /// model, context, vision and draft head.</summary>
     [Fact]

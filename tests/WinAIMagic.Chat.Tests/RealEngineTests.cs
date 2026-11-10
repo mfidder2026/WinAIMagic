@@ -194,6 +194,7 @@ public class RealEngineTests(ITestOutputHelper log) : ChatTest
         if (Url == null) return;
         var picture = await ImageScaler.MakeAsync(TestPicture, "vision-test.png");
         Assert.NotNull(picture);
+        ChatClient.SeesImages = () => true;     // the real engine was started with vision
         var store = new ConversationStore();
         Settings.Shared.Thinking = false;
         var chat = new ChatClient { ContextLimit = 65_536, ModelName = "real" };

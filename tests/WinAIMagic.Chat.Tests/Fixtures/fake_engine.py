@@ -26,7 +26,12 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        if self.path == "/systems":
+        if self.path == "/kwargs":
+            body = json.dumps([{"stream": bool(r.get("stream")), "kwargs": r.get("chat_template_kwargs")} for r in requests]).encode()
+        elif self.path == "/slots":
+            # as llama-server: the one slot, busy while a request runs
+            body = json.dumps([{"id": 0, "is_processing": now > 0}]).encode()
+        elif self.path == "/systems":
             body = json.dumps([r["messages"][0]["content"] for r in requests if r.get("stream")]).encode()
         else:
             body = json.dumps({"most": most, "requests": len(requests), "slots": slots}).encode()
@@ -88,7 +93,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.end_headers()
         out = []
-        if "SCHRIJF" in text and not after_tool:
+        if "DRIE" in text and not after_tool:
+            calls = [{"index": i, "id": f"call_d{i}", "type": "function",
+                      "function": {"name": "write_file", "arguments": json.dumps({"path": f"d{i}.txt", "content": "x"})}} for i in range(3)]
+            out.append(chunk({"tool_calls": calls}))
+            out.append(chunk({}, "tool_calls"))
+        elif "SCHRIJF" in text and not after_tool:
             args = json.dumps({"path": "x.txt", "content": "hoi"})
             out.append(chunk({"tool_calls": [{"index": 0, "id": "call1", "type": "function",
                                               "function": {"name": "write_file", "arguments": args}}]}))

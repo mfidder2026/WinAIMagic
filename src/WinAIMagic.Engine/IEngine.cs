@@ -168,7 +168,19 @@ public abstract class EngineBase : IEngine
 
     public int Port => fixedPort ?? Settings.Shared.Port;
     /// <summary>The app's own client always uses this PC's address, also when the engine listens on all of them.</summary>
-    public Uri BaseUrl => new($"http://{(Host == "0.0.0.0" ? "127.0.0.1" : Host)}:{Port}");
+    public Uri BaseUrl => Url(Host, Port);
+
+    /// <summary>The engine's address. A typed address that makes no URI ("::1", "my pc", "localhost:") stopped the app
+    /// (Settings sets it per keystroke, and the speed gauge reads it every half second); it falls back to this PC. An IPv6
+    /// address gets its brackets, and 0.0.0.0 (listen on all) is reached at this PC's own address.</summary>
+    public static Uri Url(string host, int port)
+    {
+        var h = host.Trim();
+        if (h == "0.0.0.0") h = "127.0.0.1";
+        if (h.Contains(':') && !h.StartsWith('[')) h = "[" + h + "]";
+        return Uri.TryCreate($"http://{h}:{port}", UriKind.Absolute, out var u) && u.Host.Length > 0 && u.Port == port
+            ? u : new Uri($"http://127.0.0.1:{port}");
+    }
 
     /// <summary>The command for this model: exe, arguments, environment.</summary>
     protected abstract ChildStart Command(EngineStart start);

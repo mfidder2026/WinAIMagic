@@ -82,9 +82,25 @@ public class ViewImageTests : ChatTest
         await Screenshot("shot.png");
         var a = await WorkspaceTools.ImageAsync(Call("shot.png"));
         var history = Enumerable.Range(1, 5).Select(i => new ChatMessage { Role = ChatRole.User, Text = $"beeld {i}", Attachments = [a], Automatic = true }).ToList();
+        ChatClient.SeesImages = () => true;
         var o = new ChatClient().RequestMessages(history);
         Assert.Equal(1 + 5, o.Count);
         Assert.Equal(ChatClient.ImagesKept, o.Count(m => m!["content"] is JsonArray));
+    }
+
+    /// <summary>The engine runs without vision: a picture in the conversation goes as a line of text, or the engine refuses this
+    /// and every later request of the conversation (a Telegram photo, a picture dropped on the chat).</summary>
+    [Fact]
+    public async Task WithoutVisionAPictureGoesAsText()
+    {
+        await Screenshot("shot.png");
+        var a = await WorkspaceTools.ImageAsync(Call("shot.png"));
+        ChatClient.SeesImages = () => false;
+        var o = new ChatClient().RequestMessages([new ChatMessage { Role = ChatRole.User, Text = "wat staat hierop?", Attachments = [a] }]);
+        Assert.All(o, m => Assert.IsAssignableFrom<JsonValue>(m!["content"]));
+        var text = o[^1]!["content"]!.GetValue<string>();
+        Assert.Contains("shot.png", text);
+        Assert.EndsWith("wat staat hierop?", text);
     }
 
     /// <summary>In the loop: the picture follows the tool results as a message of the app, and the tool result says so.</summary>

@@ -317,6 +317,10 @@ public static class WorkspaceTools
     {
         var file = Resolve(path);
         if (!File.Exists(file) && !Directory.Exists(file)) throw ToolError.NotFound(path);
+        // a tail of 0 or less is ignored and a limit is at least 1 (as on the Mac, where suffix(-50) stopped the app;
+        // here it gave an empty answer, and the model could take the file for empty)
+        if (tail <= 0) tail = null;
+        if (limit != null) limit = Math.Max(1, limit.Value);
         long size = new FileInfo(file).Length;
         byte[] data;
         if (size > 2_000_000)
@@ -342,7 +346,6 @@ public static class WorkspaceTools
         int first = 1;
         if (tail is { } t)
         {
-            t = Math.Max(0, t);
             first = Math.Max(1, lines.Count - t + 1);
             lines = lines.GetRange(Math.Max(0, lines.Count - t), Math.Min(t, lines.Count));
         }

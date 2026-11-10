@@ -23,6 +23,8 @@ public sealed class FakeModel : HttpMessageHandler
 
     public List<Request> Requests { get; } = [];
     public Func<string, string, string> Answer { get; set; } = (_, _) => "";
+    /// <summary>Whether the answer to this user message stops at the token limit.</summary>
+    public Func<string, bool> CutOff { get; set; } = _ => false;
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
@@ -32,7 +34,7 @@ public sealed class FakeModel : HttpMessageHandler
         var r = new Request(host, body);
         Requests.Add(r);
         var text = Answer(r.System, r.User);
-        var chunk = new JsonObject { ["choices"] = new JsonArray(new JsonObject { ["delta"] = new JsonObject { ["content"] = text }, ["finish_reason"] = "stop" }) };
+        var chunk = new JsonObject { ["choices"] = new JsonArray(new JsonObject { ["delta"] = new JsonObject { ["content"] = text }, ["finish_reason"] = CutOff(r.User) ? "length" : "stop" }) };
         return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("data: " + chunk.ToJsonString() + "\n\ndata: [DONE]\n\n", Encoding.UTF8) };
     }
 }

@@ -104,8 +104,90 @@ public sealed class DocumentStudioTests : StudioTest
         Assert.DoesNotContain("ruis.example", body);
         Assert.Contains(Studio.Notes, n => n.Contains("[9]"));
         Assert.Contains(Studio.Notes, n => n.Contains("'bron 3'"));
-        Assert.Contains(Studio.Notes, n => n.Contains("2 pagina's"));
+        // the page that did not load and the one about something else were stand-ins: no remark about them
+        Assert.DoesNotContain(Studio.Notes, n => n.Contains("geen bruikbare pagina"));
+        // the model is told how many sources there are
+        Assert.Contains(Model.Requests, r => r.User.Contains("[1] tot en met [2]"));
     });
+
+    /// On the Mac (1.14.10), 5 pages that did not load were said, although others stood in for them; now only a question
+    /// without any page is named.
+    [Fact]
+    public Task APageThatFailsIsReplacedAndOnlyAQuestionWithoutPagesIsNamed() => UiThread.Run(async () =>
+    {
+        var read = new List<string>();
+        Studio.SearchWeb = (q, _) => Task.FromResult(q.Contains("leeg")
+            ? [new WebTools.Hit("Kapot", $"https://kapot.example/{q.Length}", "")]
+            : Enumerable.Range(1, 6).Select(i => new WebTools.Hit($"P{i}", $"https://{(i % 2 == 0 ? "kapot" : "goed")}.example/{i}", "")).ToList());
+        Studio.FetchPage = (url, _) =>
+        {
+            read.Add(url);
+            if (url.Contains("kapot")) throw new HttpRequestException("cannot find host");
+            return Task.FromResult(("Goed", "Inhoud [12] met een voetnoot[a]."));
+        };
+        var pages = new List<string>();
+        Model.Answer = (system, user) =>
+        {
+            if (system.Contains("hoe een document eruit moet zien")) return PlanWithoutSearch + "ZOEK: mfa eisen\nZOEK: leeg onderwerp\n";
+            if (system.Contains("webpagina")) { pages.Add(user); return "Een feit [3]."; }
+            if (system.Contains("voorblad")) return "";
+            return "Tekst [1].";
+        };
+        Attach("eisen.txt", "Iets.");
+        Studio.Make("Maak een AQS", true);
+        await WaitUntilDone();
+        Assert.Null(Studio.Problem);
+        // 4 per question: the 3 good pages of the first question are all read, the failures do not count
+        Assert.Equal(3, read.Count(u => u.Contains("goed")));
+        Assert.Single(Studio.Notes, n => n.Contains("geen bruikbare pagina"));
+        Assert.Contains(Studio.Notes, n => n.Contains("'leeg onderwerp'"));
+        // a page's own footnote marks do not reach the model, nor its notes the writer
+        Assert.DoesNotContain(pages, p => p.Contains("[12]") || p.Contains("[a]"));
+        var writer = Model.Requests.Select(r => r.User).Where(u => u.Contains("Schrijf nu de inhoud")).ToList();
+        Assert.NotEmpty(writer);
+        Assert.DoesNotContain(writer, w => w.Contains("Een feit [3]"));
+    });
+
+    /// A section about 5 architecture layers stopped at the token limit on the Mac (1.14.10); now the model goes on writing.
+    [Fact]
+    public Task ALongSectionGoesOnWhereItStopped() => UiThread.Run(async () =>
+    {
+        const string start = "Eerste alinea, die lang genoeg is om te blijven staan, over de eerste lagen.\n\nTweede alinea die afgebr";
+        Model.Answer = (system, user) =>
+        {
+            if (system.Contains("hoe een document eruit moet zien")) return "TITEL: AQS\nOPBOUW: eisen.txt\n# Lagen\n> Vijf lagen.\n";
+            if (system.Contains("voorblad")) return "";
+            return user.Contains("Je schreef al dit begin") ? "Tweede alinea, nu heel." : start;
+        };
+        Model.CutOff = u => !u.Contains("Je schreef al dit begin") && u.Contains("Schrijf nu de inhoud");
+        Attach("eisen.txt", "Iets.");
+        Studio.Make("Maak een AQS", false);
+        await WaitUntilDone();
+        Assert.DoesNotContain(Studio.Notes, n => n.Contains("te lang werd"));
+        var body = new DocumentDraft(Studio.Text).Body;
+        Assert.Contains("over de eerste lagen.\n\nTweede alinea, nu heel.", body);
+        Assert.DoesNotContain("afgebr", body);
+    });
+
+    [Fact]
+    public void ACutOffTextEndsOnAWholeSentence()
+    {
+        Assert.Equal("Een zin. Nog een hele lange zin die doorloopt.", DocumentStudio.CompletePart("Een zin. Nog een hele lange zin die doorloopt. En dan af").Text);
+        Assert.Equal("\n\n", DocumentStudio.CompletePart("Klaar.").Joint);
+        Assert.Equal("Feit en  maar [link](https://x) en [B] blijft", DocumentStudio.WithoutFootnotes("Feit[3] en [citation needed] maar [link](https://x) en [B] blijft"));
+    }
+
+    /// Ling wrote "veld: Klant: Gemeente Voorbeeld" on the Mac, so in 1.14.10 the cover stayed empty.
+    [Fact]
+    public void TheCoverReadsWhatASmallModelWrites()
+    {
+        const string answer = "veld: Klant: Gemeente Voorbeeld\n- **versie:** 0.2\nAanleiding: Verouderde koppeling\nauteur: 'M. Fidder'\nKlant: Andere klant";
+        var found = DocumentStudio.CoverValues(answer, ["Klant", "versie", "auteur"]);
+        Assert.Equal(["Klant", "versie", "auteur"], found.Select(f => f.Key));
+        Assert.Equal(["Gemeente Voorbeeld", "0.2", "M. Fidder"], found.Select(f => f.Value));
+        // "unknown" and the template's own marking are no value
+        Assert.Empty(DocumentStudio.CoverValues("Klant: onbekend\nversie: (niet vermeld)\nauteur: [Auteur]\nproject: -", ["Klant", "versie", "auteur", "project"]));
+    }
 
     [Fact]
     public Task TheListOfSourcesIsNoReasonForAWarning() => UiThread.Run(async () =>

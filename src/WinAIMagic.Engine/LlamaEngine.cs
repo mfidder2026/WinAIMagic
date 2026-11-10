@@ -32,7 +32,19 @@ public sealed class LlamaEngine : EngineBase
 
     protected override void OnStopped() => Slots.Stopped();
 
-    protected override Task? BeforeStop() => Slots.HasUnsaved ? Slots.SaveCurrentAsync() : null;
+    /// <summary>Saves the conversation first, but not while the engine writes an answer: the engine holds the save back until
+    /// the answer is done, so the model went on writing under "Model ontladen…" (the Mac saw up to a minute). After it nothing
+    /// is saved any more.</summary>
+    protected override Task? BeforeStop()
+    {
+        if (!Slots.HasUnsaved) { Slots.WillStop(); return null; }
+        return SaveAndGo();
+        async Task SaveAndGo()
+        {
+            try { await Slots.SaveCurrentAsync(onlyWhenIdle: true).ConfigureAwait(false); }
+            finally { Slots.WillStop(); }
+        }
+    }
 
     public override void SaveForQuit()
     {

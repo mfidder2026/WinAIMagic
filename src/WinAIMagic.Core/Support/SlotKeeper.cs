@@ -26,6 +26,8 @@ public sealed class SlotKeeper
     private string? key;
     private Guid? current;
     private bool unsaved;
+    /// <summary>The engine has been told to stop: nothing more is saved (an answer that ends because of the stop would try).</summary>
+    private bool going;
     private readonly List<string> log = [];
 
     private static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };
@@ -60,6 +62,7 @@ public sealed class SlotKeeper
             key = stateKey;
             current = null;
             unsaved = false;
+            going = false;
         }
         try { Directory.CreateDirectory(Folder); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
@@ -73,7 +76,33 @@ public sealed class SlotKeeper
             key = null;
             current = null;
             unsaved = false;
+            going = false;
         }
+    }
+
+    /// <summary>The engine is about to be stopped: from now on nothing is saved.</summary>
+    public void WillStop() { lock (sync) going = true; }
+
+    /// <summary>Is the engine writing an answer right now? It holds a save back until the slot is free, so a save then waits
+    /// for the whole answer, and a stop with it. Null when the engine does not answer.</summary>
+    public async Task<bool?> EngineBusyAsync()
+    {
+        Uri? url;
+        lock (sync) url = baseUrl;
+        if (url == null) return null;
+        using var req = new HttpRequestMessage(HttpMethod.Get, url.ToString().TrimEnd('/') + "/slots");
+        var apiKey = Settings.Shared.ApiKey;
+        if (apiKey.Length > 0) req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + apiKey);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        try
+        {
+            using var resp = await Http.SendAsync(req, cts.Token).ConfigureAwait(false);
+            if ((int)resp.StatusCode != 200) return null;
+            return JsonNode.Parse(await resp.Content.ReadAsStringAsync(cts.Token).ConfigureAwait(false)) is JsonArray slots
+                ? slots.Any(n => n?["is_processing"] is JsonValue v && v.TryGetValue<bool>(out var b) && b)
+                : null;
+        }
+        catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException or JsonException) { return null; }
     }
 
     /// <summary>What a saved state belongs to: the same model, context, vision and draft head.</summary>
@@ -130,21 +159,32 @@ public sealed class SlotKeeper
         finally { busy.Release(); }
     }
 
-    /// <summary>Writes the state of the conversation in the engine to its file, when it changed.</summary>
-    public async Task SaveCurrentAsync()
+    /// <summary>Writes the state of the conversation in the engine to its file, when it changed. <paramref name="onlyWhenIdle"/>:
+    /// not while the engine writes an answer (a stop must not wait for it; the last finished answer was saved already).</summary>
+    public async Task SaveCurrentAsync(bool onlyWhenIdle = false)
     {
         await busy.WaitAsync().ConfigureAwait(false);
-        try { await SaveCurrentLocked().ConfigureAwait(false); }
+        try { await SaveCurrentLocked(onlyWhenIdle).ConfigureAwait(false); }
         finally { busy.Release(); }
     }
 
-    private async Task SaveCurrentLocked()
+    private async Task SaveCurrentLocked(bool onlyWhenIdle = false)
     {
         string? k;
         Guid owner;
         lock (sync)
         {
-            if (key == null || current == null || !unsaved || !Settings.Shared.KeepEngineMemory) return;
+            if (key == null || current == null || !unsaved || going || !Settings.Shared.KeepEngineMemory) return;
+            owner = current.Value;
+        }
+        if (onlyWhenIdle && await EngineBusyAsync().ConfigureAwait(false) != false)
+        {
+            Note?.Invoke($"WinAIMagic: gesprek {Short(owner)} niet bewaard: de engine was nog bezig");
+            return;
+        }
+        lock (sync)
+        {
+            if (key == null || current == null || !unsaved || going) return;
             k = key;
             owner = current.Value;
             unsaved = false;
@@ -223,9 +263,15 @@ public sealed class SlotKeeper
             Guid owner;
             lock (sync)
             {
-                if (key == null || current == null || !unsaved || !Settings.Shared.KeepEngineMemory) return;
+                if (key == null || current == null || !unsaved || going || !Settings.Shared.KeepEngineMemory) return;
                 k = key;
                 owner = current.Value;
+            }
+            // while an answer is being written the engine holds the save back until it is done: then nothing is saved
+            if (Task.Run(EngineBusyAsync).GetAwaiter().GetResult() != false)
+            {
+                Note?.Invoke($"WinAIMagic: gesprek {Short(owner)} niet bewaard bij afsluiten: de engine was nog bezig");
+                return;
             }
             var saved = Task.Run(() => Call("save", FileName(k, owner), owner, limit, "save (afsluiten)")).GetAwaiter().GetResult();
             if (!saved) return;

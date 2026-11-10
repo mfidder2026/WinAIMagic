@@ -184,6 +184,30 @@ public static class SystemTools
         return IsReadOnly(core) ? core : null;
     }
 
+    private const string Word = @"(""[^""$`]+""|'[^']+'|[^\s;|&<>(){}$`'""]+)";
+    private static readonly Regex RegAdd = new(@"\breg(?:\.exe)?\s+add\s+" + Word + @"[^;|&\n]*?\s/v\s+" + Word, RegexOptions.IgnoreCase);
+    private static readonly Regex SetPathName = new(@"\b(?:Set|New)-ItemProperty\b[^;|&\n]*?-Path\s+" + Word + @"[^;|&\n]*?-Name\s+" + Word, RegexOptions.IgnoreCase);
+    private static readonly Regex SetNamePath = new(@"\b(?:Set|New)-ItemProperty\b[^;|&\n]*?-Name\s+" + Word + @"[^;|&\n]*?-Path\s+" + Word, RegexOptions.IgnoreCase);
+
+    /// <summary>The check for a step that writes one registry value: <c>reg add k /v n …</c> → <c>reg query k /v n</c>, and
+    /// <c>Set-ItemProperty -Path p -Name n …</c> → <c>Get-ItemPropertyValue -Path p -Name n</c>. Null when the step writes none or
+    /// more than one, or when the result would not only read.</summary>
+    public static string? DerivedCheck(string apply)
+    {
+        static bool Flag(string w) => w.StartsWith('-') || w.StartsWith('/');
+        var reads = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (Match m in RegAdd.Matches(apply))
+            if (!Flag(m.Groups[1].Value) && !Flag(m.Groups[2].Value)) reads.Add($"reg query {m.Groups[1].Value} /v {m.Groups[2].Value}");
+        foreach (Match m in SetPathName.Matches(apply))
+            if (!Flag(m.Groups[1].Value) && !Flag(m.Groups[2].Value)) reads.Add($"Get-ItemPropertyValue -Path {m.Groups[1].Value} -Name {m.Groups[2].Value}");
+        foreach (Match m in SetNamePath.Matches(apply))
+            if (!Flag(m.Groups[1].Value) && !Flag(m.Groups[2].Value)) reads.Add($"Get-ItemPropertyValue -Path {m.Groups[2].Value} -Name {m.Groups[1].Value}");
+        // a step that writes through both ways, or two values: no guess
+        if (reads.Count != 1 || Keys(apply).Count != 1) return null;
+        var check = reads.First();
+        return IsReadOnly(check) ? check : null;
+    }
+
     // MARK: - plans
 
     public sealed record Step(string Title, string Check, string Apply, string Undo, bool Admin);
@@ -243,7 +267,10 @@ public static class SystemTools
             if (apply.Length == 0) throw new PlanException($"Step {i + 1} has no apply command.");
             bool admin = s["admin"] is JsonValue v && (v.TryGetValue<bool>(out var b) ? b : v.TryGetValue<string>(out var t) && t.Equals("true", StringComparison.OrdinalIgnoreCase));
             var title = WorkspaceTools.Str(s, "title") is { Length: > 0 } given ? given : apply;
-            steps.Add(new Step(title, (WorkspaceTools.Str(s, "check") ?? "").Trim(), apply, (WorkspaceTools.Str(s, "undo") ?? "").Trim(), admin));
+            var check = (WorkspaceTools.Str(s, "check") ?? "").Trim();
+            // a model that leaves the check out of a step that writes one value: the card showed no value and nothing was recorded
+            if (check.Length == 0) check = DerivedCheck(apply) ?? "";
+            steps.Add(new Step(title, check, apply, (WorkspaceTools.Str(s, "undo") ?? "").Trim(), admin));
         }
         return (WorkspaceTools.Str(a, "summary") is { Length: > 0 } summary ? summary : steps[0].Title, steps);
     }

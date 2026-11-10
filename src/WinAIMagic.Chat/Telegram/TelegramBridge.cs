@@ -168,6 +168,19 @@ public sealed class TelegramBridge
                 return;
             }
         }
+        // the model may run without vision (not downloaded, or no room for it): then the photo is not looked at
+        if (attachments.Count > 0 && !ChatClient.SeesImages())
+        {
+            await Try(() => bot.Send(chatId, L("Het model draait nu zonder afbeeldingen (vision), dus de foto kan ik niet bekijken.")));
+            attachments.Clear();
+            if (prompt.Length == 0) return;
+        }
+        // a second message while the model loaded passed the check above minutes ago: say so instead of starting a second run
+        if (chat.IsBusy(id))
+        {
+            await Try(() => bot.Send(chatId, L("Ik ben nog bezig met je vorige vraag. /stop stopt die.")));
+            return;
+        }
         await bot.Typing(chatId);
         chat.Send(prompt, attachments, id, store, BaseUrl());
         Stream(id, chatId);

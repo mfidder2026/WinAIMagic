@@ -149,7 +149,7 @@ public sealed partial class AppState : INotifyPropertyChanged, IDisposable
     /// <summary>The second engine (documents, a description for an image) when it was ever started.</summary>
     public IEngine? FastEngine => documentHost?.FastEngine;
     public double TokensPerSec => Host.Metrics.Current?.TokensPerSec ?? 0;
-    public Uri BaseUrl => TestUrl ?? Host.Engine?.BaseUrl ?? new Uri($"http://{(Settings.Host == "0.0.0.0" ? "127.0.0.1" : Settings.Host)}:{Settings.Port}");
+    public Uri BaseUrl => TestUrl ?? Host.Engine?.BaseUrl ?? EngineBase.Url(Settings.Host, Settings.Port);
     /// <summary>The model the chat talks to.</summary>
     public ModelInfo? ChatModel => Host.Engine?.Model ?? Host.SelectedModel;
 

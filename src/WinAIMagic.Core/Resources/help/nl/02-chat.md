@@ -16,7 +16,7 @@ Staat er nog geen model aan, dan start je vraag het vanzelf. Een ander model sta
 | Knop | Wat het doet |
 |---|---|
 | Afbeelding | Voeg een afbeelding toe (ook slepen, of plakken met Ctrl+V). Werkt als *vision* aan staat. |
-| Denken | Uit, laag, normaal of hoog: hoe lang het model eerst nadenkt (laag 2.000 tokens, normaal 8.000, hoog wat bij Instellingen staat). Werkt bij elk model dat kan nadenken. Langer is beter bij lastige vragen, maar trager. Werkt het model in stappen, dan denkt het na de eerste stap hoogstens 4.000 tokens per stap. |
+| Denken | Uit, laag, normaal of hoog: hoe lang het model eerst nadenkt (laag 2.000 tokens, normaal 8.000, hoog wat bij Instellingen staat). Werkt bij elk model dat kan nadenken. Langer is beter bij lastige vragen, maar trager. Werkt het model in stappen, dan denkt het na de eerste stap hoogstens 4.000 tokens per stap. Kies je midden in een lang gesprek een ander niveau, dan leest het model dat gesprek één keer opnieuw: bij DeepSeek staat het niveau bovenaan de prompt. |
 | Web | Het model mag het web doorzoeken en pagina's lezen. |
 | Werkmap | Kies een map waarin het model mag werken. |
 | L S U | De rechten in die map: lezen, schrijven, uitvoeren. |

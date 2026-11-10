@@ -16,7 +16,7 @@ When no model runs yet, your question starts it by itself. Another model starts 
 | Button | What it does |
 |---|---|
 | Image | Add an image (also drag, or paste with Ctrl+V). Works when *vision* is on. |
-| Think | Off, low, normal or high: how long the model thinks first (low 2,000 tokens, normal 8,000, high what Settings says). Works with every model that can think. Longer is better for hard questions, but slower. When the model works in steps, it thinks at most 4,000 tokens per step after the first. |
+| Think | Off, low, normal or high: how long the model thinks first (low 2,000 tokens, normal 8,000, high what Settings says). Works with every model that can think. Longer is better for hard questions, but slower. When the model works in steps, it thinks at most 4,000 tokens per step after the first. Choosing another level in the middle of a long conversation makes the model read that conversation once more: with DeepSeek the level stands at the top of the prompt. |
 | Web | The model may search the web and read pages. |
 | Work folder | Choose a folder the model may work in. |
 | R W X | The rights in that folder: read, write, execute. |

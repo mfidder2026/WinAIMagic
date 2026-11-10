@@ -150,6 +150,7 @@ public class ChatRequestTests : ChatTest
     [Fact]
     public async Task HistoryForTheModel()
     {
+        ChatClient.SeesImages = () => true;
         var jpeg = new byte[] { 1, 2, 3 };
         store.Update(Id, c =>
         {
