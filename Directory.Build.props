@@ -3,7 +3,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <Version>1.14.9</Version>
+    <Version>1.14.11</Version>
     <Company>WinAIMagic</Company>
     <Product>WinAIMagic</Product>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
