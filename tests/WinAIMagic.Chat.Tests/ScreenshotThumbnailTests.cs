@@ -35,7 +35,7 @@ public class ScreenshotThumbnailTests : ChatTest
         var old = Path.Combine(folder, "oud.png");
         File.WriteAllBytes(old, Png());
         File.SetLastWriteTimeUtc(old, DateTime.UtcNow.AddHours(-1));
-        var start = DateTime.UtcNow;
+        var start = WorkspaceTools.FileClockNow();
         File.WriteAllBytes(Path.Combine(folder, "intro.png"), Png());
         File.WriteAllBytes(Path.Combine(folder, "a", "b", "kasteel.png"), Png());
         File.WriteAllBytes(Path.Combine(folder, "a", "b", "c", "te-diep.png"), Png());
@@ -59,7 +59,7 @@ public class ScreenshotThumbnailTests : ChatTest
         WorkspaceTools.Current = NewFolder("work");
         var name = "wam-shot-" + Guid.NewGuid().ToString("N")[..8] + ".png";
         var file = Path.Combine(Path.GetTempPath(), name);
-        var start = DateTime.UtcNow;
+        var start = WorkspaceTools.FileClockNow();
         File.WriteAllBytes(file, Png());
         try
         {

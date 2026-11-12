@@ -602,6 +602,52 @@ public class AgentLoopTests : ChatTest
     private static Func<HttpResponseMessage> Write(string name, string id = "w") => () => Call("write_file", new JsonObject { ["path"] = name, ["content"] = "x" }, id);
     private static string Content(JsonObject body) => body["messages"]![0]!["content"]!.GetValue<string>();
 
+    /// <summary>The conversations file was written only when an answer ended: on the Mac a two-hour answer would have lost every step
+    /// in a crash. Now each round starts by saving the one before (at most every 10 s; here every time).</summary>
+    [Fact]
+    public async Task ALongAnswerIsSavedOnTheWay()
+    {
+        var was = ConversationStore.SaveEvery;
+        ConversationStore.SaveEvery = TimeSpan.Zero;
+        try
+        {
+            var seen = new List<(int Results, bool AllDone, bool EndsInResult)>();
+            HttpResponseMessage Round(Func<HttpResponseMessage> answer)
+            {
+                // the request of the next round: what is on disk now
+                var saved = System.Text.Json.JsonSerializer.Deserialize<List<Conversation>>(File.ReadAllBytes(Paths.ConversationsFile), ChatJson.Options)!;
+                var c = saved.First(x => x.Id == C.Id);
+                seen.Add((c.Messages.Count(m => m.Role == ChatRole.Tool), c.Messages.SelectMany(m => m.Activities).All(a => a.Done),
+                    c.Messages[^1].Role == ChatRole.Tool));
+                return answer();
+            }
+            var engine = new FakeEngine(
+                () => Call("list_dir", new JsonObject { ["path"] = "." }, "a"),
+                () => Round(() => Call("list_dir", new JsonObject { ["path"] = "." }, "b")),
+                () => Round(() => Call("list_dir", new JsonObject { ["path"] = "." }, "c")),
+                () => Round(() => Say("KLAAR")));
+            await Ask("Kijk drie keer", engine);
+            Assert.Equal([(1, true, true), (2, true, true), (3, true, true)], seen);
+        }
+        finally { ConversationStore.SaveEvery = was; }
+    }
+
+    /// <summary>Writing a large conversations file, as the save on the way does every 10 s at most.</summary>
+    [Fact]
+    public void WritingALargeConversationsFileIsQuick()
+    {
+        var text = new string('x', 10_000);
+        store.Update(C.Id, c => { for (int i = 0; i < 410; i++) c.Messages.Add(new ChatMessage { Role = i % 2 == 0 ? ChatRole.User : ChatRole.Assistant, Text = text }); });
+        store.Save();
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        store.Save();
+        watch.Stop();
+        var size = new FileInfo(Paths.ConversationsFile).Length;
+        Assert.True(size > 4_000_000, $"{size}");
+        Assert.True(watch.ElapsedMilliseconds < 1000, $"{watch.ElapsedMilliseconds} ms for {size} bytes");
+        Console.WriteLine($"SAVE {size} bytes in {watch.Elapsed.TotalMilliseconds:0} ms");
+    }
+
     /// <summary>A screenshot a command makes shows small with its step, so the user watches along (the Mac's 98c1fb4).</summary>
     [Fact]
     public async Task AScreenshotACommandMakesShowsWithItsStep()
@@ -1411,9 +1457,9 @@ public class ConversationFileTests : ChatTest
         store.Save();
 
         var json = JsonNode.Parse(File.ReadAllText(Paths.ConversationsFile))![0]!;
-        foreach (var key in new[] { "id", "title", "messages", "workspace", "updated", "contextTokens", "summary", "summaryUpTo" })
+        foreach (var key in new[] { "id", "title", "messages", "workspace", "updated", "contextTokens", "summary", "summaryUpTo", "looksKept" })
             Assert.NotNull(json[key]);
-        Assert.Equal(8, json.AsObject().Count);
+        Assert.Equal(9, json.AsObject().Count);
         var m = json["messages"]![1]!;
         foreach (var key in new[] { "id", "role", "text", "reasoning", "attachments", "toolCalls", "activities", "sources", "tokensPerSecond", "promptTokensPerSecond", "error", "date", "automatic" })
             Assert.NotNull(m[key]);

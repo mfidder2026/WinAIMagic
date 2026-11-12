@@ -131,6 +131,34 @@ public class SystemToolsTests : ChatTest
             Assert.False(SystemTools.IsReadOnly(c), c);
     }
 
+    /// <summary>The check reads a command as PowerShell does (the Mac's 8d63eb0 for zsh): where PowerShell would read it otherwise,
+    /// it is refused, or the dash is read as PowerShell reads it.</summary>
+    [Fact]
+    public void TheShellReadsACommandAsTheCheckDoes()
+    {
+        foreach (var c in new[]
+                 {
+                     "Get-Content '\u2018; Remove-Item x \u2018'",          // a ' closes on \u2018 in PowerShell: the rest ran as a command
+                     "Get-Content 'a\u2019 ; Remove-Item x; \u2019'",
+                     "Get-Content \"a\u201D ; Remove-Item x; \u201C\"",
+                     "Get-Content \"a\u201E\"",
+                     "Select-String x \u2013OutVariable v",            // an en dash is a - to PowerShell
+                     "Select-String x \u2014OutVariable v",
+                     "Get\u2013Credential",
+                     "Get-Content a\u0085Remove-Item x",            // a next-line character
+                     "Get-Content a\u2028Remove-Item x",
+                     "Get-Content a\u000BRemove-Item x",            // control characters
+                     "Get-Content a\u0000",
+                     "Get-Content\u00A0a",                          // a Unicode space
+                     "systeminfo\u200B",
+                     "\uFEFFsysteminfo",
+                 })
+            Assert.False(SystemTools.IsReadOnly(c), c);
+        // a tab still separates words, and a dash inside a plain read stays allowed
+        Assert.True(SystemTools.IsReadOnly("Get-Content\ta.txt"));
+        Assert.True(SystemTools.IsReadOnly("Get-ChildItem \u2013Recurse"));
+    }
+
     [Fact]
     public void ChecksAsModelsWriteThem()
     {

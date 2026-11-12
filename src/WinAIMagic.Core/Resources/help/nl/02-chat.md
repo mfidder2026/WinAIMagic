@@ -1,7 +1,7 @@
 ---
 title: Chatten
 icon: Chat
-keywords: gesprek vraag denken nadenken temperatuur systeemprompt context samenvatting ga door afbeelding plakken kopiëren stop nieuw gesprek verwijderen prullenbak schermafdruk screenshot meekijken
+keywords: gesprek vraag denken nadenken temperatuur systeemprompt context samenvatting ga door afbeelding plakken kopiëren stop nieuw gesprek verwijderen prullenbak schermafdruk screenshot meekijken fout foutmelding herhaald vastlopen
 ---
 ## Een vraag stellen
 Typ je vraag onderin en druk op **Enter**. Met **Shift+Enter** begin je een nieuwe regel. Het antwoord verschijnt terwijl het model schrijft; **Stop** breekt het af.
@@ -29,6 +29,11 @@ Werkt het model in stappen (bestanden, opdrachten, het web), dan staat het hele 
 
 ## Meekijken
 Maakt het model onderweg een schermafdruk (van een programma of de C64-emulator), dan staat er een kleine versie bij die stap. Na het antwoord blijven ze in een rijtje onder **Gedachtegang** staan; klik erop voor een grotere versie.
+
+## Als dezelfde fout steeds terugkomt
+Krijgt het model in één antwoord drie keer dezelfde foutmelding (bijvoorbeeld van een build of een script), dan zegt de app het: wat het veranderde, loste de fout niet op, dus het moet de regel uit de foutmelding letterlijk lezen en alleen die aanpassen, in plaats van steeds het hele bestand te herschrijven. Dat gebeurt opnieuw na elke volgende drie keer. Je ziet de melding als je die stap openklikt. Regelnummers tellen niet mee: een fout die een paar regels opschuift, telt als dezelfde.
+
+Schrijft het model in één antwoord drie keer hetzelfde bestand helemaal opnieuw, zonder dat een opdracht het ondertussen draait of bouwt, dan zegt de app ook dat: bouw of draai het nu en verbeter alleen wat misgaat. Een opdracht telt als het het bestand bij naam noemt (bijvoorbeeld `python c64kbuild.py intro.asm` of `build\intro.prg`).
 
 ## Als het model stopt voordat het klaar is
 Lokale modellen stoppen soms halverwege. De app merkt dat en zegt het model door te gaan; je ziet dat in het gesprek. Stopt het drie keer achter elkaar, dan vraagt de app jou om "ga door" te zeggen of een aanwijzing te geven.

@@ -195,6 +195,9 @@ public sealed class SlotKeeper
             lock (sync) log.Add("save " + owner.ToString("D").ToUpperInvariant());
             Prune();
         }
+        // not saved: the next chance (another conversation, the engine stopping, quitting) tries again. It stayed "saved", so
+        // after a failed save a quit skipped it too.
+        else lock (sync) if (current == owner) unsaved = true;
     }
 
     private HttpRequestMessage? Request(string action, string name)

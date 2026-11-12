@@ -76,16 +76,81 @@ public class ViewImageTests : ChatTest
         Assert.Contains("view_image", Names());
     }
 
+    /// <summary>Each look as the run makes it: a call of view_image, its result, and the picture as a message of the app.</summary>
+    private static List<ChatMessage> Look(int n, Attachment a) =>
+    [
+        new() { Role = ChatRole.Assistant, ToolCalls = [new ToolCall($"v{n}", WorkspaceTools.ImageTool, "{\"path\":\"shot.png\"}")] },
+        new() { Role = ChatRole.Tool, Text = "shot.png bekeken", ToolCallId = $"v{n}" },
+        new() { Role = ChatRole.User, Text = "Hier is de afbeelding die je opvroeg: shot.png.", Attachments = [a], Automatic = true },
+    ];
+
+    private static int Pictures(JsonArray o) => o.Count(m => m!["content"] is JsonArray);
+
+    /// <summary>Only the last 3 looks went as pictures. A new look turned an old one into text far back in the conversation, and
+    /// Qwen3.6 read the whole conversation again each time on the Mac: 82K, 110K and 144K tokens (3, 5 and 11 minutes) in one C64 run.</summary>
     [Fact]
-    public async Task OnlyTheLastPicturesTheModelLookedAtAreSentAgain()
+    public async Task APictureTheModelLookedAtStaysAndANewLookChangesNothingBefore()
     {
         await Screenshot("shot.png");
         var a = await WorkspaceTools.ImageAsync(Call("shot.png"));
-        var history = Enumerable.Range(1, 5).Select(i => new ChatMessage { Role = ChatRole.User, Text = $"beeld {i}", Attachments = [a], Automatic = true }).ToList();
         ChatClient.SeesImages = () => true;
-        var o = new ChatClient().RequestMessages(history);
-        Assert.Equal(1 + 5, o.Count);
-        Assert.Equal(ChatClient.ImagesKept, o.Count(m => m!["content"] is JsonArray));
+        var chat = new ChatClient();
+        var history = new List<ChatMessage> { new() { Role = ChatRole.User, Text = "Maak een C64-spel en kijk of het werkt." } };
+        for (int n = 1; n <= 5; n++) history.AddRange(Look(n, a));
+        var before = chat.RequestMessages(history);
+        Assert.Equal(5, Pictures(before));
+        Assert.Equal(1 + 1 + 5 * 3, before.Count);
+
+        history.AddRange(Look(6, a));
+        var after = chat.RequestMessages(history);
+        Assert.Equal(6, Pictures(after));
+        // what the engine already read is sent the same, character for character: it reads only the new look
+        Assert.Equal(new JsonArray([.. before.Select(m => m!.DeepClone())]).ToJsonString(),
+            new JsonArray([.. after.Take(before.Count).Select(m => m!.DeepClone())]).ToJsonString());
+    }
+
+    /// <summary>A conversation saved by 1.14.12 sent its looks but the last 3 as text. After the update it sends exactly that again,
+    /// so the engine's saved state still fits; a new look stays a picture and changes nothing before it.</summary>
+    [Fact]
+    public async Task AConversationOfTheOlderVersionSendsWhatItSentBefore()
+    {
+        await Screenshot("shot.png");
+        var a = await WorkspaceTools.ImageAsync(Call("shot.png"));
+        ChatClient.SeesImages = () => true;
+        var c = new Conversation { Messages = [new ChatMessage { Role = ChatRole.User, Text = "Maak een C64-spel en kijk of het werkt." }] };
+        for (int n = 1; n <= 5; n++) c.Messages.AddRange(Look(n, a));
+        // as 1.14.12 saved it: without the field
+        var saved = JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(new List<Conversation> { c }, ChatJson.Options))!.AsArray();
+        Assert.True(saved[0]!.AsObject().Remove("looksKept"));
+        File.WriteAllText(Paths.ConversationsFile, saved.ToJsonString());
+
+        var store = new ConversationStore();
+        var loaded = store.Find(c.Id)!;
+        Assert.True(loaded.LooksKept);
+        var chat = new ChatClient();
+        var before = chat.RequestMessages(loaded.Messages);
+        Assert.Equal(3, Pictures(before));
+        Assert.Equal(2, before.Count(m => m!["content"] is JsonValue v && v.GetValue<string>() is var t && t.StartsWith('(') && t.Contains("shot.png")));
+
+        var after = chat.RequestMessages([.. loaded.Messages, .. Look(6, a)]);
+        Assert.Equal(4, Pictures(after));
+        Assert.Equal(new JsonArray([.. before.Select(m => m!.DeepClone())]).ToJsonString(),
+            new JsonArray([.. after.Take(before.Count).Select(m => m!.DeepClone())]).ToJsonString());
+
+        // loading it again (saved by this version) changes nothing more
+        store.Update(c.Id, x => x.Messages.AddRange(Look(6, a)));
+        store.Save();
+        var again = new ConversationStore().Find(c.Id)!;
+        Assert.Equal(4, Pictures(chat.RequestMessages(again.Messages)));
+    }
+
+    [Fact]
+    public void ANewConversationKeepsItsLooks()
+    {
+        Assert.True(new Conversation().LooksKept);
+        var c = new Conversation();
+        c.KeepLooksAsSent();
+        Assert.True(c.LooksKept);
     }
 
     /// <summary>The engine runs without vision: a picture in the conversation goes as a line of text, or the engine refuses this

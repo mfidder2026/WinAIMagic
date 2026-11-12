@@ -67,9 +67,19 @@ public static class SystemTools
     /// <summary>The words of a command line, or null when it does more than run one program with plain arguments: $, `, @, a line
     /// break, or ; | &amp; &lt; &gt; ( ) { } [ ] outside quotes. Quotes are taken off. Inside double quotes $ and ` still count: PowerShell
     /// expands them there.</summary>
+    /// <summary>The check reads every character the way PowerShell does, or refuses the command: PowerShell also takes the typographic
+    /// quotes as quotes (a ' it opened closes on a ’, so text the check saw as quoted ran as a command), a control character or a
+    /// Unicode space other than the plain space and tab separates or ends what the check saw as one word, and the dashes – — ― are
+    /// a - to it. The dashes are read as -; the rest is refused.</summary>
+    private static bool ReadsDifferently(char c) =>
+        c is '\u2018' or '\u2019' or '\u201A' or '\u201B' or '\u201C' or '\u201D' or '\u201E'
+        || c != '\t' && (char.IsControl(c) || char.IsWhiteSpace(c) && c != ' ' || c is '\u2028' or '\u2029' or '\u0085' or '\uFEFF' or '\u200B');
+
     public static List<string>? Words(string command)
     {
         if (command.IndexOfAny(['\n', '\r', '`', '$']) >= 0) return null;
+        if (command.Any(ReadsDifferently)) return null;
+        command = command.Replace('–', '-').Replace('—', '-').Replace('―', '-');
         var output = new List<string>();
         var word = new StringBuilder();
         char? quote = null;

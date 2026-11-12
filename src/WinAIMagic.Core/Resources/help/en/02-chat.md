@@ -1,7 +1,7 @@
 ---
 title: Chat
 icon: Chat
-keywords: conversation question thinking temperature system prompt context summary go on image paste copy stop new conversation delete trash screenshot watch along
+keywords: conversation question thinking temperature system prompt context summary go on image paste copy stop new conversation delete trash screenshot watch along error repeated stuck
 ---
 ## Asking a question
 Type your question at the bottom and press **Enter**. **Shift+Enter** starts a new line. The answer appears while the model writes; **Stop** breaks it off.
@@ -29,6 +29,11 @@ When the model works in steps (files, commands, the web), the whole answer is in
 
 ## Watching along
 When the model takes a screenshot on the way (of a program or the C64 emulator), a small copy shows with that step. After the answer they stay in a row under **Reasoning**; click one for a larger copy.
+
+## When the same error keeps coming back
+When the model gets the same error three times in one answer (from a build or a script, for example), the app tells it: what it changed did not fix the error, so it should read the line the error names, word for word, and change only that line, instead of rewriting the whole file again. This happens again after every next three times. You see the note when you open that step. Line numbers do not count: an error that moved a few lines counts as the same one.
+
+When the model writes the same file in full three times in one answer, and no command runs or builds it in between, the app says that too: build or run it now and fix only what goes wrong. A command counts when it names the file (for example `python c64kbuild.py intro.asm` or `build\intro.prg`).
 
 ## When the model stops before it is done
 Local models sometimes stop halfway. The app notices and tells the model to go on; you see that in the conversation. If it stops three times in a row, the app asks you to say "go on" or to give a hint.

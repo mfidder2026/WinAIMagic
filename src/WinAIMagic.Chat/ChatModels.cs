@@ -52,6 +52,9 @@ public sealed class ChatMessage
     public bool? Automatic { get; set; }
     /// <summary>The answer stopped at its token limit: the model gets only its start and end back, not the whole monologue.</summary>
     public bool? CutOff { get; set; }
+    /// <summary>A picture the model looked at that an older version (up to 1.14.12) sent as a line of text: it stays text, so what
+    /// the engine already read of the conversation does not change (Conversation.KeepLooksAsSent).</summary>
+    public bool? LookAsText { get; set; }
     /// <summary>While the model writes a tool call: what it prepares ("Schrijft bestand demo.bas · 1.240 tekens"). Not saved.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public string? Preparing { get; set; }
 
@@ -61,7 +64,7 @@ public sealed class ChatMessage
         || (Role == ChatRole.Assistant && Text.Length == 0 && ToolCalls.Count > 0 && Activities.Count == 0);
 }
 
-public sealed class Conversation
+public sealed class Conversation : IJsonOnDeserializing
 {
     public const string DefaultTitle = "Nieuw gesprek";
 
@@ -90,6 +93,23 @@ public sealed class Conversation
     /// its system prompt stays the same, so the engine reuses what it read (and a saved state still fits). "" is no file.
     /// A change counts for new conversations, and for this one after its summary.</summary>
     public Dictionary<string, string>? Notes { get; set; }
+    /// <summary>Every picture the model looks at stays a picture. null: a conversation of a version up to 1.14.12, which sent only
+    /// the last 3 as pictures and the older ones as text.</summary>
+    public bool? LooksKept { get; set; } = true;
+
+    // a saved conversation without the field is one of an older version: not the default of a new one
+    void IJsonOnDeserializing.OnDeserializing() => LooksKept = null;
+
+    /// <summary>A conversation of an older version keeps sending its older looks as text, as that version last did: otherwise the
+    /// first question after the update would read the whole conversation again (Qwen3.6 on the Mac, 149K tokens: 11 minutes). New
+    /// looks stay pictures.</summary>
+    public void KeepLooksAsSent()
+    {
+        if (LooksKept != null) return;
+        var looks = Messages.Where(m => m.Automatic == true && m.Attachments.Count > 0).ToList();
+        foreach (var m in looks.Take(Math.Max(0, looks.Count - 3))) m.LookAsText = true;
+        LooksKept = true;
+    }
 
     /// <summary>The title in the chosen language while it is still the default.</summary>
     [JsonIgnore]
@@ -149,6 +169,7 @@ public sealed class ConversationStore
             var list = JsonSerializer.Deserialize<List<Conversation>>(File.ReadAllBytes(file), ChatJson.Options)
                 ?? throw new JsonException("null");
             Conversations = [.. list.OrderByDescending(c => c.Updated)];
+            foreach (var c in Conversations) c.KeepLooksAsSent();
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -238,5 +259,18 @@ public sealed class ConversationStore
         lock (gate) data = JsonSerializer.SerializeToUtf8Bytes(Conversations, ChatJson.Options);
         try { AtomicFile.Write(Paths.ConversationsFile, data); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        lock (gate) lastSaved = DateTime.UtcNow;
+    }
+
+    private DateTime lastSaved = DateTime.MinValue;
+    /// <summary>A long answer saves on the way at most this often.</summary>
+    public static TimeSpan SaveEvery { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>What an answer did so far, while it goes on: an answer can run for hours, and the conversation was written only at
+    /// its end (on the Mac the Terminator intro kept two hours of steps in memory only, lost if the app had been killed).</summary>
+    public void SaveOnTheWay()
+    {
+        lock (gate) if (DateTime.UtcNow - lastSaved < SaveEvery) return;
+        Save();
     }
 }

@@ -130,6 +130,36 @@ public sealed class SlotKeeperTests : ChatTest
         Assert.True(lesson["kwargs"]!["enable_thinking"]!.GetValue<bool>());
     }
 
+    /// <summary>A stop cancelled the run, and with it the save at its end (it sat inside the try). The keeper also counted a failed
+    /// save as saved, so quitting skipped it too: on the Mac the 164K-token Terminator conversation would have been read again.</summary>
+    [Fact]
+    public async Task AStoppedAnswerIsSavedAndAFailedSaveIsTriedAgain()
+    {
+        var (store, a, _) = TwoConversations();
+        var keeper = new SlotKeeper(dir);
+        keeper.Started(Url, "k");
+        var lines = new List<string>();
+        keeper.Note = l => { lock (lines) lines.Add(l); };
+        var chat = new ChatClient();
+        chat.Send("hallo", [], a.Id, store, Url);
+        await Until(() => keeper.Current == a.Id);
+        await Task.Delay(150);      // the stand-in writes its answer for 0.4 s
+        chat.Stop(a.Id);
+        await Until(() => !chat.IsBusy(a.Id));
+        Assert.Equal(["save " + Id(a.Id)], await SlotCalls());
+        Assert.False(keeper.HasUnsaved);
+
+        // a save that fails stays to do, so the next chance (a quit) tries again
+        var b = Guid.NewGuid();
+        await keeper.EnterAsync(b);
+        server.Kill(true);
+        server.WaitForExit();
+        await keeper.SaveCurrentAsync();
+        lock (lines) Assert.Contains("save mislukt", lines[^1]);
+        Assert.True(keeper.HasUnsaved);
+        GC.KeepAlive(keeper);
+    }
+
     /// <summary>A stop while the engine writes an answer does not wait for it: the engine holds a save back until the slot is
     /// free, so the model went on writing under "Model ontladen…".</summary>
     [Fact]

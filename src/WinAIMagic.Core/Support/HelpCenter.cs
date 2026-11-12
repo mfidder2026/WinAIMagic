@@ -10,9 +10,13 @@ public static class HelpCenter
     /// <summary>The help's language: Dutch for Dutch, English for the others.</summary>
     public static string Language => AppLanguages.Current == AppLanguage.Nl ? "nl" : "en";
 
-    public static IReadOnlyList<HelpTopic> Topics(string? language = null)
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, IReadOnlyList<HelpTopic>> read = new();
+
+    /// <summary>The topics of a language, read once (the Mac read all help files every time its panel was built).</summary>
+    public static IReadOnlyList<HelpTopic> Topics(string? language = null) => read.GetOrAdd(language ?? Language, ReadTopics);
+
+    private static IReadOnlyList<HelpTopic> ReadTopics(string language)
     {
-        language ??= Language;
         var list = new List<HelpTopic>();
         foreach (var (path, text) in BundledTexts.Under("help/" + language))
         {

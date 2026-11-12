@@ -487,6 +487,16 @@ public static class WorkspaceTools
 
     private const uint InvalidFileAttributes = 0xFFFFFFFF, FileShareAll = 7, OpenExisting = 3, FileFlagBackupSemantics = 0x02000000;
 
+    /// <summary>Now, by the clock the file system stamps files with: it moves in steps of about 15 ms, and DateTime.UtcNow is precise,
+    /// so a file written right after a precise start could look a few ms older than it (the screenshot tests failed under load).</summary>
+    public static DateTime FileClockNow()
+    {
+        GetSystemTimeAsFileTime(out long ticks);
+        return DateTime.FromFileTimeUtc(ticks);
+    }
+
+    [DllImport("kernel32.dll")]
+    private static extern void GetSystemTimeAsFileTime(out long fileTime);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "GetFileAttributesW")]
     private static extern uint GetFileAttributes(string path);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "CreateFileW")]

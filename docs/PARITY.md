@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.14.12
+# Parity with MacAIMagic 1.14.13
 
-How this version relates to MacAIMagic at commit `089c43c`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `16f91cd`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -37,6 +37,21 @@ How this version relates to MacAIMagic at commit `089c43c`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `16f91cd` (1.14.13): pictures that stay, a stopped answer kept, saves on the way, notes on repeated errors and rewrites
+
+- **Taken over:**
+  - `889e9b5`: every picture the model looked at stays a picture for the rest of the conversation; only the last 3 used to, and each new look turned an old one into text far back, so a hybrid model read the whole conversation again (on the Mac 82K-149K tokens, 3-11 minutes). A conversation saved by 1.14.12 or older keeps its older looks as text (`ChatMessage.LookAsText`, set once at load by `Conversation.KeepLooksAsSent` when `looksKept` is missing; here through `IJsonOnDeserializing`, since a C# initializer would fill the missing field). Tests: APictureTheModelLookedAtStaysAndANewLookChangesNothingBefore, AConversationOfTheOlderVersionSendsWhatItSentBefore, ANewConversationKeepsItsLooks. The old test OnlyTheLastPicturesTheModelLookedAtAreSentAgain is gone. Not measured here with a real hybrid model.
+  - `c6dcf2c`: the save of the conversation's place in the engine after an answer sat inside the try, so a stop skipped it; it now runs after the catch. A failed save stays to do (`SlotKeeper.SaveCurrentLocked` sets `unsaved` back). Test: AStoppedAnswerIsSavedAndAFailedSaveIsTriedAgain (against fake_engine.py). Not tried with the real engine.
+  - `a0af8ad`: the conversations are saved at the top of each tool round, at most every 10 s (`ConversationStore.SaveOnTheWay`). Measured here: a 4.2 MB conversations file (410 messages) writes in 9 ms (debug build). Tests: ALongAnswerIsSavedOnTheWay (reads the file while the answer runs), WritingALargeConversationsFileIsQuick.
+  - `a8c1679`: the same error three times in one answer gets a note on that tool result (`RepeatedErrors`). Adapted: the generic lines are also c64kbuild.py's `FOUT:` lines and PowerShell's `+ CategoryInfo` / `+ FullyQualifiedErrorId`; "is not recognized" and "cannot find" count as error lines; a folder is left out with `C:\` and `\` paths too. The Mac's second fix (the last step of a round not stored done) was not needed here: the step was already stored with its output; ALongAnswerIsSavedOnTheWay and TheThirdSameErrorTellsTheModel check it. Tests: TheTerminatorErrorIsRecognizedWhereverItMoves, OtherErrorsAndGoodBuildsDoNotCount, TheNewBuildOutputTheCheckerAndPython (with PowerShell's output), TheThirdSameErrorTellsTheModel.
+  - `400dd33`: the third whole write of a file without a command that names it gets a note (`UntestedRewrites`). Tests: ThePatternOfTheTerminatorRun, AFileCountsAsRunWhenACommandNamesIt (with PowerShell commands), TheThirdWholeWriteWithoutARunTellsTheModel. Help (nl, en): "Als dezelfde fout steeds terugkomt", with c64kbuild.py as the example. Neither note was seen with a real model.
+  - `8d63eb0`, adapted for PowerShell: `SystemTools.Words` refuses the typographic quotes (‘ ’ ‚ ‛ “ ” „; PowerShell closes a ' on a ’, so `Get-Content '‘; Remove-Item x ‘'` passed the check and would have run Remove-Item), control characters other than tab, Unicode spaces and invisible characters, and reads the dashes – — ― as -. Test: TheShellReadsACommandAsTheCheckDoes (14 commands). The zsh cases (backslash, braces, assignment) do not apply to PowerShell.
+  - `5c355e1`, in part: the help topics are read once per language (`HelpCenter.Topics`). The rest was already so here: streamed text reaches the conversation at most every 0.1 s (`StreamThrottle`, `AppState`), and the turning mark, edge and ring are storyboards on the composition thread. Measured here with the debug app and the fake engine writing 4,000 lines of code: 0.83 s of CPU in 8 s (10% of one core), 6% idle. Not measured with a real model.
+  - `eb08a1f`: version 1.14.13.
+- **Fixed here, from 1.14.12's watching along:** the start of a command is taken from the clock the file system stamps files with (`WorkspaceTools.FileClockNow`, steps of about 15 ms); with the precise clock a screenshot made right after the start could look older, and the two screenshot tests failed in a full test run.
+- **Not needed:** `16f91cd` (the chat already jumps to the end without animation here, and a ScrollViewer cannot stand past its end; not seen on Windows). `ba25414`, `ab87017`, `1a063f5`, `742e5a1`: measurements of the Mac's engine on Metal.
+- **Open (research, no code):** `73df3f2` and `148a19b` suggest trying llamAmpere and a requantized Flash-Next on an RTX card; not measured on this PC.
 
 ### Up to `089c43c` (1.14.12): watching along, and the chat no longer scrolls into empty space
 

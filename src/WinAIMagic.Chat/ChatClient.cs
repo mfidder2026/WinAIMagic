@@ -53,8 +53,6 @@ public sealed class ChatClient(HttpClient? http = null)
     public int MaxAnswerTokens => Math.Max(4096, (int)(ContextLimit * AnswerShare));
     /// <summary>The engine runs with vision now: the model can look at an image file (view_image). Set by the app.</summary>
     public static Func<bool> SeesImages { get; set; } = () => false;
-    /// <summary>Pictures the model looked at stay in its requests, the last few of them: each costs hundreds of tokens.</summary>
-    public const int ImagesKept = 3;
 
     /// <summary>Any conversation at work.</summary>
     public bool Busy { get { lock (sync) return runs.Count > 0; } }
@@ -262,17 +260,21 @@ public sealed class ChatClient(HttpClient? http = null)
         WorkspaceTools.Current = folder;
         try
         {
-            await Run(id, store, baseUrl, owner, ct);
-            await Learn(id, store, baseUrl, ct);
-            // the answer is done: its place in the engine goes to the SSD now, not only when another conversation takes the
-            // model or the app quits (a quit or a crash that comes first would lose it)
+            try
+            {
+                await Run(id, store, baseUrl, owner, ct);
+                await Learn(id, store, baseUrl, ct);
+            }
+            // a stop can also surface as another error of the cancelled request (an IOException from the stream): never a red line
+            catch (Exception) when (ct.IsCancellationRequested) { }
+            catch (Exception e)
+            {
+                store.Update(id, c => { if (c.Messages.Count > 0) c.Messages[^1].Error = e.Message; });
+            }
+            // the answer is done, or stopped: its place in the engine goes to the SSD now, not only when another conversation takes
+            // the model or the app quits (a quit or a crash that comes first would lose it). It sat inside the try, so a stop
+            // skipped it, and going on in a 164K-token conversation meant reading it all again (about 12 minutes on the Mac).
             if (Gate(baseUrl).Holder == null && SlotKeeper.At(baseUrl) is { } keeper && keeper.Current == id) await keeper.SaveCurrentAsync();
-        }
-        // a stop can also surface as another error of the cancelled request (an IOException from the stream): never a red line
-        catch (Exception) when (ct.IsCancellationRequested) { }
-        catch (Exception e)
-        {
-            store.Update(id, c => { if (c.Messages.Count > 0) c.Messages[^1].Error = e.Message; });
         }
         finally
         {
@@ -303,6 +305,10 @@ public sealed class ChatClient(HttpClient? http = null)
         bool changedFiles = false;
         // rounds of tools since the model last updated its step list: a model forgets to tick steps off
         int roundsSinceSteps = 0;
+        // the same error in the results of the folder's tools, again and again: the model hears it the third time
+        var repeated = new RepeatedErrors();
+        // the same file written in full again and again, and never run: the model hears it the third time
+        var rewrites = new UntestedRewrites();
         // a step was taken in an earlier round of this answer
         bool tookSteps = false;
         // "ga door" on work that is under way: the plan was made, so even the first round only takes the next step
@@ -311,6 +317,8 @@ public sealed class ChatClient(HttpClient? http = null)
         {
             for (int round = 0; round < rounds; round++)
             {
+                // the last round is complete here (its results, a picture it looked at): on disk before the next one starts
+                store.SaveOnTheWay();
                 if (store.Find(id)?.ContextTokens is { } used && used > ContextLimit * CompactAt)
                     await CompactAsync(id, store, baseUrl, null, ct);
                 if (ct.IsCancellationRequested) return;
@@ -472,7 +480,7 @@ public sealed class ChatClient(HttpClient? http = null)
                         }
                         else
                         {
-                            var commandStart = DateTime.UtcNow;
+                            var commandStart = WorkspaceTools.FileClockNow();
                             text = await WorkspaceTools.RunAsync(call, ct);
                             // the pictures the step makes (an emulator screenshot): small, beside the step, so the user watches along
                             if (call.Name == "run_command")
@@ -542,8 +550,18 @@ public sealed class ChatClient(HttpClient? http = null)
                     int room = Math.Max(8_000, ContextLimit * 3 / 4);
                     if (text.Length > room)
                         text = TextLimit.Prefix(text, room * 3 / 4) + $"\n… (shortened, the output was {text.Length} characters) …\n" + TextLimit.Suffix(text, room / 4);
+                    // on this result itself, so the model reads it with the error; the user sees it in the step's output
+                    var warning = isWorkspace && repeated.Note(text) is { } again ? "\n\n" + again : "";
+                    if (isWorkspace && step.Denied != true)
+                    {
+                        if (call.Name == "write_file" && !text.StartsWith("Error", StringComparison.Ordinal) && WorkspaceTools.Str(callArgs, "path") is { } written)
+                            warning += rewrites.Wrote(written) is { } rewritten ? "\n\n" + rewritten : "";
+                        else if (call.Name == "run_command")
+                            rewrites.Ran(WorkspaceTools.Str(callArgs, "command") ?? "");
+                    }
                     step.Done = true;
-                    step.Output = TextLimit.Prefix(text, 4000);
+                    step.Output = TextLimit.Prefix(text, 4000) + warning;
+                    text += warning;
                     if (shots != null) step.Images = shots;
                     // the reminder rides on the round's last result: a message of its own would break the tool turn, and on the last
                     // one the engine's cache of the conversation stays valid
@@ -1116,9 +1134,13 @@ public sealed class ChatClient(HttpClient? http = null)
             system += "\n\n" + L("Samenvatting van het begin van dit gesprek (die berichten zijn weggelaten om ruimte te maken in je context):") + "\n" + summary;
 
         var o = new JsonArray(new JsonObject { ["role"] = "system", ["content"] = system });
-        // older pictures the model looked at itself go as a line of text; the user's own pictures always go
+        // Every picture stays a picture, also the ones the model looked at itself long ago: what was sent once is never changed.
+        // Only the last 3 looks used to go as pictures; each new look turned an old one into a line of text far back in the
+        // conversation, and a hybrid model (Qwen3.6, Qwen3.8-Flash-Next) then read the whole conversation again: 82K, 110K and 144K
+        // tokens, 3, 5 and 11 minutes, in one C64 run on the Mac. A full context is summarized, and the summary leaves the old
+        // pictures out. A conversation of that older version keeps its old looks as text (ChatMessage.LookAsText), as the engine
+        // read them.
         var list = history as IList<ChatMessage> ?? history.ToList();
-        var keptLooks = list.Where(m => m.Automatic == true && m.Attachments.Count > 0).TakeLast(ImagesKept).Select(m => m.Id).ToHashSet();
         bool sees = SeesImages();
         foreach (var m in list)
         {
@@ -1133,7 +1155,7 @@ public sealed class ChatClient(HttpClient? http = null)
                         var note = L($"(Hier stond een afbeelding: {names}. Het model draait nu zonder afbeeldingen (vision); zeg dat als het ertoe doet.)");
                         o.Add(new JsonObject { ["role"] = "user", ["content"] = m.Text.Length == 0 ? note : note + "\n\n" + m.Text });
                     }
-                    else if (m.Automatic == true && m.Attachments.Count > 0 && !keptLooks.Contains(m.Id))
+                    else if (m.LookAsText == true && m.Automatic == true && m.Attachments.Count > 0)
                     {
                         var seen = string.Join(", ", m.Attachments.Select(a => a.Filename));
                         o.Add(new JsonObject { ["role"] = "user", ["content"] = L($"(Hier stond een afbeelding die je eerder bekeek: {seen}.)") });
