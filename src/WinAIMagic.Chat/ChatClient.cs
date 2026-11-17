@@ -77,6 +77,13 @@ public sealed class ChatClient(HttpClient? http = null)
     public int ContextLimit { get; set; } = 65_536;
     /// <summary>The model the engine runs, for the system prompt.</summary>
     public string ModelName { get; set; } = "DeepSeek-V4.1-Flash";
+    /// <summary>The family of the model that answers (the engine's, else the chosen one): it decides the sampling and what goes
+    /// back. Set by the app.</summary>
+    public Func<string?> ModelFamily { get; set; } = () => null;
+    public bool IsQwen => ModelFamily() == "qwen";
+    /// <summary>A skill takes at most about a quarter of the context (some 3 characters per token): 26,000 characters at 32K, a whole
+    /// 71 KB skill from about 88K.</summary>
+    public int SkillLimit => (int)(ContextLimit * 0.8);
     /// <summary>A question waiting for an answer, of any conversation.</summary>
     public Approval? PendingApproval { get { lock (sync) return approvals.Values.FirstOrDefault(); } }
     /// <summary>The approval this conversation waits for.</summary>
@@ -295,7 +302,7 @@ public sealed class ChatClient(HttpClient? http = null)
         // connectors loaded before (or always loaded) run again, so their tools are in the request
         if (Connectors is { } connectors) await connectors.EnsureRunningAsync(LoadedConnectors, ct);
         if (KeepsNotes && WorkspaceTools.Workspace is { } folder) WorkspaceNotes.CreateIfNeeded(folder);
-        LoadMatchingSkills(id, store);
+        LoadMatchingSkills(id, store, limit: SkillLimit);
         var activities = new List<ToolActivity>();
         var sources = new List<Source>();
         int nudges = 0;
@@ -319,7 +326,7 @@ public sealed class ChatClient(HttpClient? http = null)
             {
                 // the last round is complete here (its results, a picture it looked at): on disk before the next one starts
                 store.SaveOnTheWay();
-                if (store.Find(id)?.ContextTokens is { } used && used > ContextLimit * CompactAt)
+                if (store.Find(id)?.ContextTokens is { } used && used > ContextLimit * CompactAt && !TrimOldResults(id, store, used))
                     await CompactAsync(id, store, baseUrl, null, ct);
                 if (ct.IsCancellationRequested) return;
                 // each round keeps its own steps, so the chat shows thinking, text and steps in the order they came
@@ -352,7 +359,8 @@ public sealed class ChatClient(HttpClient? http = null)
                     history.RemoveAt(history.Count - 1);
                     try
                     {
-                        result = await Task.Run(() => StreamAsync(history, c.Summary, baseUrl, throttle, budget, ct), CancellationToken.None);
+                        bool keepThinking = IsQwen && c.ThinkingKept == true;
+                        result = await Task.Run(() => StreamAsync(history, c.Summary, keepThinking, baseUrl, throttle, budget, ct), CancellationToken.None);
                         await throttle.DrainAsync();
                         break;
                     }
@@ -390,8 +398,12 @@ public sealed class ChatClient(HttpClient? http = null)
                     bool cutOff = result.FinishReason == "length";
                     if (!LooksUnfinished(reply.Text, reply.Reasoning, cutOff, WorkspaceActive || tookSteps || activities.Count > 0, changedFiles))
                     {
-                        // KLAAR is a word for the app, not for the user
-                        store.Update(id, _ => reply.Text = WithoutDoneWord(reply.Text));
+                        // KLAAR is a word for the app, not for the user; the task is done, so are its steps
+                        store.Update(id, c =>
+                        {
+                            reply.Text = WithoutDoneWord(reply.Text);
+                            c.Steps = WorkSteps.Finished(c.Steps);
+                        });
                         return;
                     }
                     if (nudges >= MaxNudges)
@@ -496,7 +508,7 @@ public sealed class ChatClient(HttpClient? http = null)
                     }
                     else if (isSkill)
                     {
-                        text = Skills.Run(call);
+                        text = Skills.Run(call, limit: SkillLimit);
                     }
                     else if (isSteps)
                     {
@@ -596,7 +608,7 @@ public sealed class ChatClient(HttpClient? http = null)
 
     /// <summary>A question clearly about a skill's subject gets that skill before the first answer, as if the model had called
     /// use_skill: a small model often answers or searches the web without loading it. Once per skill per conversation.</summary>
-    internal static void LoadMatchingSkills(Guid id, ConversationStore store, IReadOnlyList<Skill>? skills = null)
+    internal static void LoadMatchingSkills(Guid id, ConversationStore store, IReadOnlyList<Skill>? skills = null, int? limit = null)
     {
         if (!Settings.Shared.Skills || store.Find(id) is not { } c) return;
         if (c.Messages.LastOrDefault(m => m.Role == ChatRole.User && m.Automatic != true)?.Text is not { } question) return;
@@ -616,7 +628,7 @@ public sealed class ChatClient(HttpClient? http = null)
             store.Update(id, conversation =>
             {
                 conversation.Messages.Add(step);
-                conversation.Messages.Add(new ChatMessage { Role = ChatRole.Tool, Text = Skills.Run(call, [skill]), ToolCallId = call.Id });
+                conversation.Messages.Add(new ChatMessage { Role = ChatRole.Tool, Text = Skills.Run(call, [skill], limit), ToolCallId = call.Id });
             });
         }
     }
@@ -850,7 +862,7 @@ public sealed class ChatClient(HttpClient? http = null)
         StateChanged?.Invoke();
         try
         {
-            var messages = RequestMessages(c.Unsummarized, c.Summary);
+            var messages = RequestMessages(c.Unsummarized, c.Summary, IsQwen && c.ThinkingKept == true);
             messages.Add(new JsonObject { ["role"] = "user", ["content"] = ChatTexts.LearnRequest });
             var body = new JsonObject
             {
@@ -863,7 +875,7 @@ public sealed class ChatClient(HttpClient? http = null)
                 // "Reasoning Effort" from the start of the system prompt and the old thoughts, so the engine read the whole
                 // conversation again after every task (the Mac measured 52,232 tokens, 383 s). Thinking is stopped by the
                 // budget instead, which does not change the prompt.
-                ["chat_template_kwargs"] = TemplateKwargs(),
+                ["chat_template_kwargs"] = TemplateKwargs(IsQwen),
                 ["thinking_budget_tokens"] = 0,
             };
             // the same tools as the conversation, so its start stays the same for the engine; it must only write here
@@ -965,6 +977,43 @@ public sealed class ChatClient(HttpClient? http = null)
     }
 
     // MARK: - compacting
+
+    /// <summary>Long tool results longer ago than this many messages may be trimmed when the context is full.</summary>
+    public const int KeepRecentResults = 8;
+    /// <summary>A trimmed result keeps this many characters of its start and its end.</summary>
+    public const int TrimKeepStart = 600, TrimKeepEnd = 200;
+
+    /// <summary>A full conversation in which old tool results (files read, command output) take most of the room: those results go
+    /// to the model with only their start and end (TrimmedResult), and the rest of the conversation stays word for word, without a
+    /// summary the model has to write first. Only when that brings the conversation to half of the context; otherwise CompactAsync
+    /// summarizes, as before. The engine reads the conversation again either way, once. Returns whether it trimmed.</summary>
+    public bool TrimOldResults(Guid id, ConversationStore store, int used)
+    {
+        if (store.Find(id) is not { } c) return false;
+        var open = c.Unsummarized;
+        if (open.Count <= KeepRecentResults) return false;
+        var candidates = open.Take(open.Count - KeepRecentResults)
+            .Where(m => m.Role == ChatRole.Tool && m.Trimmed != true && m.Text.Length > TrimKeepStart + TrimKeepEnd + 400).ToList();
+        // about 3 characters per token for code and command output
+        int saved = candidates.Sum(m => m.Text.Length - TrimmedResult(m.Text).Length) / 3;
+        if (candidates.Count == 0 || used - saved > ContextLimit * 0.5) return false;
+        var ids = candidates.Select(m => m.Id).ToHashSet();
+        store.Update(id, conversation =>
+        {
+            foreach (var m in conversation.Messages) if (ids.Contains(m.Id)) m.Trimmed = true;
+            conversation.ContextTokens = null;
+        });
+        store.Save();
+        return true;
+    }
+
+    /// <summary>A trimmed tool result as the model gets it: its start and end, and how to get the rest back.</summary>
+    public static string TrimmedResult(string text)
+    {
+        if (text.Length <= TrimKeepStart + TrimKeepEnd + 400) return text;
+        var left = (text.Length - TrimKeepStart - TrimKeepEnd).ToString("N0", AppLanguages.Current.Culture());
+        return TextLimit.Prefix(text, TrimKeepStart) + "\n\n[" + L($"… {left} tekens van deze uitvoer weggelaten om ruimte te maken; vraag het opnieuw op als je het nodig hebt …") + "]\n\n" + TextLimit.Suffix(text, TrimKeepEnd);
+    }
 
     /// <summary>Summarize the start of a conversation, so it fits in the context again: everything before the last two questions
     /// becomes a summary that goes with the system prompt; the messages stay visible in the chat.</summary>
@@ -1100,7 +1149,7 @@ public sealed class ChatClient(HttpClient? http = null)
         return tools;
     }
 
-    internal JsonArray RequestMessages(IEnumerable<ChatMessage> history, string? summary = null)
+    internal JsonArray RequestMessages(IEnumerable<ChatMessage> history, string? summary = null, bool keepThinking = false)
     {
         var s = Settings.Shared;
         var date = DateTime.Now.ToString("D", AppLanguages.Current.Culture());
@@ -1175,8 +1224,11 @@ public sealed class ChatClient(HttpClient? http = null)
                     break;
                 case ChatRole.Assistant:
                     if (m.Text.Length == 0 && m.ToolCalls.Count == 0) continue;
-                    // the thinking stays here: reasoning never goes back to the model
                     var msg = new JsonObject { ["role"] = "assistant", ["content"] = m.CutOff == true ? Shortened(m.Text) : m.Text };
+                    // Qwen's template puts the thinking of the steps since the last question back as the model wrote it (with
+                    // preserve_thinking false, TemplateKwargs). Sent empty, the model saw its steps without their reasoning, unlike
+                    // its training, and the engine read the conversation again from the last answer on. Other models get none.
+                    if (keepThinking && m.Reasoning.Length > 0 && m.CutOff != true) msg["reasoning_content"] = m.Reasoning;
                     if (m.ToolCalls.Count > 0)
                     {
                         var calls = new JsonArray();
@@ -1192,7 +1244,7 @@ public sealed class ChatClient(HttpClient? http = null)
                     o.Add(msg);
                     break;
                 case ChatRole.Tool:
-                    o.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = m.ToolCallId ?? "", ["content"] = m.Text });
+                    o.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = m.ToolCallId ?? "", ["content"] = m.Trimmed == true ? TrimmedResult(m.Text) : m.Text });
                     break;
             }
         }
@@ -1251,25 +1303,44 @@ public sealed class ChatClient(HttpClient? http = null)
     /// <summary>What the chat template is rendered with, the same for every request about a conversation (its answers and
     /// the lessons after them): these change the start of the prompt (DeepSeek writes "Reasoning Effort" into the system
     /// part and drops old thoughts without thinking), and then the engine reads the whole conversation again.</summary>
-    public static JsonObject TemplateKwargs() =>
-        new() { ["enable_thinking"] = Settings.Shared.Thinking, ["reasoning_effort"] = Settings.Shared.ReasoningEffort };
+    public static JsonObject TemplateKwargs(bool qwen = false)
+    {
+        // Qwen's template knows low, medium, high/xhigh only: "max" (Maximaal) stopped every request with a template error
+        var effort = qwen && Settings.Shared.ReasoningEffort == "max" ? "high" : Settings.Shared.ReasoningEffort;
+        var kwargs = new JsonObject { ["enable_thinking"] = Settings.Shared.Thinking, ["reasoning_effort"] = effort };
+        // the thinking of the steps since the last question goes back (reasoning_content), that of earlier questions not: Qwen3.8's
+        // template keeps all of it by default, which made a conversation grow three times as fast on the Mac (2,217 against 729
+        // tokens after three questions with Qwen3.8-Flash-Next). Qwen's card names this for agents.
+        if (qwen) kwargs["preserve_thinking"] = false;
+        return kwargs;
+    }
 
-    internal JsonObject StreamBody(IEnumerable<ChatMessage> history, string? summary, int? thinkingBudget = null)
+    internal JsonObject StreamBody(IEnumerable<ChatMessage> history, string? summary, int? thinkingBudget = null, bool keepThinking = false)
     {
         var s = Settings.Shared;
         int budget = thinkingBudget ?? s.ThinkingBudgetNow;
+        bool qwen = IsQwen;
         var body = new JsonObject
         {
             ["model"] = ModelName,
-            ["messages"] = RequestMessages(history, summary),
+            ["messages"] = RequestMessages(history, summary, keepThinking),
             ["stream"] = true,
             ["stream_options"] = new JsonObject { ["include_usage"] = true },
             ["temperature"] = s.Temperature,
             ["top_p"] = 1.0,
             ["max_tokens"] = MaxAnswerTokens,
             // enable_thinking is understood by both templates (DeepSeek maps it to thinking_mode)
-            ["chat_template_kwargs"] = TemplateKwargs(),
+            ["chat_template_kwargs"] = TemplateKwargs(qwen),
         };
+        // Qwen's own settings (model cards of Qwen3.6 and Qwen3.8): with thinking top_p 0.95, top_k 20, min_p 0; without top_p 0.8,
+        // top_k 20, min_p 0 (its presence penalty 1.5 is left out: the card warns it can mix languages). Otherwise the engine's
+        // defaults applied: top_k 40, min_p 0.05. The temperature stays the user's.
+        if (qwen)
+        {
+            body["top_p"] = s.Thinking ? 0.95 : 0.8;
+            body["top_k"] = 20;
+            body["min_p"] = 0.0;
+        }
         // without a limit a model can keep doubting on a hard question and never get to its answer
         // off means off: GLM's template ignores enable_thinking and always opens with <think>
         if (!s.Thinking) body["thinking_budget_tokens"] = 0;
@@ -1341,10 +1412,10 @@ public sealed class ChatClient(HttpClient? http = null)
         return payload.Length == 0 ? null : payload;
     }
 
-    private async Task<StreamResult> StreamAsync(List<ChatMessage> history, string? summary, Uri baseUrl, StreamThrottle throttle, int thinkingBudget, CancellationToken ct)
+    private async Task<StreamResult> StreamAsync(List<ChatMessage> history, string? summary, bool keepThinking, Uri baseUrl, StreamThrottle throttle, int thinkingBudget, CancellationToken ct)
     {
         // the model writes for one conversation at a time; the others wait here (and a stop while waiting is a stop)
-        var body = StreamBody(history, summary, thinkingBudget);
+        var body = StreamBody(history, summary, thinkingBudget, keepThinking);
         var gate = Gate(baseUrl);
         if (!await gate.AcquireAsync(RunConversation ?? Guid.NewGuid(), ct).ConfigureAwait(false)) throw new OperationCanceledException(ct);
         await EnterEngine(baseUrl).ConfigureAwait(false);

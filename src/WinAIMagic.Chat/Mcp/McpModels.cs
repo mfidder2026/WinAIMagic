@@ -137,7 +137,7 @@ public static class McpSecrets
 
     /// <summary>The Windows Credential Manager.</summary>
     public static IStore Windows { get; } = new CredentialManager();
-    public static IStore Store { get; set; } = Windows;
+    public static IStore Store { get; set; } = WinAIMagic.Core.Support.Paths.Portable ? new ProtectedFile(Path.Combine(WinAIMagic.Core.Support.Paths.AppData, "secrets.json")) : Windows;
 
     public static string? Get(string account) => Store.Get(account);
     public static void Set(string account, string value) => Store.Set(account, value);
@@ -146,6 +146,55 @@ public static class McpSecrets
     /// <summary>"keychain:&lt;name&gt;" becomes the stored value; anything else stays as it is.</summary>
     public static string Resolve(string value) =>
         value.StartsWith("keychain:", StringComparison.Ordinal) ? Get(value[9..]) ?? "" : value;
+
+    /// <summary>WinAIMagic Portable: the secrets in a file in its data folder, encrypted for this Windows user (DPAPI), not in the
+    /// Credential Manager of the PC it happens to run on.</summary>
+    public sealed class ProtectedFile(string file) : IStore
+    {
+        private readonly object gate = new();
+
+        private Dictionary<string, string> Read()
+        {
+            try { return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(file)) ?? []; }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { return []; }
+        }
+
+        private void Write(Dictionary<string, string> items) => AtomicFile.Write(file, System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(items));
+
+        public string? Get(string account)
+        {
+            lock (gate)
+            {
+                if (!Read().TryGetValue(account, out var sealedText)) return null;
+                try
+                {
+                    return Encoding.UTF8.GetString(System.Security.Cryptography.ProtectedData.Unprotect(Convert.FromBase64String(sealedText), null,
+                        System.Security.Cryptography.DataProtectionScope.CurrentUser));
+                }
+                catch (Exception e) when (e is FormatException or System.Security.Cryptography.CryptographicException) { return null; }
+            }
+        }
+
+        public void Set(string account, string value)
+        {
+            lock (gate)
+            {
+                var items = Read();
+                items[account] = Convert.ToBase64String(System.Security.Cryptography.ProtectedData.Protect(Encoding.UTF8.GetBytes(value), null,
+                    System.Security.Cryptography.DataProtectionScope.CurrentUser));
+                Write(items);
+            }
+        }
+
+        public void Delete(string account)
+        {
+            lock (gate)
+            {
+                var items = Read();
+                if (items.Remove(account)) Write(items);
+            }
+        }
+    }
 
     public sealed class Memory : IStore
     {

@@ -36,7 +36,15 @@ public sealed partial class Sidebar : Grid
         var version = Ui.Label("v" + Paths.AppVersion, 11, Theme.Secondary);
         version.VerticalAlignment = VerticalAlignment.Bottom;
         version.Margin = new Thickness(0, 0, 0, 2);
-        var head = Ui.Row("auto,*", 10, mark, Ui.V(0, Ui.H(6, name, version), modelName));
+        var heading = Ui.V(0, Ui.H(6, name, version), modelName);
+        // WinAIMagic Portable: from which drive, green; orange when that drive could not be written and the data is on this pc
+        if (Paths.Portable)
+        {
+            var drive = Ui.Label(L($"USB · {Portable.Drive(Paths.AppRoot)}"), 11, new SolidColorBrush(Paths.PortableOnDrive ? Theme.Mint : Theme.Amber));
+            if (!Paths.PortableOnDrive) drive.Tip(L("De USB-schijf kon niet beschreven worden: de gegevens staan nu op deze pc, in WinAIMagic Portable onder AppData."));
+            heading.Children.Insert(1, drive);
+        }
+        var head = Ui.Row("auto,*", 10, mark, heading);
         head.Margin = new Thickness(18, 10, 12, 10);
         Children.Add(head.At(0));
 

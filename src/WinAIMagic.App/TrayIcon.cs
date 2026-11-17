@@ -131,11 +131,14 @@ public sealed class TrayIcon : IDisposable
     {
         get
         {
+            // a portable copy never writes the registry
+            if (WinAIMagic.Core.Support.Paths.Portable) return false;
             using var k = Registry.CurrentUser.OpenSubKey(RunKey);
             return k?.GetValue(RunName) is string v && v.Contains(Environment.ProcessPath ?? "\0", StringComparison.OrdinalIgnoreCase);
         }
         set
         {
+            if (WinAIMagic.Core.Support.Paths.Portable) return;
             using var k = Registry.CurrentUser.CreateSubKey(RunKey);
             if (value) k.SetValue(RunName, $"\"{Environment.ProcessPath}\" --background");
             else if (k.GetValue(RunName) != null) k.DeleteValue(RunName);

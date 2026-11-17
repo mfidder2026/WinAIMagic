@@ -30,6 +30,8 @@ public sealed class ComparePage : IPage
     private readonly List<FrameworkElement> textCards = new(), imageCards = new();
     private readonly FrameworkElement results;
     private readonly Grid table = new() { ColumnSpacing = 18, RowSpacing = 8 };
+    /// <summary>Under the table: a model measured while another program kept the GPU busy.</summary>
+    private readonly StackPanel warnings = new() { Spacing = 6 };
     private string shownReady = "?", shownResults = "?";
 
     public ComparePage(AppState app)
@@ -80,7 +82,7 @@ public sealed class ComparePage : IPage
             VerticalScrollMode = ScrollMode.Disabled,
         };
         tableScroll.SizeChanged += (_, e) => table.MinWidth = e.NewSize.Width;
-        results = Ui.V(Theme.SectionSpacing, charts, Ui.Card(tableScroll, L("Alle cijfers"), Glyph.Bullets, Theme.Cyan));
+        results = Ui.V(Theme.SectionSpacing, charts, Ui.Card(tableScroll, L("Alle cijfers"), Glyph.Bullets, Theme.Cyan), warnings);
 
         View = Ui.Page(
             Ui.PageHead(Ui.PageIcon(Glyph.Compare), L("Vergelijken"), Ui.Label(L("Dezelfde meting op elk model: een prompt van ~2.500 tokens lezen en 300 tokens schrijven, of een afbeelding van 1024 × 1024 maken."), 14, Theme.Secondary, wrap: true)),
@@ -136,6 +138,14 @@ public sealed class ComparePage : IPage
         foreach (var c in textCards) c.Show(text.Count > 0);
         foreach (var c in imageCards) c.Show(images.Count > 0);
         BuildTable(latest);
+        warnings.Children.Clear();
+        foreach (var r in latest.Where(r => r.SharedGpu))
+        {
+            var percent = Math.Round(r.OtherGpu ?? 0).ToString("0", AppLanguages.Current.Culture());
+            warnings.Children.Add(Ui.H(8, Ui.Icon(Glyph.Warning, 13, new SolidColorBrush(Theme.Amber)),
+                Ui.Label(L($"{r.ModelName}: een ander programma hield de GPU ook na 20 seconden wachten nog voor {percent} procent bezig, bijvoorbeeld een video of een venster dat steeds beweegt. Deze snelheden zijn te laag; sluit dat programma en meet opnieuw."), 13, new SolidColorBrush(Theme.Amber), wrap: true)));
+        }
+        warnings.Show(warnings.Children.Count > 0);
     }
 
     private FrameworkElement Choice(ModelInfo m)

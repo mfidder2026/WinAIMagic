@@ -22,7 +22,7 @@ When no model runs yet, your question starts it by itself. Another model starts 
 | R W X | The rights in that folder: read, write, execute. |
 
 ## Context and summarizing
-At the top of the conversation a meter shows how much of the context the conversation uses. At 80% the model summarizes the start; the messages stay visible. **Summarize now** in the meter does it at once.
+At the top of the conversation a meter shows how much of the context the conversation uses. At 80% the app first shortens long old tool output (files read, command output): the model gets its start and end, and the rest of the conversation stays word for word. If that is not enough, the model summarizes the start; the messages stay visible. **Summarize now** in the meter does it at once.
 
 ## An answer in steps
 When the model works in steps (files, commands, the web), the whole answer is in one card: every thought, text and step where it came. A thought is folded, with its start on one line; while the model thinks, you see the last lines of what it thinks now. While it works you see the latest 14 parts, with **earlier steps** for the rest; only the newest text is shown whole, of an earlier one you see its first lines and **Show all**. When the answer is done, all the work before the last text folds into one line **Reasoning and N steps**.

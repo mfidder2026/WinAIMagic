@@ -1,7 +1,7 @@
 ---
 title: Getting started
 icon: Home
-keywords: begin first start install model download engine start
+keywords: begin first start install model download engine start usb portable stick work laptop
 ---
 WinAIMagic runs large AI models entirely on this PC. Nothing goes to the cloud: your questions, files and answers stay here.
 
@@ -34,3 +34,10 @@ For that it reads the help itself and looks at how the app and this PC stand. It
 - At the top right is **?**: it opens the help for the screen that is open.
 - **F1** does the same from any screen.
 - Type a word in the search field, such as "administrator", "slow" or "taskbar".
+
+## From a USB drive (Portable)
+**WinAIMagic Portable** is a separate download (a zip) that runs from a USB drive without installing and without administrator rights. Unzip it, put the folder **WinAIMagic Portable** on the drive and open **WinAIMagic.exe** there.
+- Everything goes into the folder **WinAIMagic-data** next to the app: models, conversations, the work folder, documents, pictures and the settings. On the PC itself it writes nothing in AppData, your own folders or the registry.
+- It starts offline: web search, the browser, mail, controlling programs, Telegram, the heartbeat and the cluster network are off until you turn them on.
+- It uses port 8090, so it can run beside an installed WinAIMagic. At the top left it says **USB · E:** in green; orange when the drive could not be written and the data is on this PC.
+- The programs are not signed: if your organization blocks unsigned programs from a USB drive, it does not start there.

@@ -27,6 +27,9 @@ public sealed class Settings : INotifyPropertyChanged
     private readonly Dictionary<string, object?> v = new();
     private bool loading;
 
+    /// <summary>Settings that are never written to disk: a test that sets them meets no other test's file.</summary>
+    public static Settings Detached() => new() { loading = true };
+
     private T Get<T>(T fallback, [CallerMemberName] string key = "") => v.TryGetValue(key, out var x) && x is T t ? t : fallback;
 
     private void Set<T>(T value, [CallerMemberName] string key = "")
@@ -183,9 +186,10 @@ public sealed class Settings : INotifyPropertyChanged
     {
         var s = new Settings { loading = true };
         bool resave = false;
+        bool first = !File.Exists(Paths.SettingsFile);
         try
         {
-            if (File.Exists(Paths.SettingsFile))
+            if (!first)
             {
                 using var doc = JsonDocument.Parse(File.ReadAllText(Paths.SettingsFile));
                 // (0.1.0 also wrote a copy with the keys unencrypted: the next save leaves it out)
@@ -205,6 +209,12 @@ public sealed class Settings : INotifyPropertyChanged
         catch (Exception e) when (e is JsonException or IOException or InvalidOperationException or FormatException)
         {
             try { File.Copy(Paths.SettingsFile, Paths.SettingsFile + ".bad", true); } catch (IOException) { }
+        }
+        // a portable copy starts offline, on its own port, with its work folder on the drive
+        if (first && Paths.Portable)
+        {
+            Portable.FirstStart(s, Paths.AppData);
+            resave = true;
         }
         s.loading = false;
         if (resave) s.Save();

@@ -10,8 +10,9 @@ using static WinAIMagic.Core.Support.Lang;
 namespace WinAIMagic.App;
 
 /// <summary>The model's own browser window (Instellingen → Agent → Browser): WebView2 with cookies of its own in the app data
-/// folder, apart from Edge and Chrome. The user can watch it, and logs in there themselves. It comes to the front without taking
-/// the keyboard away from the chat.</summary>
+/// folder, apart from Edge and Chrome. It works in the background: the window starts minimized, in the taskbar, and comes forward
+/// only when the user has to act in it (a password, PIN or payment field: Reveal), without taking the keyboard away from the chat.
+/// Before, every page brought it over the chat (the owner on the Mac, 2026-11-16).</summary>
 public sealed class BrowserWindow(DispatcherQueue ui) : IBrowserHost
 {
     private Window? window;
@@ -45,6 +46,8 @@ public sealed class BrowserWindow(DispatcherQueue ui) : IBrowserHost
         window.Closed += (_, _) => { web = null; window = null; loading?.TrySetResult("the window was closed"); };
         // cookies of its own, kept between starts
         var env = await CoreWebView2Environment.CreateWithOptionsAsync(null, Path.Combine(Paths.AppData, "Browser"), new CoreWebView2EnvironmentOptions());
+        // in the taskbar, not over the chat
+        if (window.AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter p) p.Minimize(false);
         Show();
         await web.EnsureCoreWebView2Async(env);
         var c = web.CoreWebView2;
@@ -62,13 +65,22 @@ public sealed class BrowserWindow(DispatcherQueue ui) : IBrowserHost
         return c;
     }
 
+    /// <summary>The title of the page in the window's title (and the taskbar); the window stays where it is.</summary>
     private void Show()
     {
         if (window == null) return;
         var title = web?.CoreWebView2?.DocumentTitle;
         window.Title = L("Browser van het model") + (string.IsNullOrEmpty(title) ? "" : " · " + title);
-        window.AppWindow.Show(false);
     }
+
+    public void Reveal() => ui.TryEnqueue(() =>
+    {
+        if (window == null) return;
+        if (window.AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter p && p.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized)
+            p.Restore(false);
+        window.AppWindow.Show(false);
+        window.AppWindow.MoveInZOrderAtTop();
+    });
 
     public Task<string?> Open(Uri url) => OnUi(async () =>
     {

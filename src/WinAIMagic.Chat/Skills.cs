@@ -83,17 +83,20 @@ public static class Skills
         : L("Je hebt skills: instructies per onderwerp, met geteste commando's. Laad een skill met use_skill voordat je aan dat onderwerp werkt, en volg hem op:")
           + "\n" + string.Join("\n", skills.Select(s => $"- {s.Name}: {s.Description}"));
 
-    public static string Run(ToolCall call, IReadOnlyList<Skill>? skills = null)
+    public static string Run(ToolCall call, IReadOnlyList<Skill>? skills = null, int? limit = null)
     {
         skills ??= All;
         var name = (WorkspaceTools.Str(WorkspaceTools.Args(call), "name") ?? "").Trim();
-        if (skills.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) is { } found) return Text(found);
+        if (skills.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) is { } found) return Text(found, limit);
         return $"There is no skill named \"{name}\". Available: " + string.Join(", ", skills.Select(s => s.Name));
     }
 
     /// <summary>What the model reads of a skill. A user's skill says where its files are, so its scripts can be found; one written
-    /// for another platform (the Mac's) gets its Mac folder replaced by the real one and a note on what differs here.</summary>
-    public static string Text(Skill s)
+    /// for another platform (the Mac's) gets its Mac folder replaced by the real one and a note on what differs here. `limit`: the
+    /// most characters of the body the conversation can take. A longer skill keeps its start, then gets the headings of the rest and
+    /// where its file is, so the model reads the parts it needs (on the Mac a 71 KB C64 skill did not fit next to a question in a
+    /// 24-32K context: the engine refused the whole request).</summary>
+    public static string Text(Skill s, int? limit = null)
     {
         var body = s.Body;
         var head = $"# Skill: {s.Name}\n\n";
@@ -109,7 +112,25 @@ public static class Skills
                     + "emulator) may be installed elsewhere here or not at all: look for them before you use them.\n";
             head += "\n";
         }
+        if (limit is { } most && body.Length > most) body = Shortened(body, most, s.Folder is { } f ? Path.Combine(f, "SKILL.md") : null);
         return head + body;
+    }
+
+    public static string Shortened(string body, int limit, string? file)
+    {
+        var cut = body[..Math.Max(0, Math.Min(limit, body.Length))];
+        int end = cut.LastIndexOf('\n');
+        var kept = end >= 0 ? cut[..end] : cut;
+        var all = body[kept.Length..].Split('\n').Select(l => l.TrimEnd('\r')).Where(l => l.StartsWith('#')).ToList();
+        var headings = all.Take(80).Select(h => "  " + h).ToList();
+        if (all.Count > 80) headings.Add($"  … and {all.Count - 80} more headings");
+        var note = $"\n\n[This skill is longer than this conversation can hold: {kept.Length} of its {body.Length} characters are above.";
+        if (file != null)
+            note += $" The rest is in {file}. Read only the section you need with run_command, for example "
+                + $"`Select-String -Path '{file}' -Pattern '^#'` for the headings with their line numbers and "
+                + $"`Get-Content '{file}' | Select-Object -Skip (FROM-1) -First (TO-FROM+1)` for the lines between them.";
+        if (headings.Count > 0) note += " Headings in the part left out:\n" + string.Join("\n", headings);
+        return kept + note + "]";
     }
 
     private static readonly System.Text.RegularExpressions.Regex MacSkillFolder =

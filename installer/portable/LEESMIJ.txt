@@ -1,0 +1,50 @@
+WinAIMagic Portable
+===================
+
+Nederlands
+----------
+WinAIMagic Portable draait vanaf een USB-schijf, zonder installatie en zonder beheerdersrechten.
+
+1. Pak de zip uit en zet de map "WinAIMagic Portable" op de USB-schijf.
+2. Open WinAIMagic.exe in die map.
+
+Alles komt in de map WinAIMagic-data naast WinAIMagic.exe: modellen, gesprekken, wat de engine van een gesprek bewaart,
+de werkmap (Werkmap), documenten (Documenten), afbeeldingen (Afbeeldingen) en de instellingen. Op de pc zelf schrijft
+WinAIMagic Portable niets in AppData, Documenten, Afbeeldingen of het register. Windows zelf kan nog wel sporen
+bijhouden, zoals de lijst met onlangs geopende programma's.
+
+- Het start offline: zoeken op internet, de browser, mail, programma's bedienen, Telegram, de heartbeat en het
+  clusternetwerk staan uit tot je ze zelf aanzet. Die keuze blijft op de schijf.
+- Het gebruikt poort 8090, zodat het naast een geinstalleerde WinAIMagic kan draaien.
+- Linksboven staat "USB · <schijf>" in groen. Oranje betekent: de schijf kon niet beschreven worden, en de gegevens
+  staan op deze pc in %LOCALAPPDATA%\WinAIMagic Portable.
+- Een model laden vanaf een USB-stick duurt lang. Een snelle USB-SSD helpt.
+- Op een pc met een NVIDIA-kaart biedt de pagina Systeem het NVIDIA-pakket aan; dat komt dan ook op de schijf.
+- De programma's zijn niet digitaal ondertekend. Blokkeert je organisatie programma's zonder handtekening van een
+  USB-schijf (een regel van Microsoft Defender), dan start WinAIMagic Portable daar niet. Vraag dat na bij je IT-afdeling.
+- API-sleutels en wachtwoorden van connectors worden versleuteld voor de Windows-gebruiker die ze invoert. Op een andere
+  pc of als andere gebruiker moet je ze opnieuw invoeren.
+
+English
+-------
+WinAIMagic Portable runs from a USB drive, without installing and without administrator rights.
+
+1. Unzip it and put the folder "WinAIMagic Portable" on the USB drive.
+2. Open WinAIMagic.exe in that folder.
+
+Everything goes into the folder WinAIMagic-data next to WinAIMagic.exe: models, conversations, what the engine keeps of a
+conversation, the work folder (Werkmap), documents (Documenten), pictures (Afbeeldingen) and the settings. On the PC
+itself WinAIMagic Portable writes nothing in AppData, Documents, Pictures or the registry. Windows itself may still keep
+traces, such as the list of recently opened programs.
+
+- It starts offline: web search, the browser, mail, controlling programs, Telegram, the heartbeat and the cluster network
+  are off until you turn them on. That choice stays on the drive.
+- It uses port 8090, so it can run beside an installed WinAIMagic.
+- At the top left it says "USB · <drive>" in green. Orange means the drive could not be written, and the data is on this
+  PC in %LOCALAPPDATA%\WinAIMagic Portable.
+- Loading a model from a USB stick takes long. A fast USB SSD helps.
+- On a PC with an NVIDIA card the System page offers the NVIDIA pack; it then goes onto the drive too.
+- The programs are not digitally signed. If your organization blocks unsigned programs from a USB drive (a Microsoft
+  Defender rule), WinAIMagic Portable does not start there. Ask your IT department.
+- API keys and connector passwords are encrypted for the Windows user who enters them. On another PC, or as another user,
+  enter them again.

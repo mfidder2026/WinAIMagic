@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Lays out dist\\app (the published app with its engine folder) and builds the release files.
 
-    python scripts/package.py [--skip-publish] [--skip-setup] [--zip]
+    python scripts/package.py [--skip-publish] [--skip-setup] [--portable]
 
 Layout: dist\\app\\WinAIMagic.exe, dist\\app\\engine\\{tiered\\(serve, tools, bin), python\\, cuda\\, vulkan\\, cpu\\}.
 Everything the user needs comes along: no Python, Visual Studio or CUDA Toolkit on the target PC (brief §2.5).
@@ -11,7 +11,9 @@ Two files for a release, in dist\\ (one version of the app, on the owner's reque
   engine\\nvidia-pack.json, which names the second file. It installs over an older version.
 - WinAIMagic-NVIDIA-<v>.zip: those engines, which the app offers to download on a PC with an NVIDIA card. It must be attached to
   the release v<v>: the manifest points there.
---zip also builds WinAIMagic-<v>.zip, the same app to unzip, with its data beside it; it is not released.
+--portable (or --zip) also builds WinAIMagic-Portable-<v>.zip: WinAIMagic Portable, for a USB drive. The folder
+"WinAIMagic Portable" with the app (without the NVIDIA engines, which it offers to download like the setup does),
+portable.txt and LEESMIJ.txt; everything it writes goes into WinAIMagic-data beside WinAIMagic.exe.
 """
 import argparse
 import hashlib
@@ -223,19 +225,20 @@ def sha256(path):
 def portable(pack):
     v = version()
 
-    out = DIST / f"WinAIMagic-{v}.zip"
+    out = DIST / f"WinAIMagic-Portable-{v}.zip"
     print(">", out.name, flush=True)
+    folder = "WinAIMagic Portable/"
     left_out = [ENGINE / f for f in NVIDIA_FOLDERS]
     files = [p for p in sorted(APP.rglob("*")) if p.is_file() and not any(p.is_relative_to(d) for d in left_out)]
     stage = DIST / "portable-extra"
     shutil.rmtree(stage, ignore_errors=True)
     stage.mkdir(parents=True)
     (stage / "portable.txt").write_text(
-        "WinAIMagic\r\n\r\n"
-        "This file keeps settings, conversations and models in the folder 'data' next to WinAIMagic.exe.\r\n"
-        "Remove it and WinAIMagic uses %LOCALAPPDATA%\\WinAIMagic, like the installed version.\r\n", encoding="utf-8")
-    items = [(p, "WinAIMagic/" + p.relative_to(APP).as_posix()) for p in files]
-    items += [(stage / "portable.txt", "WinAIMagic/portable.txt")]
+        "WinAIMagic Portable\r\n\r\n"
+        "This file keeps everything WinAIMagic writes in the folder WinAIMagic-data next to WinAIMagic.exe:\r\n"
+        "settings, conversations, models, the work folder, documents and pictures. See LEESMIJ.txt.\r\n", encoding="utf-8")
+    items = [(p, folder + p.relative_to(APP).as_posix()) for p in files]
+    items += [(stage / "portable.txt", folder + "portable.txt"), (ROOT / "installer/portable/LEESMIJ.txt", folder + "LEESMIJ.txt")]
     zip_tree(out, items)
     shutil.rmtree(stage, ignore_errors=True)
     print(f"  {out.name}: {out.stat().st_size / 1e6:.0f} MB, sha256 {sha256(out)}")
@@ -245,7 +248,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-publish", action="store_true")
     ap.add_argument("--skip-setup", action="store_true")
-    ap.add_argument("--zip", action="store_true", help="also build the app as a zip (not released)")
+    ap.add_argument("--portable", "--zip", dest="zip", action="store_true", help="also build WinAIMagic Portable as a zip")
     a = ap.parse_args()
     APP.mkdir(parents=True, exist_ok=True)
     if not a.skip_publish:

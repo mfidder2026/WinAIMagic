@@ -325,6 +325,17 @@ public class LlamaEngineTests : EngineTest
         Settings.Shared.NgramMod = true;
         Settings.Shared.Mtp = false;
         Assert.DoesNotContain("draft-mtp", e.Arguments(new EngineStart(glm, new[] { "a" }, plan, Card)));
+        // MTP off: ngram-mod alone for a model that fits whole in VRAM + RAM (the Mac's ffff5ba)
+        Assert.True(plan.FitsInMemory);
+        var ngramAlone = e.Arguments(new EngineStart(glm, new[] { "a" }, plan, Card)).ToList();
+        Assert.Equal("ngram-mod", ngramAlone[ngramAlone.IndexOf("--spec-type") + 1]);
+        Assert.Single(ngramAlone, "--spec-type");
+        Settings.Shared.NgramMod = false;
+        Assert.DoesNotContain("--spec-type", e.Arguments(new EngineStart(glm, new[] { "a" }, plan, Card)));
+        Settings.Shared.NgramMod = true;
+        // a model that streams from the SSD gets none
+        var small = MemoryPlanner.Plan(TestModels.IndexOf(glm), SystemInfo.Simulated(FakeGpuBackend.Nvidia(8), 32, 10), 65_536, false);
+        if (!small.FitsInMemory) Assert.DoesNotContain("--spec-type", e.Arguments(new EngineStart(glm, new[] { "a" }, small, Card)));
         Settings.Shared.Mtp = true;
         var fileMtp = ModelCatalog.Shared.Model("qwen3.8-flash-next-q4")!;
         var qplan = MemoryPlanner.Plan(TestModels.IndexOf(fileMtp), SystemInfo.Simulated(FakeGpuBackend.Nvidia(16), 128, 10), 65_536, false);

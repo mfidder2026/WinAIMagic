@@ -1,7 +1,7 @@
 ---
 title: Aan de slag
 icon: Home
-keywords: begin eerste start installeren model downloaden engine starten
+keywords: begin eerste start installeren model downloaden engine starten usb portable draagbaar stick werklaptop
 ---
 WinAIMagic draait grote AI-modellen helemaal op deze pc. Er gaat niets naar de cloud: je vragen, bestanden en antwoorden blijven hier.
 
@@ -34,3 +34,10 @@ Het leest daarvoor zelf de hulp en kijkt hoe de app en deze pc ervoor staan. Zij
 - Rechtsboven staat **?**: dat opent de hulp bij het scherm dat open is.
 - **F1** doet hetzelfde vanuit elk scherm.
 - Typ in het zoekveld een woord, zoals "beheerder", "trager" of "taakbalk".
+
+## Vanaf een USB-schijf (Portable)
+**WinAIMagic Portable** is een aparte download (een zip) die zonder installatie en zonder beheerdersrechten van een USB-schijf draait. Pak de zip uit, zet de map **WinAIMagic Portable** op de schijf en open daar **WinAIMagic.exe**.
+- Alles komt in de map **WinAIMagic-data** naast de app: modellen, gesprekken, de werkmap, documenten, afbeeldingen en de instellingen. Op de pc zelf schrijft het niets in AppData, je eigen mappen of het register.
+- Het start offline: zoeken op internet, de browser, mail, programma's bedienen, Telegram, de heartbeat en het clusternetwerk staan uit tot je ze aanzet.
+- Het gebruikt poort 8090, zodat het naast een geïnstalleerde WinAIMagic kan draaien. Linksboven staat **USB · E:** in groen; oranje als de schijf niet beschreven kon worden en de gegevens op deze pc staan.
+- De programma's zijn niet ondertekend: blokkeert je organisatie programma's zonder handtekening van een USB-schijf, dan start het daar niet.

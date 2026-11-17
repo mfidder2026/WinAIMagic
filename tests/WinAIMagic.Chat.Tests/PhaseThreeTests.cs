@@ -138,6 +138,16 @@ public class ConcurrentChatTests : ChatTest
         Assert.Equal("Antwoord op: nog een vraag", LastAnswer(b.Id));
     }
 
+    /// <summary>The model forgot its last task_list call, and on the Mac the user saw 2 of 5 under a finished task.</summary>
+    [Fact]
+    public void AFinishedTaskTicksOffEveryStep()
+    {
+        Assert.Null(WorkSteps.Finished(null));
+        var done = WorkSteps.Finished([new WorkStep("a", "done"), new WorkStep("b", "doing"), new WorkStep("c", "todo")])!;
+        Assert.Equal(["a", "b", "c"], done.Select(s => s.Title));
+        Assert.All(done, s => Assert.True(s.IsDone));
+    }
+
     [Fact]
     public async Task TheModelsStepListIsKept()
     {
@@ -148,10 +158,12 @@ public class ConcurrentChatTests : ChatTest
         await Until(() => !chat.IsBusy(a.Id));
         var steps = store.Find(a.Id)!.Steps!;
         Assert.Equal(["Eerst kijken", "Dan bouwen", "Testen"], steps.Select(s => s.Title));
-        Assert.Equal(["done", "doing", "todo"], steps.Select(s => s.Status));
+        // the model set 1 of 3 done (the tool result below); the finished answer ticks off the rest
+        Assert.Equal(["done", "done", "done"], steps.Select(s => s.Status));
         var result = store.Find(a.Id)!.Messages.First(m => m.Role == ChatRole.Tool).Text;
         Assert.Contains("1 of 3 done", result);
         // a list that is not finished stays with the next question; a finished one goes
+        store.Update(a.Id, c => c.Steps = [new WorkStep("Eerst kijken", "done"), new WorkStep("Dan bouwen", "doing")]);
         chat.Send("hallo", [], a.Id, store, Base);
         await chat.Completion;
         Assert.NotNull(store.Find(a.Id)!.Steps);

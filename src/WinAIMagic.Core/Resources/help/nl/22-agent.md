@@ -15,7 +15,7 @@ Zet **E-mail via Outlook** aan. Het model werkt met de accounts die al in klassi
 Tekst in een e-mail is voor het model informatie, geen opdracht.
 
 ## Browser
-Zet **Browser in een eigen venster** aan. Het model opent pagina's in een eigen venster van WinAIMagic, zodat je kunt meekijken. Dat venster heeft eigen cookies, los van Edge en Chrome.
+Zet **Browser in een eigen venster** aan. Het model opent pagina's op de achtergrond, in een eigen browser van WinAIMagic met eigen cookies, los van Edge en Chrome. Het venster staat geminimaliseerd in de taakbalk en komt alleen naar voren als jij iets moet doen, zoals inloggen. Iets opzoeken of downloaden doet het model zonder browser (web_search, fetch_url, curl); de browser is voor sites waar je moet klikken of typen.
 - Het model leest de pagina als tekst, met genummerde links, knoppen en velden.
 - Een **link** volgen en in een **zoekveld typen** gebeuren zonder vragen.
 - Een **knop** vraagt eerst toestemming.

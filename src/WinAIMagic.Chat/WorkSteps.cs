@@ -72,6 +72,10 @@ public static class WorkSteps
         return $"Task list updated: {done} of {steps.Count} done" + (doing.Count == 0 ? "." : "; now: " + string.Join(", ", doing) + ".");
     }
 
+    /// <summary>The answer is finished (the model said KLAAR, or answered without announcing a next step): every step is done. Models
+    /// forget the last task_list call; on the Mac the user then saw 2 of 5 under a finished task.</summary>
+    public static List<WorkStep>? Finished(List<WorkStep>? steps) => steps?.Select(s => s with { Status = "done" }).ToList();
+
     /// <summary>After this many rounds of tools without task_list, the model is reminded of its list.</summary>
     public const int RemindAfter = 6;
 

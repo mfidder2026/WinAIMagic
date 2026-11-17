@@ -13,7 +13,8 @@ public static class Notifier
     public static void SetUp(AppState state)
     {
         app = state;
-        if (registered || Program.TestData) return;
+        // a portable copy registers nothing with Windows (it leaves no traces): its notices go through the tray icon
+        if (registered || Program.TestData || WinAIMagic.Core.Support.Paths.Portable) return;
         try
         {
             AppNotificationManager.Default.NotificationInvoked += (_, e) =>

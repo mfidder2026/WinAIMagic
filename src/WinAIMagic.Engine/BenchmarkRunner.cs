@@ -34,6 +34,10 @@ public sealed record BenchResult
     [JsonPropertyName("imageSeconds")] public double? ImageSeconds { get; init; }
     [JsonPropertyName("imageSize")] public string? ImageSize { get; init; }
     [JsonIgnore] public bool MakesImage => ImageSeconds != null;
+    /// <summary>The GPU's load (percent) just before the model started, with no engine running: another program's.</summary>
+    [JsonPropertyName("otherGPU")] public double? OtherGpu { get; init; }
+    /// <summary>Another program kept the GPU busy before the measurement: its speeds are too low.</summary>
+    [JsonIgnore] public bool SharedGpu => (OtherGpu ?? 0) >= BenchmarkRunner.OtherGpuBusy;
 }
 
 /// <summary>Runs the same measurement on each model in turn: start it, read a ~2.5K-token prompt, write 300 tokens.</summary>
@@ -72,6 +76,10 @@ public sealed class BenchmarkRunner
 
     public async Task Run(IEnumerable<string> ids, EngineHost host)
     {
+        // the comparison starts each model by choosing it; afterwards the user's own choice comes back (on the Mac it stayed on the
+        // last model measured: after a full run Ling-3.0-tiny was the chosen model and ran instead of the owner's own)
+        var chosen = host.SelectedModelId;
+        var wasRunning = host.Engine?.State.IsRunning == true ? host.Engine.Model?.Id : null;
         foreach (var id in ids)
         {
             var model = host.Store.Catalog.Model(id);
@@ -84,11 +92,19 @@ public sealed class BenchmarkRunner
             }
             SetStep("Engine starten…");
             var started = DateTime.UtcNow;
+            double? otherGpu = null;
             // an engine started with another choice of what to skip would measure that choice instead
             string running = (host.Engine as TieredEngine)?.SkipExpertsInUse ?? "off";
             if (host.Engine?.Model?.Id != id || host.Engine?.State.IsRunning != true || running != host.SkipExpertsFor(model))
             {
                 if (host.Engine != null) await host.Engine.StopAndWait();
+                // no engine runs now: what keeps the GPU busy is another program, and it makes this measurement too slow. Wait until
+                // it is quiet (the previous model unloading, a window settling), at most 20 s
+                SetStep("Wachten tot de GPU vrij is…");
+                otherGpu = await GpuLoadNow(host.Metrics);
+                for (int i = 0; i < 9 && otherGpu >= OtherGpuBusy; i++) otherGpu = await GpuLoadNow(host.Metrics);
+                SetStep("Engine starten…");
+                started = DateTime.UtcNow;
                 host.SelectedModelId = id;
                 started = DateTime.UtcNow;
                 host.StartEngine();
@@ -125,6 +141,7 @@ public sealed class BenchmarkRunner
                     CpuMoELayers = plan.CpuMoELayers,
                     ExpertCacheGb = plan.ExpertCache / 1e9,
                     SkipExperts = (host.Engine as TieredEngine)?.SkipExpertsInUse ?? "off",
+                    OtherGpu = otherGpu,
                 };
                 lock (gate) results.Add(r);
                 Save();
@@ -134,9 +151,37 @@ public sealed class BenchmarkRunner
                 SetStep("Fout: " + LogFilter.Clean(e.Message));
             }
         }
+        var back = AfterRun(chosen, wasRunning, host.Engine?.State.IsRunning == true ? host.Engine.Model?.Id : null);
+        if (back.Stop && host.Engine != null)
+        {
+            SetStep("Engine stoppen…");
+            await host.Engine.StopAndWait();
+        }
+        if (host.SelectedModelId != chosen) host.SelectedModelId = chosen;
+        if (back.Start) host.StartEngine();
         Running = null;
         SetStep("");
     }
+
+    /// <summary>From this GPU load (percent) with no engine running, the comparison waits, and then says the GPU was shared. The
+    /// Mac's numbers (M3 Max): idle 0-13%; the Claude app drawing a conversation 21-25%, and GLM Compact still wrote 23.9 tok/s;
+    /// a screen-control frame 65-97%, and it wrote 2.5. Not measured on a PC.</summary>
+    public const double OtherGpuBusy = 50;
+
+    /// <summary>The GPU's load over two seconds: the average of the live samples in that time (the busiest engine of the card, as
+    /// Task Manager shows it).</summary>
+    public static async Task<double> GpuLoadNow(LiveMetrics metrics)
+    {
+        var t0 = DateTime.Now;
+        await Task.Delay(TimeSpan.FromSeconds(2.2));
+        var during = metrics.Samples.Where(s => s.T >= t0).ToList();
+        return during.Count == 0 ? 0 : during.Average(s => s.Gpu);
+    }
+
+    /// <summary>What follows a comparison: a model the comparison left running stops, unless it is the user's own; the user's own
+    /// model starts again when it ran before the comparison.</summary>
+    public static (bool Stop, bool Start) AfterRun(string chosen, string? wasRunning, string? nowRunning) =>
+        (nowRunning != null && nowRunning != chosen, wasRunning == chosen && nowRunning != chosen);
 
     /// <summary>The same image on every PC: a fixed description and number, with loading. The chat engine stops first, as on the page.</summary>
     public const string ImagePrompt = "a lighthouse on a rocky coast at dusk, waves, photo";

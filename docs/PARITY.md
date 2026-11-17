@@ -1,6 +1,6 @@
-# Parity with MacAIMagic 1.14.13
+# Parity with MacAIMagic 1.14.16
 
-How this version relates to MacAIMagic at commit `16f91cd`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
+How this version relates to MacAIMagic at commit `7702cf5`, the last Mac commit taken over. [CLAUDE.md](../CLAUDE.md) says how to take over newer ones. Test cases are listed one by one in [PARITY-tests.md](PARITY-tests.md).
 
 ## Swift files and their counterparts
 
@@ -37,6 +37,28 @@ How this version relates to MacAIMagic at commit `16f91cd`, the last Mac commit 
 | `Support/Voice`, `ModernSpeech`, `AgentSettingsView` | `App/Speech`, `App/Microphone`, `Engine/SpeechEngine`, `Chat/Agent/SpeechText`, `App/Views/AgentTab` | Adapted: reading aloud with Windows' voices; speaking and Telegram voice messages through the speech engine with Whisper large-v3-turbo instead of SpeechAnalyzer, both on the PC |
 
 ## Taken over since the first port
+
+### Up to `7702cf5` (1.14.16): Qwen's sampling, trimmed tool output, ngram-mod without MTP, Compare, long skills, the browser in the background, Portable
+
+Measured on this PC (RTX 5060 Ti 16 GB, 128 GB RAM, the main engine of the package, temperature 0):
+- Ministral-3-8B Q4 whole on the card: a one-line change in a long file 67.6 tok/s plain, **477 tok/s with ngram-mod**, the same text; a story 69.7 either way, a rename everywhere 67 -> 65.
+- Qwen3.6-35B-A3B Q4 with the app's arguments (21 expert layers in RAM): story 34.6 plain, 35.3 with ngram-mod; the one-line change 35.3 plain, **45.2 with ngram-mod**, the same text. Unsloth's file with the MTP layer (sha256 as in the Mac's catalog): 38.6 (story) and 45.3 (change) with MTP 2 + ngram-mod.
+- `--poll 0` with Ministral on the card: no difference here; the engine used one core either way (69.7 tok/s).
+
+- **Taken over:**
+  - `f94d0df`: a finished answer (KLAAR, or no next step announced) ticks off every step of the list (`WorkSteps.Finished`). Tests: AFinishedTaskTicksOffEveryStep, TheModelsStepListIsKept (now all done). The blank chat was a SwiftUI LazyVStack problem; the WinUI list was not changed.
+  - `91cb8c8`: at 80% of the context old tool results (before the last 8 messages, longer than 1,200 characters) go to the model with their first 600 and last 200 characters, when that brings the conversation to half of the context; only otherwise the model summarizes (`ChatClient.TrimOldResults`, `ChatMessage.Trimmed`). Help (nl, en). Not run in a real full conversation.
+  - `d9c31a4`: for Qwen (the family of the model that answers, `ChatClient.ModelFamily`) top_p 0.95/0.8, top_k 20, min_p 0; reasoning_content of the steps since the last question with preserve_thinking false; "max" sent as "high". Conversations of 1.14.13 and older keep empty thinking (`Conversation.ThinkingKept` null). Tests: QwenRequestTests (EarlierThinkingGoesBackWhenKept, AnOlderConversationKeepsSendingEmptyThinking, MaximaalBecomesHighForQwen, QwenGetsItsOwnSampling). Answer quality not measured.
+  - `ffff5ba`, adapted: ngram-mod alone for a model without MTP (or with MTP off) that fits whole in VRAM + RAM (`plan.FitsInMemory`, no expert cache); the switch no longer greys out without MTP. Measured here, see above. Caption, help and translations without the Mac's "four times".
+  - `2144748`, `3b96e58`, `5a0f173`: Compare gives the user's own model back afterwards (`BenchmarkRunner.AfterRun`), and before each model, with no engine running, waits up to 20 s for the GPU (the busiest engine, as Task Manager counts it) to fall under 50%; a result measured with a busier GPU gets the warning under the table (`BenchResult.OtherGpu`). Tests: BenchmarkRestoreTests. The 50% is the Mac's; not measured on a PC, and not seen in the app.
+  - `b10dd36`, in part: a skill takes at most 0.8 characters per token of context; a longer one keeps its start, the headings of the rest (at most 80) and its file's path, with PowerShell commands to read a section (`Skills.Shortened`, also for skills the app loads by itself). Tests: SkillSizeTests. The KV per token of qwen35moe stays 16,000 here (measured on the 5060 Ti), not the Mac's 22,528.
+  - `4102c2e`: the model's browser window starts minimized in the taskbar and comes forward only at a password, PIN or payment field (`IBrowserHost.Reveal`); the instruction and browser_open steer looking up and downloading to web_search, fetch_url or curl. Help (nl, en, Agent). Not seen in the app.
+  - `7702cf5`, adapted: **WinAIMagic Portable** (`Support/Portable.cs`), on the `portable.txt` mode that was there. Everything in WinAIMagic-data beside the exe (or `data` of an older copy): settings, conversations, models, engine memory, Werkmap (the default work folder), Documenten, Afbeeldingen, the connectors' secrets (a DPAPI file instead of the Credential Manager). Offline at the first start (web search, browser, mail, controlling programs, Telegram, heartbeat, cluster network off), port 8090, no Windows notifications (the tray balloon instead), no Start with Windows, "USB · E:" in the sidebar (orange with the fallback to %LOCALAPPDATA%\WinAIMagic Portable when the drive cannot be written). `scripts/package.py --portable` builds WinAIMagic-Portable-<v>.zip with `installer/portable/LEESMIJ.txt`. Tests: PortableTests. Not done: signed binaries (no certificate), so Defender's rule against unsigned programs from USB blocks it where an organization turns that rule on; not run from a real USB drive; Windows itself still keeps traces such as recent programs.
+  - `35a22fd`, `bce4561`, `7702cf5`: version 1.14.16.
+- **Not taken over yet:**
+  - `6b9edcd`, `8274827`: Qwen3.6 and its Heretic with the MTP layer. Measured here (above): +9% on plain writing, nothing on code changes, for a 22.7 GB download for whoever has the file now. Left to the owner.
+  - `7b7fc7d`, `54ab91e`, `bb0eee7`: Qwen3.8-27B Q8 (29 GB, dense). On a 16 GB card most of it would run from RAM; not downloaded or measured. Left to the owner.
+- **Not needed:** `0bb8ac1` (`--poll 0`: no difference measured here; its GGUFIndex fix is the Mac's own code), `8d8aed2` (Finder icon), `16f91cd`'s successor in `f94d0df` (SwiftUI only), `55f6a34` and the background part of `5a0f173` (the Mac's glass and SwiftUI redraws; the WinUI background takes no live input unless "Bewegende achtergrond" is on, and the mark, ring and edge are composition animations), `d76b984` (the Mac considering 89f9784). Research only: `8ae899e`, `f475aa2`, `dd87fe2`, `cc99e37`, `dca4997`, `9971aaf`, `ae87d87`, `9df3a31`, `ce83263`, `f066f49`, `95f278c`, `9c3cb05`, `1e2d2c6`.
 
 ### Up to `16f91cd` (1.14.13): pictures that stay, a stopped answer kept, saves on the way, notes on repeated errors and rewrites
 

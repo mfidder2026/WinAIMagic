@@ -14,7 +14,7 @@ Een groot model hoeft hier niet helemaal in het geheugen te passen. Elke kaart z
 |---|---|
 | **Compact** | Kleiner gemaakt, zodat meer ervan in VRAM + RAM past. |
 | **Q4** | Dichter bij de originele gewichten, maar groter: de meest gebruikte experts staan op de videokaart, de rest in het RAM of op de SSD. |
-| **MTP** | GLM en Qwen raden de volgende tokens vooraf; dezelfde antwoorden, sneller schrijven. Aan/uit onder Instellingen → Engine. Daaronder **Herhaalde tekst sneller schrijven**: tekst die al in het gesprek staat, zoals code die het model aanpast, schrijft het in grote stukken tegelijk. |
+| **MTP** | GLM en Qwen raden de volgende tokens vooraf; dezelfde antwoorden, sneller schrijven. Aan/uit onder Instellingen → Engine. Daaronder **Herhaalde tekst sneller schrijven**: tekst die al in het gesprek staat, zoals code die het model aanpast, schrijft het in grote stukken tegelijk, ook bij de modellen zonder MTP (DeepSeek, Qwen3.6, Ministral, Ling), zolang het model helemaal in VRAM en RAM past. |
 
 ## Twee engines
 De **hoofdengine** verdeelt een groot model over VRAM, RAM en SSD. De **tweede engine** draait kleinere modellen, het snelle model en de beperkte modus op een pc met weinig VRAM.

@@ -22,7 +22,7 @@ Staat er nog geen model aan, dan start je vraag het vanzelf. Een ander model sta
 | L S U | De rechten in die map: lezen, schrijven, uitvoeren. |
 
 ## Context en samenvatten
-Bovenin het gesprek laat een meter zien hoeveel van de context het gesprek gebruikt. Bij 80% vat het model het begin samen; de berichten blijven zichtbaar. Met **Nu samenvatten** in de meter doe je dat zelf meteen.
+Bovenin het gesprek laat een meter zien hoeveel van de context het gesprek gebruikt. Bij 80% kort de app eerst lange oude uitvoer van gereedschap in (gelezen bestanden, uitvoer van commando's): het model krijgt daarvan het begin en het eind, de rest van het gesprek blijft woord voor woord. Is dat niet genoeg, dan vat het model het begin samen; de berichten blijven zichtbaar. Met **Nu samenvatten** in de meter doe je dat zelf meteen.
 
 ## Een antwoord in stappen
 Werkt het model in stappen (bestanden, opdrachten, het web), dan staat het hele antwoord in één kaart: elke gedachte, tekst en stap op de plek waar die kwam. Een gedachte is ingeklapt, met het begin ervan op één regel; terwijl het model nadenkt, zie je de laatste regels van wat het nu denkt. Tijdens het werk zie je de laatste 14 delen, met **eerdere stappen** voor de rest; alleen de nieuwste tekst staat er helemaal, van een eerdere zie je de eerste regels en **Toon alles**. Is het antwoord klaar, dan klapt al het werk voor de laatste tekst in tot één regel **Gedachtegang en N stappen**.

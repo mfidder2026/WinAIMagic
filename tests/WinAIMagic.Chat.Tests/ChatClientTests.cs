@@ -1457,9 +1457,9 @@ public class ConversationFileTests : ChatTest
         store.Save();
 
         var json = JsonNode.Parse(File.ReadAllText(Paths.ConversationsFile))![0]!;
-        foreach (var key in new[] { "id", "title", "messages", "workspace", "updated", "contextTokens", "summary", "summaryUpTo", "looksKept" })
+        foreach (var key in new[] { "id", "title", "messages", "workspace", "updated", "contextTokens", "summary", "summaryUpTo", "looksKept", "thinkingKept" })
             Assert.NotNull(json[key]);
-        Assert.Equal(9, json.AsObject().Count);
+        Assert.Equal(10, json.AsObject().Count);
         var m = json["messages"]![1]!;
         foreach (var key in new[] { "id", "role", "text", "reasoning", "attachments", "toolCalls", "activities", "sources", "tokensPerSecond", "promptTokensPerSecond", "error", "date", "automatic" })
             Assert.NotNull(m[key]);

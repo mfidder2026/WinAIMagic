@@ -14,8 +14,9 @@ public static class Paths
         {
             if (appData == null)
             {
-                appData = Portable ? Path.Combine(AppRoot, "data")
-                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WinAIMagic");
+                var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                if (Portable) (appData, PortableOnDrive) = Support.Portable.DataFolder(AppRoot, local);
+                else appData = Path.Combine(local, "WinAIMagic");
                 Directory.CreateDirectory(appData);
             }
             return appData;
@@ -23,9 +24,13 @@ public static class Paths
         set { appData = value; Directory.CreateDirectory(value); }
     }
 
-    /// <summary>The portable app: portable.txt beside WinAIMagic.exe keeps settings, conversations and models in a folder `data`
-    /// beside it, so the whole folder can move to another drive or PC. Documents and images still go to the user's own folders.</summary>
-    public static bool Portable => File.Exists(Path.Combine(AppRoot, "portable.txt"));
+    /// <summary>WinAIMagic Portable: portable.txt beside WinAIMagic.exe keeps everything in WinAIMagic-data beside it, documents and
+    /// images too, so the whole folder runs from a USB drive (Support.Portable).</summary>
+    public static bool Portable => Support.Portable.IsOn(AppRoot);
+
+    /// <summary>The portable app writes its data on its own drive; false when that drive could not be written and the data went
+    /// to %LOCALAPPDATA%\WinAIMagic Portable.</summary>
+    public static bool PortableOnDrive { get; private set; } = true;
 
     public static string DefaultModelsRoot => Path.Combine(AppData, "models");
 
@@ -65,15 +70,15 @@ public static class Paths
     {
         get
         {
-            var dir = Path.Combine(KnownDocuments(), "WinAIMagic");
+            var dir = Portable ? Path.Combine(AppData, "Documenten") : Path.Combine(KnownDocuments(), "WinAIMagic");
             Directory.CreateDirectory(dir);
             return dir;
         }
     }
 
     /// <summary>Pictures\WinAIMagic, where the images go; made when the first image is. A OneDrive redirection is followed here too.</summary>
-    public static string PicturesFolder =>
-        Path.Combine(Known(new Guid("33E28130-4E1E-4676-835A-98395C3BC3BB"), Environment.SpecialFolder.MyPictures), "WinAIMagic");
+    public static string PicturesFolder => Portable ? Path.Combine(AppData, "Afbeeldingen")
+        : Path.Combine(Known(new Guid("33E28130-4E1E-4676-835A-98395C3BC3BB"), Environment.SpecialFolder.MyPictures), "WinAIMagic");
 
     /// <summary>The folder of the installed app: the engine folder lies beside WinAIMagic.exe.</summary>
     public static string AppRoot => AppContext.BaseDirectory;

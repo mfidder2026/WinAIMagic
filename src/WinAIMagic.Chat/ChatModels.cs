@@ -55,6 +55,9 @@ public sealed class ChatMessage
     /// <summary>A picture the model looked at that an older version (up to 1.14.12) sent as a line of text: it stays text, so what
     /// the engine already read of the conversation does not change (Conversation.KeepLooksAsSent).</summary>
     public bool? LookAsText { get; set; }
+    /// <summary>A long tool result far back in a full conversation: the model gets only its start and end back
+    /// (ChatClient.TrimOldResults), so the conversation fits again without a summary.</summary>
+    public bool? Trimmed { get; set; }
     /// <summary>While the model writes a tool call: what it prepares ("Schrijft bestand demo.bas · 1.240 tekens"). Not saved.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public string? Preparing { get; set; }
 
@@ -96,9 +99,17 @@ public sealed class Conversation : IJsonOnDeserializing
     /// <summary>Every picture the model looks at stays a picture. null: a conversation of a version up to 1.14.12, which sent only
     /// the last 3 as pictures and the older ones as text.</summary>
     public bool? LooksKept { get; set; } = true;
+    /// <summary>The model's earlier thinking goes back with each earlier answer (Qwen: its template keeps it, as the model was
+    /// trained). null: a conversation of a version up to 1.14.13, which sent empty thinking; it stays so, or the first question after
+    /// the update would make the engine read the whole conversation again.</summary>
+    public bool? ThinkingKept { get; set; } = true;
 
-    // a saved conversation without the field is one of an older version: not the default of a new one
-    void IJsonOnDeserializing.OnDeserializing() => LooksKept = null;
+    // a saved conversation without these fields is one of an older version: not the default of a new one
+    void IJsonOnDeserializing.OnDeserializing()
+    {
+        LooksKept = null;
+        ThinkingKept = null;
+    }
 
     /// <summary>A conversation of an older version keeps sending its older looks as text, as that version last did: otherwise the
     /// first question after the update would read the whole conversation again (Qwen3.6 on the Mac, 149K tokens: 11 minutes). New
